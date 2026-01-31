@@ -1,0 +1,14 @@
+project_id = "your-project-id"
+backend = "postgres"
+
+[api]
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+shadow_port = 54322
+
+
+

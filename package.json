@@ -1,0 +1,29 @@
+{
+  "name": "chatbot-autoatendimento",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.json",
+    "reset-sessions": "tsx src/scripts/reset-sessions.ts",
+    "reset-session": "tsx src/scripts/reset-sessions.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "nodemailer": "^6.9.15",
+    "zod": "^3.23.8",
+    "undici": "^6.19.8",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "pino-pretty": "^11.2.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3"
+  }
+}
+
