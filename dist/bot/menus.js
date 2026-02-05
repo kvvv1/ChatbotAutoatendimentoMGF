@@ -24,7 +24,7 @@ export const messages = {
     otpAccepted: 'Verificação concluída com sucesso ✅',
     requireLogin: 'Você precisa estar logado para acessar esta opção.',
     requireLigacao: 'Selecione uma ligação primeiro.',
-    videoIntro: 'Preparamos um vídeo orientativo para apresentar os principais recursos do autoatendimento.',
+    videoIntro: '🎬 *Vídeo de teste*\n\nO vídeo orientativo oficial está em produção. Enquanto isso, segue um vídeo demonstrativo:',
     videoUnavailable: 'O vídeo orientativo está indisponível no momento. Tente novamente mais tarde.',
     humanContact: 'Encaminhando para atendimento humano. Em breve um atendente entrará em contato.',
     sessionExpired: '⏱️ Sua sessão foi finalizada por inatividade. Para continuar, envie uma nova mensagem.',

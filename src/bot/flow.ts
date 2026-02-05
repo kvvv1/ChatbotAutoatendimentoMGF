@@ -9,6 +9,7 @@ import { fetchConsumoByLigacao, type ConsumoLeitura } from '../company/consumo.j
 import { fetchDadosCadastraisByLigacao, type DadosCadastraisLigacao } from '../company/cadastro.js';
 import { fetchClienteByCpf, loginByIdEletronico } from '../company/cliente.js';
 import { isLinkApiConfigured, linkImpressaoConta } from '../company/linkApi.js';
+import { fetchDadosAutarquia, formatarTelefone } from '../company/autarquia.js';
 
 function onlyDigits(value: string): string {
   try {
@@ -210,6 +211,7 @@ export type BotReply =
       footer?: string;
     }
   | { type: 'audio'; audioUrl: string; viewOnce?: boolean; waveform?: boolean; delayTypingSeconds?: number }
+  | { type: 'video'; video: string; caption?: string; viewOnce?: boolean }
   | { type: 'document'; document: string; extension?: string; fileName?: string; caption?: string }
   | { type: 'location'; title: string; address: string; latitude: string; longitude: string };
 
@@ -336,7 +338,19 @@ export async function processMessage(
     // 0 - falar com atendente
     if (text === '0') {
       try {
-        replies.push(messages.humanContact);
+        // Tenta buscar telefone da autarquia
+        let telefoneMsg = '';
+        try {
+          const autarquia = await fetchDadosAutarquia(config);
+          if (autarquia.telefone) {
+            const telFormatado = formatarTelefone(autarquia.telefone);
+            telefoneMsg = `\n\n📞 Você também pode ligar para: *${telFormatado}*`;
+          }
+        } catch {
+          // Ignora erro - usa apenas a mensagem padrão
+        }
+        
+        replies.push(messages.humanContact + telefoneMsg);
         await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
       } catch (err) {
         // Mesmo se falhar ao salvar, retorna a resposta
@@ -722,11 +736,12 @@ export async function processMessage(
                 } else {
                   const intro = config.videoTutorialIntro?.trim() || messages.videoIntro;
                   replies.push(intro);
-                  const caption = config.videoTutorialCaption?.trim();
-                  if (caption) {
-                    replies.push(caption);
-                  }
-                  replies.push(`Acesse o vídeo: ${config.videoTutorialUrl}`);
+                  // Envia o vídeo diretamente via Z-API
+                  replies.push({
+                    type: 'video',
+                    video: config.videoTutorialUrl,
+                    caption: config.videoTutorialCaption?.trim() || undefined
+                  });
                 }
               } catch (err) {
                 replies.push(messages.videoUnavailable);
@@ -1072,10 +1087,20 @@ export async function processMessage(
                   break;
                 }
 
-                const title = config.atendimentoMapsTitle?.trim() || 'Atendimento presencial';
-                const address = config.atendimentoMapsAddress?.trim() || 'Endereço de atendimento';
+                // Busca endereço da autarquia para usar no pin
+                let enderecoAutarquia = '';
+                try {
+                  const autarquia = await fetchDadosAutarquia(config);
+                  if (autarquia.endereco) {
+                    enderecoAutarquia = autarquia.endereco;
+                  }
+                } catch {
+                  // Ignora erro - usa dados do .env
+                }
 
-                // Envia apenas a localização via Z-API
+                const title = config.atendimentoMapsTitle?.trim() || 'Atendimento presencial';
+                const address = enderecoAutarquia || config.atendimentoMapsAddress?.trim() || 'Endereço de atendimento';
+
                 replies.push({
                   type: 'location',
                   title,
