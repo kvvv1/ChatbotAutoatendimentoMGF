@@ -30,4 +30,22 @@ export class SupabaseSessionStore {
         if (error)
             throw error;
     }
+    async delete(phone) {
+        const supabase = getSupabaseAdmin(this.config);
+        const { error } = await supabase
+            .from('sessions')
+            .delete()
+            .eq('phone', phone);
+        if (error)
+            throw error;
+    }
+    async deleteAll() {
+        const supabase = getSupabaseAdmin(this.config);
+        const { error } = await supabase
+            .from('sessions')
+            .delete()
+            .neq('phone', ''); // Delete all (condition always true)
+        if (error)
+            throw error;
+    }
 }

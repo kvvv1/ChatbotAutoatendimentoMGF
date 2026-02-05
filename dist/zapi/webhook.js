@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ZapiClient } from './client.js';
-import { SupabaseSessionStore } from '../supabase/sessionStore.js';
+import { MemorySessionStore } from '../state/memorySessionStore.js';
 import { logAudit } from '../supabase/audit.js';
 import { hasActiveHumanTicket, logMessage } from '../supabase/messages.js';
 import { processMessage } from '../bot/flow.js';
@@ -17,7 +17,8 @@ const zapiWebhookSchema = z.object({
 }).passthrough();
 export async function registerZapiRoutes(app, config) {
     const zapi = new ZapiClient(config);
-    const sessionStore = new SupabaseSessionStore(config);
+    // Usa SessionStore em memória (não depende do Supabase)
+    const sessionStore = new MemorySessionStore();
     // Estruturas em memória para antiflood e dedupe
     const userLocks = new Map();
     const userQueues = new Map();
@@ -87,8 +88,19 @@ export async function registerZapiRoutes(app, config) {
                 payload?.button?.id,
                 payload?.message?.listResponse?.id,
                 payload?.listResponse?.id,
+                // Resposta de lista específica da Z-API
+                payload?.listResponseMessage?.id,
+                payload?.listResponseMessage?.selectedRowId,
+                payload?.listResponseMessage?.singleSelectReply?.selectedRowId,
+                payload?.listResponseMessage?.selected?.id,
+                payload?.listResponseMessage?.option?.id,
                 payload?.interactive?.buttonId,
                 payload?.message?.interactive?.buttonId,
+                // Resposta de botões específica da Z-API
+                payload?.buttonsResponseMessage?.id,
+                payload?.buttonsResponseMessage?.buttonId,
+                payload?.buttonsResponseMessage?.selectedId,
+                payload?.buttonsResponseMessage?.button?.id,
                 // List replies (variações camelCase/snake_case)
                 payload?.interactive?.listReply?.id,
                 payload?.interactive?.list_reply?.id,
@@ -108,7 +120,14 @@ export async function registerZapiRoutes(app, config) {
                 payload?.optionSelectedId,
                 payload?.selected?.id
             ];
-            const selectedId = selectedIdCandidates.find(v => typeof v === 'string' && v.trim().length > 0);
+            const rawSelectedId = selectedIdCandidates.find(v => {
+                if (typeof v === 'string')
+                    return v.trim().length > 0;
+                if (typeof v === 'number')
+                    return String(v).trim().length > 0;
+                return false;
+            });
+            const selectedId = rawSelectedId !== undefined ? String(rawSelectedId).trim() : undefined;
             const textRaw = payload?.text?.message ||
                 payload?.message?.text ||
                 payload?.text?.body ||
@@ -127,6 +146,15 @@ export async function registerZapiRoutes(app, config) {
                 payload?.message?.interactive?.list_reply?.title,
                 payload?.message?.optionListResponse?.title,
                 payload?.optionListResponse?.title,
+                // Título/label de resposta de lista da Z-API
+                payload?.listResponseMessage?.title,
+                payload?.listResponseMessage?.singleSelectReply?.title,
+                payload?.listResponseMessage?.selected?.title,
+                payload?.listResponseMessage?.option?.title,
+                // Título/label da resposta de botões da Z-API
+                payload?.buttonsResponseMessage?.title,
+                payload?.buttonsResponseMessage?.label,
+                payload?.buttonsResponseMessage?.text,
                 payload?.selected?.title,
                 payload?.message?.selected?.title,
                 payload?.message?.optionListResponse?.selected?.title,
@@ -157,20 +185,42 @@ export async function registerZapiRoutes(app, config) {
                 }
                 if (t.includes('minhas ligacoes') || t === 'minhas ligacoes')
                     return '1';
-                if (t.includes('debitos') && t.includes('faturas'))
+                // 2 - Emissão de 2ª via (antes: débitos / 2ª via / enviar fatura)
+                if (t.includes('emissao') &&
+                    (t.includes('2a') || t.includes('2 via') || t.includes('2a via') || t.includes('via')))
                     return '2';
-                if (t.includes('solicitar religacao') || t.includes('religacao'))
-                    return '3';
-                if (t.includes('acompanhar servico') || t.includes('acompanhar'))
+                if (t.includes('debitos') &&
+                    (t.includes('faturas') || t.includes('2a') || t.includes('2 via') || t.includes('2a via') || t.includes('via')))
+                    return '2';
+                if (t.includes('enviar fatura'))
+                    return '2';
+                // 4 - Solicitar serviços (religação)
+                if (t.includes('solicitar servicos') ||
+                    (t.includes('servicos') && t.includes('religacao')) ||
+                    t.includes('religacao'))
                     return '4';
+                // 4 - Acompanhar solicitações
+                if (t.includes('acompanhar') &&
+                    (t.includes('solicitacoes') || t.includes('pedido') || t.includes('protocolo')))
+                    return '4';
+                // 5 - Histórico de consumo e leituras
                 if (t.includes('consumo') && t.includes('leituras'))
                     return '5';
+                // 6 - Dados cadastrais da ligação
                 if (t.includes('dados cadastrais') || t.includes('cadastrais'))
                     return '6';
-                if (t.includes('atendimento presencial') || t.includes('presencial'))
+                // 7 - Localização para atendimento presencial
+                if (t.includes('atendimento presencial') || (t.includes('localizacao') && t.includes('presencial')))
                     return '7';
-                if (t.includes('video explicativo'))
+                // 9 / 10 - Vídeo orientativo/explicativo
+                if (t.includes('video') && (t.includes('orientativo') || t.includes('explicativo')))
+                    return '9';
+                // 10 - Ajuda (IA)
+                if (t.includes('ajuda') && t.includes('ia'))
                     return '10';
+                // 0 - Falar com atendente
+                if (t.includes('falar com atendente') || t.includes('atendente'))
+                    return '0';
                 return undefined;
             }
             let text = typeof selectedId === 'string' ? selectedId.trim() : '';
@@ -185,15 +235,17 @@ export async function registerZapiRoutes(app, config) {
             // Heurística: varre o payload procurando um título conhecido quando id/título/texto não vieram nos campos padrão
             if (!text) {
                 const knownLabels = [
+                    // Espelha exatamente os títulos usados em MENU_ITEMS em src/bot/flow.ts
                     { label: 'Minhas ligações', id: '1' },
-                    { label: 'Débitos e faturas', id: '2' },
-                    { label: 'Solicitar religação', id: '3' },
-                    { label: 'Acompanhar serviço', id: '4' },
-                    { label: 'Consumo e leituras', id: '5' },
-                    { label: 'Dados cadastrais', id: '6' },
-                    { label: 'Atendimento presencial', id: '7' },
-                    { label: '0) Vídeo explicativo', id: '10' },
-                    { label: 'Vídeo explicativo', id: '10' }
+                    { label: 'Emissão de 2ª via', id: '2' },
+                    { label: 'Solicitar serviços (ex.: religação)', id: '4' },
+                    { label: 'Acompanhar solicitações', id: '5' },
+                    { label: 'Histórico de consumo e leituras', id: '6' },
+                    { label: 'Dados cadastrais da ligação', id: '7' },
+                    { label: 'Localização para atendimento presencial', id: '8' },
+                    { label: 'Vídeo orientativo', id: '9' },
+                    { label: 'Ajuda (IA)', id: '10' },
+                    { label: 'Falar com atendente', id: '0' }
                 ];
                 const flatStrings = [];
                 const visited = new Set();
@@ -229,9 +281,11 @@ export async function registerZapiRoutes(app, config) {
                 // Loga chaves principais para diagnóstico rápido (sem payload completo)
                 try {
                     const msg = payload?.message ?? {};
+                    const listResp = payload?.listResponseMessage;
+                    const optionResp = payload?.optionListResponse;
                     const keys = Object.keys(payload || {});
                     const msgKeys = Object.keys(msg || {});
-                    request.log.warn({ phone, text, keys, msgKeys }, 'Mensagem inválida');
+                    request.log.warn({ phone, text, keys, msgKeys, listResponseMessage: listResp, optionListResponse: optionResp }, 'Mensagem inválida');
                 }
                 catch {
                     request.log.warn({ phone, text }, 'Mensagem inválida');
@@ -300,23 +354,45 @@ export async function registerZapiRoutes(app, config) {
                             catch { }
                         }
                         else if (out.type === 'buttons') {
-                            await zapi.sendButtons({ phone, text: out.text, buttons: out.buttons, footer: out.footer });
+                            const buttonsOut = out;
                             try {
-                                await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
+                                // Usa o endpoint /send-button-list da Z-API (atributo buttonList)
+                                request.log.info({ phone, buttons: buttonsOut.buttons, text: buttonsOut.text }, 'Enviando button-list');
+                                await zapi.sendButtonList({
+                                    phone,
+                                    message: buttonsOut.text,
+                                    buttons: (buttonsOut.buttons || []).map((b) => ({ id: b.id, label: b.text }))
+                                });
+                                request.log.info({ phone }, 'Button-list enviada com sucesso');
+                                try {
+                                    await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
+                                }
+                                catch { }
                             }
-                            catch { }
+                            catch (err) {
+                                request.log.error({ err, phone, buttons: buttonsOut.buttons, text: buttonsOut.text }, 'Erro ao enviar button-list, tentando fallback em texto numerado');
+                                // Fallback: envia como texto com opções numeradas para o usuário digitar 1, 2, etc.
+                                const buttonsText = (buttonsOut.buttons || [])
+                                    .map((b, idx) => `${idx + 1} - ${b.text}`)
+                                    .join('\n');
+                                await zapi.sendText({
+                                    phone,
+                                    message: `${buttonsOut.text}\n\n${buttonsText}\n\nDigite o número correspondente ou use os botões acima.`
+                                });
+                            }
                         }
                         else if (out.type === 'list') {
+                            const listOut = out;
                             // Converte lista com sections para optionList (send-option-list), que é o recomendado pela Z-API
                             const options = []
-                                .concat(...(out.sections || []).map(s => s.rows || []))
-                                .map(r => ({ id: r.id, title: r.title, description: r.description }));
+                                .concat(...(listOut.sections || []).map((s) => s.rows || []))
+                                .map((r) => ({ id: r.id, title: r.title, description: r.description }));
                             await zapi.sendOptionList({
                                 phone,
-                                message: out.text,
+                                message: listOut.text,
                                 optionList: {
-                                    title: (out.sections && out.sections[0]?.title) || 'Opções disponíveis',
-                                    buttonLabel: out.buttonText || 'Abrir lista',
+                                    title: (listOut.sections && listOut.sections[0]?.title) || 'Opções disponíveis',
+                                    buttonLabel: listOut.buttonText || 'Abrir lista',
                                     options
                                 }
                             });
@@ -325,14 +401,29 @@ export async function registerZapiRoutes(app, config) {
                             }
                             catch { }
                         }
+                        else if (out.type === 'copyCode') {
+                            const codeOut = out;
+                            await zapi.sendTextWithCode({
+                                phone,
+                                message: codeOut.message,
+                                code: codeOut.code,
+                                image: codeOut.image,
+                                buttonText: codeOut.buttonText
+                            });
+                            try {
+                                await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
+                            }
+                            catch { }
+                        }
                         else if (out.type === 'link') {
+                            const linkOut = out;
                             await zapi.sendLink({
                                 phone,
-                                message: out.message,
-                                image: out.image,
-                                linkUrl: out.linkUrl,
-                                title: out.title,
-                                linkDescription: out.linkDescription
+                                message: linkOut.message,
+                                image: linkOut.image,
+                                linkUrl: linkOut.linkUrl,
+                                title: linkOut.title,
+                                linkDescription: linkOut.linkDescription
                             });
                             try {
                                 await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
@@ -340,11 +431,28 @@ export async function registerZapiRoutes(app, config) {
                             catch { }
                         }
                         else if (out.type === 'video') {
+                            const videoOut = out;
                             await zapi.sendVideo({
                                 phone,
-                                video: out.video,
-                                caption: out.caption,
-                                viewOnce: out.viewOnce
+                                video: videoOut.video,
+                                caption: videoOut.caption,
+                                viewOnce: videoOut.viewOnce
+                            });
+                            try {
+                                await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
+                            }
+                            catch { }
+                        }
+                        else if (out.type === 'audio') {
+                            const audioOut = out;
+                            if (!audioOut.audioUrl)
+                                continue;
+                            await zapi.sendAudio({
+                                phone,
+                                audio: audioOut.audioUrl,
+                                viewOnce: audioOut.viewOnce,
+                                waveform: audioOut.waveform,
+                                delayTypingSeconds: audioOut.delayTypingSeconds
                             });
                             try {
                                 await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
@@ -352,10 +460,41 @@ export async function registerZapiRoutes(app, config) {
                             catch { }
                         }
                         else if (out.type === 'buttonActions') {
+                            const actionsOut = out;
                             await zapi.sendButtonActions({
                                 phone,
-                                message: out.message,
-                                buttonActions: out.buttonActions
+                                message: actionsOut.message,
+                                buttonActions: actionsOut.buttonActions
+                            });
+                            try {
+                                await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
+                            }
+                            catch { }
+                        }
+                        else if (out.type === 'document') {
+                            const docOut = out;
+                            if (!docOut.document)
+                                continue;
+                            await zapi.sendDocument({
+                                phone,
+                                document: docOut.document,
+                                extension: docOut.extension || 'pdf',
+                                fileName: docOut.fileName,
+                                caption: docOut.caption
+                            });
+                            try {
+                                await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
+                            }
+                            catch { }
+                        }
+                        else if (out.type === 'location') {
+                            const locOut = out;
+                            await zapi.sendLocation({
+                                phone,
+                                title: locOut.title,
+                                address: locOut.address,
+                                latitude: locOut.latitude,
+                                longitude: locOut.longitude
                             });
                             try {
                                 await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });

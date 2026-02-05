@@ -6,6 +6,16 @@ function generateOtpCode() {
     return String(n);
 }
 export async function createAndSendOtp(config, params) {
+    // Modo mock: não envia e-mail nem grava OTP, apenas registra auditoria
+    if (config.otpMock) {
+        await logAudit(config, {
+            whatsappPhone: params.phone ?? '',
+            cpf: params.cpf,
+            action: 'otp_sent_mock',
+            payload: { email: params.email }
+        });
+        return;
+    }
     const supabase = getSupabaseAdmin(config);
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + config.otpExpiresMinutes * 60 * 1000).toISOString();
@@ -27,6 +37,16 @@ export async function createAndSendOtp(config, params) {
     });
 }
 export async function verifyOtp(config, params) {
+    // Modo mock: sempre considera o código válido para facilitar testes
+    if (config.otpMock) {
+        await logAudit(config, {
+            whatsappPhone: '',
+            cpf: params.cpf,
+            action: 'otp_verified_mock',
+            payload: { email: params.email, code: params.code }
+        });
+        return true;
+    }
     const supabase = getSupabaseAdmin(config);
     // Busca o último OTP gerado para o CPF/e-mail
     const { data, error } = await supabase

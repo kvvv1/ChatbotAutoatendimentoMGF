@@ -1,15 +1,28 @@
 export type ConversationState =
   | { name: 'idle' }
+  | { name: 'awaiting_login_id' }
+  | { name: 'awaiting_confirm_id'; idEletronico: string }
   | { name: 'awaiting_login_cpf' }
   | { name: 'awaiting_confirm_cpf' ; cpf: string }
-  | { name: 'awaiting_login_email' ; cpf: string }
-  | { name: 'awaiting_confirm_email' ; cpf: string ; email: string }
-  | { name: 'awaiting_login_otp' ; cpf: string ; email: string }
-  | { name: 'main_menu' ; cpf: string ; email?: string ; ligacaoId?: string }
-  | { name: 'select_ligacao' ; cpf: string }
-  | { name: 'view_debitos' ; cpf: string ; ligacaoId: string }
-  | { name: 'request_servico' ; cpf: string ; ligacaoId: string ; servico: string }
-  | { name: 'acompanhar_servico' ; cpf: string ; protocolo: string };
+  | { name: 'awaiting_login_email' ; cpf?: string; idEletronico?: string }
+  | { name: 'awaiting_confirm_email' ; cpf?: string; idEletronico?: string; email: string }
+  | { name: 'awaiting_login_otp' ; cpf?: string; idEletronico?: string; email: string }
+  | { name: 'main_menu' ; cpf?: string; idEletronico?: string; nomeCliente?: string; email?: string ; imovelId?: number; ligacaoId?: string ; menuAudioPlayed?: boolean }
+  | { name: 'select_ligacao' ; cpf?: string; idEletronico?: string; nomeCliente?: string; email?: string ; menuAudioPlayed?: boolean }
+  | { name: 'view_debitos' ; cpf?: string; idEletronico?: string; imovelId?: number; ligacaoId?: string ; menuAudioPlayed?: boolean }
+  | { name: 'send_fatura' ; cpf?: string; idEletronico?: string; imovelId?: number; ligacaoId?: string ; menuAudioPlayed?: boolean }
+  | { name: 'request_servico' ; cpf?: string; idEletronico?: string; imovelId?: number; ligacaoId?: string ; servico: string ; menuAudioPlayed?: boolean }
+  | {
+      name: 'acompanhar_servico';
+      cpf?: string;
+      idEletronico?: string;
+      protocolo: string;
+      imovelId?: number;
+      ligacaoId?: string;
+      email?: string;
+      step?: 'waiting_protocolo' | 'after_status';
+      menuAudioPlayed?: boolean;
+    };
 
 export type Session = {
   phone: string;

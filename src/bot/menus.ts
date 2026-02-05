@@ -1,24 +1,24 @@
 export function mainMenu(): string {
   const lines: string[] = [];
-  lines.push('Toque na opção desejada ou digite o número correspondente:');
-  lines.push('1 - Minhas ligações');
-  lines.push('2 - Débitos e 2ª via');
-  lines.push('3 - Enviar fatura');
-  lines.push('4 - Solicitar serviços (ex. religação)');
-  lines.push('5 - Acompanhar solicitações');
-  lines.push('6 - Histórico de consumo e leituras');
-  lines.push('7 - Dados cadastrais da ligação');
-  lines.push('8 - Localização para atendimento presencial');
-  lines.push('9 - Vídeo orientativo');
-  lines.push('10 - Ajuda (IA)');
-  lines.push('0 - Falar com atendente');
+  lines.push('Toque na opção desejada:');
+  lines.push('1️⃣ Vídeo orientativo');
+  lines.push('2️⃣ Minhas ligações');
+  lines.push('3️⃣ Histórico de consumo e leituras');
+  lines.push('4️⃣ Emissão de 2ª via');
+  lines.push('5️⃣ Solicitar serviços (ex.: religação)');
+  lines.push('6️⃣ Acompanhar solicitações');
+  lines.push('7️⃣ Atualizar dados cadastrais');
+  lines.push('8️⃣ Localização para atendimento presencial');
+  lines.push('0️⃣ Falar com atendente');
   return lines.join('\n');
 }
 
 export const messages = {
-  welcome: 'Olá! 👋 Sou o chatbot de autoatendimento da Gestcom Informática. Para iniciar seu atendimento, vamos validar suas informações.',
-  askCpf: 'Informe seu CPF (apenas números).',
-  invalidCpf: 'CPF inválido. Tente novamente (somente números, 11 dígitos).',
+  welcome: 'Olá!  Sou o autoatendimento do SAAE de Sete Lagoas. Para iniciar seu atendimento, vamos validar suas informações.',
+  askIdEletronico: 'Informe seu *ID Eletrônico* (encontrado na sua conta de água).',
+  // askCpf: 'Informe seu CPF (apenas números).', // COMENTADO: Não é mais usado, login é por ID Eletrônico
+  invalidIdEletronico: 'ID Eletrônico inválido ou não encontrado. Verifique e tente novamente.',
+  // invalidCpf: 'CPF inválido. Tente novamente (somente números, 11 dígitos).', // COMENTADO
   askEmail: 'Informe seu e-mail cadastrado.',
   invalidEmail: 'E-mail inválido. Tente novamente.',
   otpSent: 'Um código de verificação foi enviado ao seu e-mail. Digite o código (6 dígitos).',
@@ -28,7 +28,10 @@ export const messages = {
   videoIntro: 'Preparamos um vídeo orientativo para apresentar os principais recursos do autoatendimento.',
   videoUnavailable: 'O vídeo orientativo está indisponível no momento. Tente novamente mais tarde.',
   humanContact: 'Encaminhando para atendimento humano. Em breve um atendente entrará em contato.',
-  sessionExpired: '⏱️ Sua sessão foi finalizada por inatividade. Para continuar, envie uma nova mensagem.'
+  sessionExpired: '⏱️ Sua sessão foi finalizada por inatividade. Para continuar, envie uma nova mensagem.',
+  clienteEncontrado: (nome: string) => `Olá, *${nome}*! 👋`,
+  selecioneImovel: 'Selecione o imóvel desejado:',
+  idEletronicoInserido: (id: string) => `ID Eletrônico inserido: *${id}*`
 };
 
 

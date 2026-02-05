@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
     "reset-sessions": "tsx src/scripts/reset-sessions.ts",
-    "reset-session": "tsx src/scripts/reset-sessions.ts"
+    "reset-session": "tsx src/scripts/reset-sessions.ts",
+    "set-audios": "tsx src/scripts/generate-audio-env.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

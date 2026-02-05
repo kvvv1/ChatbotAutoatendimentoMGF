@@ -49,6 +49,35 @@ export class ZapiClient {
     }
   }
 
+  async sendTextWithCode(params: {
+    phone: string;
+    message: string;
+    code: string;
+    image?: string;
+    buttonText?: string;
+    delayTypingSeconds?: number;
+  }): Promise<void> {
+    const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-text`;
+    const body: any = {
+      phone: String(params.phone).replace(/\D/g, ''),
+      message: String(params.message).trim(),
+      code: String(params.code),
+      delayTyping: params.delayTypingSeconds ?? 2
+    };
+    if (params.image) body.image = params.image;
+    if (params.buttonText) body.buttonText = String(params.buttonText).trim();
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Falha ao enviar mensagem com código: ${res.status} ${text}`);
+    }
+  }
+
   async sendButtons(params: {
     phone: string;
     text: string;
@@ -211,6 +240,31 @@ export class ZapiClient {
     }
   }
 
+  async sendAudio(params: {
+    phone: string;
+    audio: string; // URL do áudio ou base64 com prefixo data:audio/mpeg;base64,
+    viewOnce?: boolean;
+    waveform?: boolean;
+    delayTypingSeconds?: number;
+  }): Promise<void> {
+    const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-audio`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: JSON.stringify({
+        phone: String(params.phone).replace(/\D/g, ''),
+        audio: params.audio,
+        viewOnce: params.viewOnce ?? false,
+        waveform: params.waveform ?? true,
+        delayTyping: params.delayTypingSeconds ?? 2
+      })
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Falha ao enviar áudio: ${res.status} ${text}`);
+    }
+  }
+
   async sendButtonList(params: {
     phone: string;
     message: string;
@@ -220,8 +274,8 @@ export class ZapiClient {
   }): Promise<void> {
     const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-button-list`;
     const body: any = {
-      phone: params.phone,
-      message: params.message,
+      phone: String(params.phone).replace(/\D/g, ''),
+      message: String(params.message).trim(),
       buttonList: {
         buttons: params.buttons.map(b => ({ id: b.id, label: b.label }))
       }
@@ -229,14 +283,28 @@ export class ZapiClient {
     if (params.image) body.buttonList.image = params.image;
     if (params.video) body.buttonList.video = params.video;
 
+    // Log para debug do payload
+    console.log('Enviando button-list - Payload:', JSON.stringify(body, null, 2));
+
     const res = await fetch(url, {
       method: 'POST',
       headers: this.authHeaders(),
       body: JSON.stringify(body)
     });
+    const text = await res.text().catch(() => '');
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
       throw new Error(`Falha ao enviar button-list: ${res.status} ${text}`);
+    }
+    if (text) {
+      try {
+        const json = JSON.parse(text);
+        if (json.error) {
+          console.error('Erro da API ao enviar button-list:', json);
+          throw new Error(`Erro da API (button-list): ${json.error}`);
+        }
+      } catch {
+        // se não for JSON, apenas segue em frente
+      }
     }
   }
 
@@ -293,6 +361,84 @@ export class ZapiClient {
       throw new Error(`Falha ao enviar button-actions: ${res.status} ${text}`);
     }
   }
+
+  /**
+   * Envia um documento (PDF, DOC, etc) via Z-API
+   * Formato: POST /send-document/{extension}
+   * @param params.document - URL do documento ou base64 (com prefixo data:application/pdf;base64,...)
+   * @param params.extension - Extensão do arquivo (pdf, doc, xlsx, etc). Default: pdf
+   */
+  async sendDocument(params: {
+    phone: string;
+    document: string; // URL ou base64 com prefixo data:
+    extension?: string;
+    fileName?: string;
+    caption?: string;
+  }): Promise<void> {
+    const extension = params.extension || 'pdf';
+    const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-document/${extension}`;
+    
+    const body: any = {
+      phone: String(params.phone).replace(/\D/g, ''),
+      document: params.document
+    };
+    if (params.fileName) body.fileName = params.fileName;
+    if (params.caption) body.caption = params.caption;
+
+    console.log('[ZapiClient] Enviando documento para', params.phone, 'extension:', extension, 'fileName:', params.fileName);
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: JSON.stringify(body)
+    });
+    
+    const responseText = await res.text().catch(() => '');
+    
+    if (!res.ok) {
+      console.error('[ZapiClient] Erro ao enviar documento:', res.status, responseText);
+      throw new Error(`Falha ao enviar documento: ${res.status} ${responseText}`);
+    }
+    
+    console.log('[ZapiClient] Documento enviado com sucesso:', responseText);
+  }
+
+  /**
+   * Envia uma localização via Z-API
+   * POST /send-location
+   */
+  async sendLocation(params: {
+    phone: string;
+    title: string;
+    address: string;
+    latitude: string;
+    longitude: string;
+  }): Promise<void> {
+    const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-location`;
+    
+    const body = {
+      phone: String(params.phone).replace(/\D/g, ''),
+      title: params.title,
+      address: params.address,
+      latitude: params.latitude,
+      longitude: params.longitude
+    };
+
+    console.log('[ZapiClient] Enviando localização para', params.phone, 'title:', params.title);
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: JSON.stringify(body)
+    });
+    
+    const responseText = await res.text().catch(() => '');
+    
+    if (!res.ok) {
+      console.error('[ZapiClient] Erro ao enviar localização:', res.status, responseText);
+      throw new Error(`Falha ao enviar localização: ${res.status} ${responseText}`);
+    }
+    
+    console.log('[ZapiClient] Localização enviada com sucesso:', responseText);
+  }
 }
-
-
