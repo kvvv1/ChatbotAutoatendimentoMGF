@@ -5,7 +5,9 @@ import { ZapiClient } from './client.js';
 import { MemorySessionStore } from '../state/memorySessionStore.js';
 import { logAudit } from '../supabase/audit.js';
 import { hasActiveHumanTicket, logMessage } from '../supabase/messages.js';
+import { ensureOpenHumanTicket } from '../supabase/humanTickets.js';
 import { processMessage } from '../bot/flow.js';
+import { publishHumanEvent } from '../human/events.js';
 
 const zapiWebhookSchema = z.object({
   event: z.string().optional(),
@@ -76,10 +78,18 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
       const fromMe =
         (payload as any)?.fromMe === true ||
         (payload as any)?.message?.fromMe === true ||
-        (payload as any)?.key?.fromMe === true ||
-        (payload as any)?.owner === true;
+        (payload as any)?.key?.fromMe === true;
       if (fromMe) {
-        request.log.info('Mensagem do próprio bot detectada. Ignorando.');
+        request.log.info(
+          {
+            fromMe: (payload as any)?.fromMe,
+            messageFromMe: (payload as any)?.message?.fromMe,
+            keyFromMe: (payload as any)?.key?.fromMe,
+            owner: (payload as any)?.owner,
+            event: (payload as any)?.event
+          },
+          'Mensagem do próprio bot detectada. Ignorando.'
+        );
         return;
       }
 
@@ -88,7 +98,14 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         (payload as any)?.from ||
         (payload as any)?.phone ||
         (payload as any)?.phoneNumber ||
-        (payload as any)?.message?.from;
+        (payload as any)?.message?.from ||
+        (payload as any)?.sender?.phone ||
+        (payload as any)?.sender?.id ||
+        (payload as any)?.messages?.[0]?.from ||
+        (payload as any)?.messages?.[0]?.phone ||
+        (payload as any)?.messages?.[0]?.phoneNumber ||
+        (payload as any)?.messages?.[0]?.message?.from ||
+        (payload as any)?.messages?.[0]?.key?.remoteJid;
       const phone = typeof userPhoneRaw === 'string' ? userPhoneRaw.replace(/\D/g, '') : undefined;
 
       // Captura seleção interativa (botões/listas) em múltiplos formatos suportados pela Z-API
@@ -142,11 +159,20 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         (payload as any)?.message?.text ||
         (payload as any)?.text?.body ||
         (payload as any)?.message?.text?.body ||
+        (payload as any)?.message?.body ||
+        (payload as any)?.message?.extendedTextMessage?.text ||
+        (payload as any)?.message?.extendedText?.text ||
+        (payload as any)?.message?.conversation ||
         (payload as any)?.text ||
         (typeof (payload as any)?.message === 'string' ? (payload as any).message : null) ||
-        (payload as any)?.message?.conversation ||
         (payload as any)?.body ||
         (payload as any)?.messages?.[0]?.text?.body ||
+        (payload as any)?.messages?.[0]?.message?.text ||
+        (payload as any)?.messages?.[0]?.message?.text?.body ||
+        (payload as any)?.messages?.[0]?.message?.body ||
+        (payload as any)?.messages?.[0]?.message?.conversation ||
+        (payload as any)?.messages?.[0]?.message?.extendedTextMessage?.text ||
+        (payload as any)?.messages?.[0]?.message?.extendedText?.text ||
         (payload as any)?.messages?.[0]?.conversation;
 
       // Também tenta extrair título/nome da opção selecionada
@@ -182,6 +208,12 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
       function normalize(s: string): string {
         return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
       }
+      function isHumanRequestText(value: unknown): boolean {
+        if (typeof value !== 'string') return false;
+        const t = normalize(value);
+        if (!t) return false;
+        return t === '0' || t.includes('falar com atendente') || t.includes('com atendente') || t.includes('atendimento humano') || t.includes('atendente');
+      }
       function mapTitleToCommand(title: string): string | undefined {
         const t = normalize(title);
         if (/^\d+/.test(t)) {
@@ -194,64 +226,67 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
             return num;
           }
         }
-        if (t.includes('minhas ligacoes') || t === 'minhas ligacoes') return '1';
-        // 2 - Emissão de 2ª via (antes: débitos / 2ª via / enviar fatura)
+        // 2 - Minhas ligações
+        if (t.includes('minhas ligacoes') || t === 'minhas ligacoes') return '2';
+        // 4 - Emissão de 2ª via (antes: débitos / 2ª via / enviar fatura)
         if (
           t.includes('emissao') &&
           (t.includes('2a') || t.includes('2 via') || t.includes('2a via') || t.includes('via'))
-        ) return '2';
+        ) return '4';
         if (
           t.includes('debitos') &&
           (t.includes('faturas') || t.includes('2a') || t.includes('2 via') || t.includes('2a via') || t.includes('via'))
-        ) return '2';
-        if (t.includes('enviar fatura')) return '2';
-        // 4 - Solicitar serviços (religação)
+        ) return '4';
+        if (t.includes('enviar fatura')) return '4';
+        // 5 - Solicitar serviços (religação)
         if (
           t.includes('solicitar servicos') ||
           (t.includes('servicos') && t.includes('religacao')) ||
           t.includes('religacao')
-        ) return '4';
-        // 4 - Acompanhar solicitações
+        ) return '5';
+        // 6 - Acompanhar solicitações
         if (
           t.includes('acompanhar') &&
           (t.includes('solicitacoes') || t.includes('pedido') || t.includes('protocolo'))
-        ) return '4';
-        // 5 - Histórico de consumo e leituras
-        if (t.includes('consumo') && t.includes('leituras')) return '5';
-        // 6 - Dados cadastrais da ligação
-        if (t.includes('dados cadastrais') || t.includes('cadastrais')) return '6';
-        // 7 - Localização para atendimento presencial
-        if (t.includes('atendimento presencial') || (t.includes('localizacao') && t.includes('presencial'))) return '7';
-        // 9 / 10 - Vídeo orientativo/explicativo
-        if (t.includes('video') && (t.includes('orientativo') || t.includes('explicativo'))) return '9';
-        // 10 - Ajuda (IA)
-        if (t.includes('ajuda') && t.includes('ia')) return '10';
+        ) return '6';
+        // 3 - Histórico de consumo e leituras
+        if (t.includes('consumo') && t.includes('leituras')) return '3';
+        // 7 - Atualizar dados cadastrais
+        if (t.includes('dados cadastrais') || t.includes('cadastrais') || t.includes('atualizar dados')) return '7';
+        // 8 - Localização para atendimento presencial
+        if (t.includes('atendimento presencial') || (t.includes('localizacao') && t.includes('presencial'))) return '8';
+        // 1 - Vídeo orientativo/explicativo
+        if (t.includes('video') && (t.includes('orientativo') || t.includes('explicativo'))) return '1';
         // 0 - Falar com atendente
         if (t.includes('falar com atendente') || t.includes('atendente')) return '0';
         return undefined;
       }
 
-      let text = typeof selectedId === 'string' ? selectedId.trim() : '';
-      if (!text && typeof selectedTitle === 'string') {
+      let text = '';
+      if (typeof selectedTitle === 'string') {
         const mapped = mapTitleToCommand(selectedTitle);
         if (mapped) text = mapped;
       }
+      if (!text && typeof selectedId === 'string') {
+        text = selectedId.trim();
+      }
       if (!text && typeof textRaw === 'string') {
-        text = textRaw.trim();
+        const textRawTrimmed = textRaw.trim();
+        const mappedFromText = mapTitleToCommand(textRawTrimmed);
+        text = mappedFromText || textRawTrimmed;
       }
       // Heurística: varre o payload procurando um título conhecido quando id/título/texto não vieram nos campos padrão
       if (!text) {
         const knownLabels: Array<{ label: string; id: string }> = [
           // Espelha exatamente os títulos usados em MENU_ITEMS em src/bot/flow.ts
-          { label: 'Minhas ligações', id: '1' },
-          { label: 'Emissão de 2ª via', id: '2' },
-          { label: 'Solicitar serviços (ex.: religação)', id: '4' },
-          { label: 'Acompanhar solicitações', id: '5' },
-          { label: 'Histórico de consumo e leituras', id: '6' },
+          { label: 'Vídeo orientativo', id: '1' },
+          { label: 'Minhas ligações', id: '2' },
+          { label: 'Histórico de consumo e leituras', id: '3' },
+          { label: 'Emissão de 2ª via', id: '4' },
+          { label: 'Solicitar serviços (ex.: religação)', id: '5' },
+          { label: 'Acompanhar solicitações', id: '6' },
           { label: 'Dados cadastrais da ligação', id: '7' },
           { label: 'Localização para atendimento presencial', id: '8' },
-          { label: 'Vídeo orientativo', id: '9' },
-          { label: 'Ajuda (IA)', id: '10' },
           { label: 'Falar com atendente', id: '0' }
         ];
         const flatStrings: string[] = [];
@@ -281,7 +316,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
           }
         }
       }
-      if (!phone || !text) {
+      if (!phone) {
         // Loga chaves principais para diagnóstico rápido (sem payload completo)
         try {
           const msg = (payload as any)?.message ?? {};
@@ -296,14 +331,36 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         return;
       }
 
+      const messageType = String(
+        (payload as any)?.message?.type ||
+        (payload as any)?.type ||
+        (payload as any)?.messages?.[0]?.message?.type ||
+        ''
+      ).toLowerCase();
+      const mediaPlaceholder =
+        messageType.includes('audio') ? '[Audio recebido]' :
+        messageType.includes('image') ? '[Imagem recebida]' :
+        messageType.includes('video') ? '[Vídeo recebido]' :
+        messageType.includes('document') ? '[Documento recebido]' :
+        messageType.includes('sticker') ? '[Sticker recebido]' :
+        messageType.includes('location') ? '[Localização recebida]' :
+        '[Mensagem recebida]';
+
       await logAudit(config, {
         whatsappPhone: phone,
         action: 'message_received',
         payload: { payload }
       });
-      // Log opcional de mensagem de entrada
+      // Log opcional de mensagem de entrada (preferindo título/texto exibido ao usuário)
+      const displayContent =
+        (typeof selectedTitle === 'string' && selectedTitle.trim().length > 0)
+          ? selectedTitle.trim()
+          : (typeof textRaw === 'string' && textRaw.trim().length > 0)
+            ? textRaw.trim()
+            : text || mediaPlaceholder;
       try {
-        await logMessage(config, { phone, direction: 'in', content: text });
+        await logMessage(config, { phone, direction: 'in', content: displayContent });
+        publishHumanEvent({ type: 'message', phone, at: new Date().toISOString() });
       } catch (e) {
         request.log.warn({ err: e }, 'Falha ao logar mensagem de entrada');
       }
@@ -316,6 +373,21 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         }
       } catch (e) {
         request.log.warn({ err: e }, 'Falha na checagem de atendimento humano');
+      }
+
+      // Fallback simples: se o payload indicar pedido de atendente, garante ticket aberto.
+      try {
+        if (isHumanRequestText(selectedTitle) || isHumanRequestText(textRaw) || isHumanRequestText(text)) {
+          await ensureOpenHumanTicket(config, phone);
+        }
+      } catch (e) {
+        request.log.warn({ err: e, phone }, 'Falha ao garantir ticket humano pelo webhook');
+      }
+
+      // Sem texto/interação utilizável para bot: apenas registra no painel e encerra.
+      if (!text) {
+        request.log.info({ phone, messageType }, 'Mensagem registrada sem conteúdo textual para o bot.');
+        return;
       }
 
       // Idempotência / dedupe
@@ -356,6 +428,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
             if (typeof out === 'string') {
               await zapi.sendText({ phone, message: out });
               try { await logMessage(config, { phone, direction: 'out', content: out }); } catch {}
+              publishHumanEvent({ type: 'message', phone, at: new Date().toISOString() });
             } else if ((out as any).type === 'buttons') {
               const buttonsOut = out as any;
               try {

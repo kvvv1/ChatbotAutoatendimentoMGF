@@ -1,0 +1,113 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Painel de Atendimento Humano</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/painel-atendimento/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <header class="sidebar-header">
+        <h1>Conversas</h1>
+      </header>
+
+      <div class="sidebar-controls">
+        <label for="filter-status">Filtrar por status</label>
+        <select id="filter-status">
+          <option value="abertos">Abertos (pendentes + em atendimento)</option>
+          <option value="pendente">Pendentes</option>
+          <option value="em_atendimento">Em atendimento</option>
+          <option value="finalizado">Finalizados</option>
+          <option value="cancelado">Cancelados</option>
+          <option value="">Todos</option>
+        </select>
+        <label for="search-conversation">Buscar conversa</label>
+        <input
+          id="search-conversation"
+          type="search"
+          placeholder="Nome ou numero do cliente"
+          autocomplete="off"
+        />
+      </div>
+
+      <div id="tickets-list" class="tickets-list">
+        <div class="chat-empty">Carregando conversas...</div>
+      </div>
+    </aside>
+
+    <section class="conversation">
+      <header class="conversation-header">
+        <div id="chat-header-profile-trigger" class="chat-header-profile-trigger" title="Abrir detalhes da conversa" role="button" tabindex="0" aria-label="Abrir detalhes da conversa">
+          <div class="conversation-title-row">
+            <button id="mobile-back-button" class="mobile-back-button" type="button">Conversas</button>
+            <div id="chat-title" class="chat-title">Selecione uma conversa</div>
+          </div>
+          <div id="chat-subtitle" class="chat-subtitle">Nenhuma conversa ativa</div>
+          <div id="chat-attendant" class="chat-attendant">Atendente: -</div>
+        </div>
+
+        <div class="chat-status">
+          <label for="ticket-status">Status</label>
+          <div class="status-row">
+            <select id="ticket-status" disabled>
+              <option value="pendente">Pendente</option>
+              <option value="em_atendimento">Em atendimento</option>
+              <option value="finalizado">Finalizado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+            <button
+              id="notes-toggle-button"
+              class="notes-toggle-button"
+              type="button"
+              aria-label="Abrir anotacoes internas"
+              aria-controls="notes-panel"
+              aria-expanded="false"
+              disabled
+              title="Abrir anotacoes"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 3h14a2 2 0 0 1 2 2v14l-4-3H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <aside id="chat-profile-panel" class="chat-profile-panel" aria-label="Detalhes da conversa">
+        <header class="chat-profile-header">
+          <div class="chat-profile-title">Detalhes da conversa</div>
+          <button id="chat-profile-close" class="chat-profile-close" type="button" aria-label="Fechar detalhes">Fechar</button>
+        </header>
+        <div id="chat-profile-content" class="chat-profile-content">
+          <div class="chat-empty">Selecione uma conversa para ver os detalhes.</div>
+        </div>
+      </aside>
+
+      <div id="chat-messages" class="chat-messages">
+        <div class="chat-empty">Escolha uma conversa na coluna da esquerda.</div>
+      </div>
+
+      <footer class="chat-input">
+        <textarea id="message-input" placeholder="Digite uma mensagem" disabled></textarea>
+        <button id="send-button" disabled>Enviar</button>
+      </footer>
+
+      <section id="notes-panel" class="notes-panel collapsed" aria-label="Anotacoes internas">
+        <div class="notes-header">Anotacoes internas</div>
+        <div id="notes-list" class="notes-list">
+          <div class="notes-empty">Sem anotacoes para esta conversa.</div>
+        </div>
+        <div class="notes-input">
+          <textarea id="note-input" placeholder="Adicionar anotacao interna" disabled></textarea>
+          <button id="add-note-button" disabled>Salvar anotacao</button>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <script src="/painel-atendimento/app.js" defer></script>
+</body>
+</html>

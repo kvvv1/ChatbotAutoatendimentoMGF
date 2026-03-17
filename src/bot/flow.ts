@@ -10,6 +10,7 @@ import { fetchDadosCadastraisByLigacao, type DadosCadastraisLigacao } from '../c
 import { fetchClienteByCpf, loginByIdEletronico } from '../company/cliente.js';
 import { isLinkApiConfigured, linkImpressaoConta } from '../company/linkApi.js';
 import { fetchDadosAutarquia, formatarTelefone } from '../company/autarquia.js';
+import { ensureOpenHumanTicket } from '../supabase/humanTickets.js';
 
 function onlyDigits(value: string): string {
   try {
@@ -84,6 +85,25 @@ function isValidEmail(email: string): boolean {
   } catch {
     return false;
   }
+}
+
+function normalizeUserText(value: string): string {
+  try {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  } catch {
+    return (value || '').toLowerCase().trim();
+  }
+}
+
+function isHumanAttendantRequest(value: string): boolean {
+  const normalized = normalizeUserText(value || '');
+  if (!normalized) return false;
+  if (normalized === '0') return true;
+  if (normalized.includes('falar com atendente')) return true;
+  if (normalized.includes('com atendente')) return true;
+  if (normalized.includes('atendimento humano')) return true;
+  if (normalized === 'atendente' || normalized.includes('atendente')) return true;
+  return false;
 }
 
 async function sendLigacoesSelection(
@@ -335,10 +355,21 @@ export async function processMessage(
     const state = session.state || { name: 'idle' as const };
 
     // Comandos globais (processados antes da verificação de estado)
-    // 0 - falar com atendente
-    if (text === '0') {
+    // 0 - falar com atendente (cria/garante ticket humano no Supabase)
+    if (isHumanAttendantRequest(text)) {
       try {
-        // Tenta buscar telefone da autarquia
+        let protocoloMsg = '';
+        try {
+          const ticket = await ensureOpenHumanTicket(config, phone);
+          if (ticket) {
+            const shortId = ticket.id.slice(0, 8);
+            protocoloMsg = `\n\n🔢 Protocolo do atendimento humano: *${shortId}*`;
+          }
+        } catch {
+          // Falha ao registrar ticket não impede a mensagem ao usuário
+        }
+
+        // Tenta buscar telefone da autarquia para contato alternativo
         let telefoneMsg = '';
         try {
           const autarquia = await fetchDadosAutarquia(config);
@@ -349,11 +380,11 @@ export async function processMessage(
         } catch {
           // Ignora erro - usa apenas a mensagem padrão
         }
-        
-        replies.push(messages.humanContact + telefoneMsg);
+
+        replies.push(messages.humanContact + protocoloMsg + telefoneMsg);
         await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
-      } catch (err) {
-        // Mesmo se falhar ao salvar, retorna a resposta
+      } catch {
+        // Mesmo se falhar ao salvar sessão, retorna a resposta já montada
       }
       return replies;
     }

@@ -1,7 +1,10 @@
 import Fastify from 'fastify';
+import fastifyStatic from '@fastify/static';
+import path from 'node:path';
 import { loadConfig } from './config.js';
 import { registerZapiRoutes } from './zapi/webhook.js';
 import { ZapiClient } from './zapi/client.js';
+import { registerHumanRoutes } from './human/routes.js';
 async function bootstrap() {
     const config = loadConfig();
     const app = Fastify({
@@ -14,7 +17,13 @@ async function bootstrap() {
     app.get('/health', async () => {
         return { status: 'ok' };
     });
+    // Arquivos estáticos do painel de atendimento humano
+    await app.register(fastifyStatic, {
+        root: path.join(process.cwd(), 'painel-atendimento'),
+        prefix: '/painel-atendimento/'
+    });
     await registerZapiRoutes(app, config);
+    await registerHumanRoutes(app, config);
     // Endpoint auxiliar para testes manuais de envio via Z-API
     app.post('/test/send', async (request, reply) => {
         const body = request.body;
