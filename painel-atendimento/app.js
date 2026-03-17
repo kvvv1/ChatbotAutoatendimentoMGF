@@ -145,7 +145,6 @@ function initRealtimeStream() {
     lastRealtimeEventAt = Date.now();
 
     try {
-      // Atualiza chat aberto imediatamente; lista é atualizada em paralelo.
       if (currentTicket?.id) {
         await refreshCurrentTicket({ keepScroll: true });
       }
@@ -1201,15 +1200,12 @@ async function refreshPanel() {
 
 setInterval(() => {
   if (!isBootstrapped) return;
-  // Mantém fallback de polling mesmo com SSE conectado.
-  // Se eventos realtime não chegarem por qualquer motivo, ainda atualiza.
   if (realtimeConnected && Date.now() - lastRealtimeEventAt < 8000) return;
   refreshPanel().catch((err) => {
     console.error(err);
   });
 }, REFRESH_INTERVAL_MS);
 
-// Refresh dedicado da conversa aberta para manter chat responsivo.
 setInterval(() => {
   if (!isBootstrapped) return;
   if (document.hidden) return;
