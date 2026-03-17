@@ -1,0 +1,20 @@
+# Variáveis de ambiente (NUNCA subir ao GitHub)
+.env
+
+# Dependências
+node_modules/
+
+# Build
+dist/
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Arquivos temporários
+*.zip
+*.tmp
