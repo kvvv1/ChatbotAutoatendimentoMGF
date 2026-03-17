@@ -14,7 +14,7 @@ export function mainMenu(): string {
 }
 
 export const messages = {
-  welcome: 'Olá!  Sou o autoatendimento do SAAE de Sete Lagoas. Para iniciar seu atendimento, vamos validar suas informações.',
+  welcome: 'Olá!  Sou o autoatendimento do SAAE de Formiga. Para iniciar seu atendimento, vamos validar suas informações.',
   askIdEletronico: 'Informe seu *ID Eletrônico* (encontrado na sua conta de água).',
   // askCpf: 'Informe seu CPF (apenas números).', // COMENTADO: Não é mais usado, login é por ID Eletrônico
   invalidIdEletronico: 'ID Eletrônico inválido ou não encontrado. Verifique e tente novamente.',
