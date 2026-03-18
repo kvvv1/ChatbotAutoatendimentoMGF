@@ -256,16 +256,14 @@ const MENU_ITEMS = [
     { id: '2', title: '2️⃣ Minhas ligações' },
     { id: '3', title: '3️⃣ Histórico de consumo e leituras' },
     { id: '4', title: '4️⃣ Emissão de 2ª via' },
-    { id: '5', title: '5️⃣ Solicitar serviços (ex.: religação)' },
-    { id: '6', title: '6️⃣ Acompanhar solicitações' },
-    { id: '7', title: '7️⃣ Atualizar dados cadastrais' },
-    { id: '8', title: '8️⃣ Localização para atendimento presencial' },
+    { id: '5', title: '5️⃣ Atualizar dados cadastrais' },
+    { id: '6', title: '6️⃣ Localização para atendimento presencial' },
     { id: '0', title: '0️⃣ Falar com atendente' }
 ];
 function menuSections() {
     return [
-        { title: 'Autoatendimento', rows: MENU_ITEMS.slice(0, 7) },
-        { title: 'Outros serviços', rows: MENU_ITEMS.slice(7) }
+        { title: 'Autoatendimento', rows: MENU_ITEMS.slice(0, 6) },
+        { title: 'Outros serviços', rows: MENU_ITEMS.slice(6) }
     ];
 }
 function menuInteractive(prefix) {
@@ -970,17 +968,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                             }
                             break;
                         case '5':
-                            // 5️⃣ Solicitar serviços - API ainda não implementada
-                            replies.push('🛠️ *Solicitar Serviços*\n\nEsta opção estará disponível em breve! Enquanto isso, utilize nosso atendimento presencial ou telefônico.');
-                            showMenuAfter = true;
-                            break;
-                        case '6':
-                            // 6️⃣ Acompanhar solicitações - API ainda não implementada
-                            replies.push('📝 *Acompanhar Solicitações*\n\nEsta opção estará disponível em breve! Enquanto isso, utilize nosso atendimento presencial ou telefônico.');
-                            showMenuAfter = true;
-                            break;
-                        case '7':
-                            // 7️⃣ Atualizar dados cadastrais
+                            // 5️⃣ Atualizar dados cadastrais
                             try {
                                 const cpf = state?.cpf;
                                 const idEletronico = state?.idEletronico;
@@ -1016,8 +1004,8 @@ export async function processMessage(config, phone, text, sessionStore) {
                                 showMenuAfter = true;
                             }
                             break;
-                        case '8':
-                            // 8️⃣ Localização para atendimento presencial
+                        case '6':
+                            // 6️⃣ Localização para atendimento presencial
                             try {
                                 const hasLocation = config?.atendimentoMapsLatitude && config?.atendimentoMapsLongitude;
                                 if (!hasLocation) {
