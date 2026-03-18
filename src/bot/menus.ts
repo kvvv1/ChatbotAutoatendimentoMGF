@@ -5,8 +5,7 @@ export function mainMenu(): string {
   lines.push('2️⃣ Minhas ligações');
   lines.push('3️⃣ Histórico de consumo e leituras');
   lines.push('4️⃣ Emissão de 2ª via');
-  lines.push('5️⃣ Atualizar dados cadastrais');
-  lines.push('6️⃣ Localização para atendimento presencial');
+  lines.push('5️⃣ Localização para atendimento presencial');
   lines.push('0️⃣ Falar com atendente');
   return lines.join('\n');
 }

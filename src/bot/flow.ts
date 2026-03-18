@@ -287,15 +287,14 @@ const MENU_ITEMS: { id: string; title: string; description?: string }[] = [
   { id: '2', title: '2️⃣ Minhas ligações' },
   { id: '3', title: '3️⃣ Histórico de consumo e leituras' },
   { id: '4', title: '4️⃣ Emissão de 2ª via' },
-  { id: '5', title: '5️⃣ Atualizar dados cadastrais' },
-  { id: '6', title: '6️⃣ Localização para atendimento presencial' },
+  { id: '5', title: '5️⃣ Localização para atendimento presencial' },
   { id: '0', title: '0️⃣ Falar com atendente' }
 ];
 
 function menuSections(): { title: string; rows: { id: string; title: string; description?: string }[] }[] {
   return [
-    { title: 'Autoatendimento', rows: MENU_ITEMS.slice(0, 6) },
-    { title: 'Outros serviços', rows: MENU_ITEMS.slice(6) }
+    { title: 'Autoatendimento', rows: MENU_ITEMS.slice(0, 5) },
+    { title: 'Outros serviços', rows: MENU_ITEMS.slice(5) }
   ];
 }
 
@@ -1047,56 +1046,7 @@ export async function processMessage(
               }
               break;
             case '5':
-              // 7️⃣ Atualizar dados cadastrais
-              try {
-                const cpf = (state as any)?.cpf;
-                const idEletronico = (state as any)?.idEletronico;
-                const ligacaoId = (state as any)?.ligacaoId;
-
-                const isLoggedIn7 = (cpf && cpf.length === 11) || (idEletronico && idEletronico.length > 0);
-                if (!isLoggedIn7) {
-                  replies.push(messages.requireLogin);
-                  showMenuAfter = true;
-                  break;
-                }
-
-                if (!ligacaoId || typeof ligacaoId !== 'string') {
-                  const result = await sendLigacoesSelection(
-                    config,
-                    sessionStore,
-                    phone,
-                    replies,
-                    now,
-                    cpf,
-                    state,
-                    'Primeiro selecione a ligação que você deseja utilizar.'
-                  );
-                  if (result === 'none' || result === 'single' || result === 'error') {
-                    showMenuAfter = true;
-                  }
-                  break;
-                }
-
-                const linhas: string[] = [];
-                linhas.push('Para atualizar os dados cadastrais da sua ligação, preciso que você envie:');
-                linhas.push('');
-                linhas.push('- Foto de documento oficial com foto (RG ou CNH);');
-                linhas.push('- CPF do titular;');
-                linhas.push('- Matrícula do imóvel ou contrato de locação;');
-                linhas.push('- Número de telefone para contato atualizado.');
-                linhas.push('');
-                linhas.push('Envie as fotos e as informações nesta conversa.');
-                linhas.push('Assim que recebermos, um atendente irá analisar e concluir a atualização.');
-
-                replies.push(linhas.join('\n'));
-                showMenuAfter = true;
-              } catch {
-                replies.push('Não foi possível iniciar a atualização de dados cadastrais no momento.');
-                showMenuAfter = true;
-              }
-              break;
-            case '6':
-              // 6️⃣ Localização para atendimento presencial
+              // 5️⃣ Localização para atendimento presencial
               try {
                 const hasLocation = config?.atendimentoMapsLatitude && config?.atendimentoMapsLongitude;
 
