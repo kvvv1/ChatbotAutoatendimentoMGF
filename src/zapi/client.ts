@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { fetch } from 'undici';
 import type { AppConfig } from '../config.js';
 
@@ -28,6 +30,45 @@ export class ZapiClient {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.clientToken) headers['Client-Token'] = this.clientToken;
     return headers;
+  }
+
+  private guessMimeType(filePath: string, kind: 'audio' | 'video'): string {
+    const ext = path.extname(filePath).toLowerCase();
+    if (kind === 'audio') {
+      if (ext === '.mp3') return 'audio/mpeg';
+      if (ext === '.wav') return 'audio/wav';
+      if (ext === '.ogg') return 'audio/ogg';
+      if (ext === '.m4a') return 'audio/mp4';
+      return 'audio/mpeg';
+    }
+
+    if (ext === '.mp4') return 'video/mp4';
+    if (ext === '.mov') return 'video/quicktime';
+    if (ext === '.webm') return 'video/webm';
+    if (ext === '.avi') return 'video/x-msvideo';
+    return 'video/mp4';
+  }
+
+  private async resolveMediaInput(input: string, kind: 'audio' | 'video'): Promise<string> {
+    const value = String(input || '').trim();
+    if (!value) return value;
+
+    if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:')) {
+      return value;
+    }
+
+    let filePath = value;
+    if (value.startsWith('file://')) {
+      filePath = decodeURIComponent(value.slice('file://'.length));
+    }
+
+    const resolvedPath = path.isAbsolute(filePath)
+      ? filePath
+      : path.resolve(process.cwd(), filePath);
+
+    const buffer = await readFile(resolvedPath);
+    const mimeType = this.guessMimeType(resolvedPath, kind);
+    return `data:${mimeType};base64,${buffer.toString('base64')}`;
   }
 
   async sendText(payload: SendTextPayload): Promise<void> {
@@ -223,13 +264,14 @@ export class ZapiClient {
     caption?: string;
     viewOnce?: boolean;
   }): Promise<void> {
+    const video = await this.resolveMediaInput(params.video, 'video');
     const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-video`;
     const res = await fetch(url, {
       method: 'POST',
       headers: this.authHeaders(),
       body: JSON.stringify({
         phone: params.phone,
-        video: params.video,
+        video,
         caption: params.caption,
         viewOnce: params.viewOnce ?? false
       })
@@ -247,13 +289,14 @@ export class ZapiClient {
     waveform?: boolean;
     delayTypingSeconds?: number;
   }): Promise<void> {
+    const audio = await this.resolveMediaInput(params.audio, 'audio');
     const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-audio`;
     const res = await fetch(url, {
       method: 'POST',
       headers: this.authHeaders(),
       body: JSON.stringify({
         phone: String(params.phone).replace(/\D/g, ''),
-        audio: params.audio,
+        audio,
         viewOnce: params.viewOnce ?? false,
         waveform: params.waveform ?? true,
         delayTyping: params.delayTypingSeconds ?? 2

@@ -740,7 +740,11 @@ export async function processMessage(
             // Log do erro para debug
             const errorMessage = err instanceof Error ? err.message : String(err);
             console.error('[flow] Erro ao fazer login:', errorMessage);
-            replies.push(`Erro ao validar ID Eletrônico: ${errorMessage}`);
+            if (errorMessage.includes('404') || errorMessage.toLowerCase().includes('user not found')) {
+              replies.push(messages.invalidIdEletronico);
+            } else {
+              replies.push(`Erro ao validar ID Eletrônico: ${errorMessage}`);
+            }
             replies.push(messages.askIdEletronico);
             await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
           }

@@ -4,9 +4,6 @@
 # Dependências
 node_modules/
 
-# Build
-dist/
-
 # Arquivos de sistema
 .DS_Store
 Thumbs.db
