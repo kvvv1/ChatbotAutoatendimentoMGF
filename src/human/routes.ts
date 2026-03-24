@@ -220,15 +220,25 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
 
     if ((!apiProfile || !apiProfile.ligacoes.length) && idEletronico) {
       console.log('[profile] buscando via idEletronico:', idEletronico);
+      let loginResult: Awaited<ReturnType<typeof loginByIdEletronico>> | null = null;
       try {
-        const login = await loginByIdEletronico(config, idEletronico);
-        console.log('[profile] login imoveis:', JSON.stringify(login.imoveis));
+        loginResult = await loginByIdEletronico(config, idEletronico);
+        console.log('[profile] login ok, imoveis:', JSON.stringify(loginResult.imoveis));
+      } catch (err) {
+        console.error('[profile] erro no login:', err);
+      }
+
+      if (loginResult && loginResult.imoveis?.length) {
         const ligacoesById = await Promise.all(
-          (login.imoveis || []).slice(0, 5).map(async (imovel) => {
-            const cadastro = await fetchDadosCadastraisByImovelId(config, imovel.ImovelID).catch(() => null);
+          loginResult.imoveis.slice(0, 5).map(async (imovel) => {
+            const cadastro = await fetchDadosCadastraisByImovelId(config, imovel.ImovelID).catch((err) => {
+              console.error('[profile] erro ao buscar cadastro ImovelID', imovel.ImovelID, err);
+              return null;
+            });
+            console.log('[profile] cadastro ImovelID', imovel.ImovelID, ':', JSON.stringify(cadastro));
             return {
               id: String(imovel.ImovelID),
-              label: `Imóvel ${imovel.ImovelID}`,
+              label: imovel.Endereco || `Imóvel ${imovel.ImovelID}`,
               description: imovel.Endereco || undefined,
               cadastro
             };
@@ -239,13 +249,9 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
           cliente: apiProfile?.cliente || null,
           ligacoes: ligacoesById
         };
-      } catch {
+      } else {
         if (!apiProfile) {
-          apiProfile = {
-            idEletronico,
-            cliente: null,
-            ligacoes: []
-          };
+          apiProfile = { idEletronico, cliente: null, ligacoes: [] };
         }
       }
     }
