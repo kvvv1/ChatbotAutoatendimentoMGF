@@ -659,10 +659,6 @@ async function selectTicket(id, options = {}) {
   activeTicketRequest = controller;
 
   const run = async () => {
-    const previousScrollBottomOffset = keepScroll
-      ? chatMessagesEl.scrollHeight - chatMessagesEl.scrollTop
-      : 0;
-
     if (!silent && (!currentTicket || currentTicket.id !== id)) {
       chatMessagesEl.innerHTML = '<div class="chat-empty">Carregando conversa...</div>';
     }
@@ -672,6 +668,12 @@ async function selectTicket(id, options = {}) {
       retries: 1
     });
     if (seq !== selectTicketSeq) return;
+
+    // Captura posição APÓS o fetch para respeitar scroll feito pelo usuário durante a requisição
+    const previousScrollBottomOffset = keepScroll
+      ? chatMessagesEl.scrollHeight - chatMessagesEl.scrollTop
+      : 0;
+
     const ticketFromCache = ticketsCache.find((t) => t.id === id);
     currentTicket = { ...(ticketFromCache || {}), ...(json.ticket || {}) };
     currentMessages = Array.isArray(json.messages) ? json.messages : [];
