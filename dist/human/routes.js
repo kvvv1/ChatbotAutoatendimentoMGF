@@ -110,6 +110,7 @@ export async function registerHumanRoutes(app, config) {
         let idEletronico = null;
         try {
             const recent = await getMessagesByPhone(config, ticket.phone, { limit: 120 });
+            console.log('[profile] mensagens recentes:', recent.length);
             for (let i = recent.length - 1; i >= 0; i -= 1) {
                 const raw = String(recent[i]?.content || '');
                 const parsed = raw.trim().startsWith('{') ? (() => {
@@ -140,11 +141,13 @@ export async function registerHumanRoutes(app, config) {
                 if (idEletronico)
                     break;
             }
+            console.log('[profile] idEletronico extraído:', idEletronico);
         }
-        catch {
-            // noop
+        catch (err) {
+            console.error('[profile] erro ao extrair idEletronico:', err);
         }
         const cpf = (customer?.cpf || '').replace(/\D/g, '');
+        console.log('[profile] cpf:', cpf, '| customer:', customer?.id);
         if (cpf && cpf.length === 11) {
             try {
                 const clienteApi = await fetchClienteByCpf(config, cpf).catch(() => null);
@@ -172,8 +175,10 @@ export async function registerHumanRoutes(app, config) {
             }
         }
         if ((!apiProfile || !apiProfile.ligacoes.length) && idEletronico) {
+            console.log('[profile] buscando via idEletronico:', idEletronico);
             try {
                 const login = await loginByIdEletronico(config, idEletronico);
+                console.log('[profile] login imoveis:', JSON.stringify(login.imoveis));
                 const ligacoesById = await Promise.all((login.imoveis || []).slice(0, 5).map(async (imovel) => {
                     const cadastro = await fetchDadosCadastraisByImovelId(config, imovel.ImovelID).catch(() => null);
                     return {
