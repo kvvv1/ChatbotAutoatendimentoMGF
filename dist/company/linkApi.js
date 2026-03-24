@@ -116,9 +116,12 @@ export async function linkGetDadosCadastrais(config, imovelId) {
  * POST /Ultimas-Leituras
  */
 export async function linkGetUltimasLeituras(config, imovelId) {
-    return linkPost(config, '/Ultimas-Leituras', {
+    console.log('[linkApi] Buscando leituras para ImovelID:', imovelId);
+    const result = await linkPost(config, '/Ultimas-Leituras', {
         ImovelID: imovelId
     });
+    console.log('[linkApi] Resposta /Ultimas-Leituras:', JSON.stringify(result));
+    return result;
 }
 /**
  * Busca dados resumidos (consumos e total débitos)

@@ -244,9 +244,12 @@ export async function linkGetUltimasLeituras(
   config: AppConfig,
   imovelId: number
 ): Promise<LinkLeitura[]> {
-  return linkPost<LinkLeitura[]>(config, '/Ultimas-Leituras', {
+  console.log('[linkApi] Buscando leituras para ImovelID:', imovelId);
+  const result = await linkPost<LinkLeitura[]>(config, '/Ultimas-Leituras', {
     ImovelID: imovelId
   });
+  console.log('[linkApi] Resposta /Ultimas-Leituras:', JSON.stringify(result));
+  return result;
 }
 
 /**

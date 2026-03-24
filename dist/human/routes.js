@@ -12,7 +12,7 @@ const statusSchema = z.enum(['pendente', 'em_atendimento', 'finalizado', 'cancel
 export async function registerHumanRoutes(app, config) {
     const zapi = new ZapiClient(config);
     function extractIdEletronicoFromText(value) {
-        const m = String(value || '').match(/\b\d+@[A-Za-z]\b/);
+        const m = String(value || '').match(/\b\d+@[A-Za-z0-9]+\b/);
         return m ? m[0].trim() : null;
     }
     // Página HTML simples do painel

@@ -29,7 +29,7 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
   const zapi = new ZapiClient(config);
 
   function extractIdEletronicoFromText(value: string): string | null {
-    const m = String(value || '').match(/\b\d+@[A-Za-z]\b/);
+    const m = String(value || '').match(/\b\d+@[A-Za-z0-9]+\b/);
     return m ? m[0].trim() : null;
   }
 
