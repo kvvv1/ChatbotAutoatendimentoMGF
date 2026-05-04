@@ -57,6 +57,7 @@ let isRefreshingPanel = false;
 
 const DEFAULT_ATTENDANT_NAME = 'Atendente Humano';
 const ATTENDANT_STORAGE_KEY = 'human_panel_agent_name';
+const OPERATOR_CONTEXT_STORAGE_KEY = 'human_panel_operator_context';
 
 function normalizeApiBaseUrl(rawValue) {
   const raw = typeof rawValue === 'string' ? rawValue.trim() : '';
@@ -82,7 +83,69 @@ function apiUrl(path) {
   return API_BASE_URL + (suffix.startsWith('/') ? suffix : '/' + suffix);
 }
 
-const attendantFromUrl = new URLSearchParams(window.location.search).get('atendente');
+function parseBase64JsonToken(rawToken) {
+  if (!rawToken || typeof rawToken !== 'string') return null;
+  try {
+    const normalized = rawToken.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = normalized.length % 4;
+    const padded = padding ? normalized + '='.repeat(4 - padding) : normalized;
+    const jsonText = window.atob(padded);
+    const parsed = JSON.parse(jsonText);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeOperatorContext(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const nome = typeof raw.nome === 'string' ? raw.nome.trim() : '';
+  const email = typeof raw.email === 'string' ? raw.email.trim() : '';
+  const id = raw.id != null ? String(raw.id).trim() : '';
+  if (!nome && !email && !id) return null;
+  return { nome, email, id };
+}
+
+function saveOperatorContext(context) {
+  if (!context) return;
+  try {
+    window.localStorage.setItem(OPERATOR_CONTEXT_STORAGE_KEY, JSON.stringify(context));
+  } catch {}
+}
+
+function getOperatorContext() {
+  try {
+    const raw = window.localStorage.getItem(OPERATOR_CONTEXT_STORAGE_KEY);
+    if (!raw) return null;
+    return sanitizeOperatorContext(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function getOperatorHeaders() {
+  const ctx = getOperatorContext();
+  if (!ctx) return {};
+  const headers = {};
+  if (ctx.nome) headers['x-panel-operator-name'] = ctx.nome;
+  if (ctx.email) headers['x-panel-operator-email'] = ctx.email;
+  if (ctx.id) headers['x-panel-operator-id'] = ctx.id;
+  return headers;
+}
+
+const params = new URLSearchParams(window.location.search);
+const attendantFromUrl = params.get('atendente');
+const tokenFromUrl = params.get('token');
+
+const operatorFromToken = sanitizeOperatorContext(parseBase64JsonToken(tokenFromUrl));
+if (operatorFromToken) {
+  saveOperatorContext(operatorFromToken);
+  if (operatorFromToken.nome) {
+    window.localStorage.setItem(ATTENDANT_STORAGE_KEY, operatorFromToken.nome);
+  }
+}
+
 if (attendantFromUrl && attendantFromUrl.trim()) {
   window.localStorage.setItem(ATTENDANT_STORAGE_KEY, attendantFromUrl.trim());
 }
@@ -210,6 +273,7 @@ async function fetchJson(url, options = {}) {
         signal: fetchOptions.signal || controller.signal,
         cache: fetchOptions.cache || 'no-store',
         headers: {
+          ...getOperatorHeaders(),
           ...(fetchOptions.headers || {})
         }
       });
