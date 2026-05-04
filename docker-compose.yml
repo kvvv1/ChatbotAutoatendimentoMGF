@@ -1,6 +1,6 @@
 services:
   chatbot:
-    image: ${CHATBOT_IMAGE:-chatbot-autoatendimento}
+    image: ${CHATBOT_IMAGE:-registry.digitalocean.com/gestcom/chatbot:latest}
     container_name: chatbot-${MUNICIPIO:-municipio}
     restart: unless-stopped
     ports:
