@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import type { RowDataPacket } from 'mysql2/promise';
 import type { AppConfig } from '../config.js';
-import { getSupabaseAdmin } from '../supabase/client.js';
+import { getDb } from '../supabase/client.js';
 import { sendOtpEmail } from '../email/smtp.js';
 import { logAudit } from '../supabase/audit.js';
 
@@ -12,7 +14,6 @@ export async function createAndSendOtp(
   config: AppConfig,
   params: { phone?: string; cpf: string; email: string }
 ): Promise<void> {
-  // Modo mock: não envia e-mail nem grava OTP, apenas registra auditoria
   if (config.otpMock) {
     await logAudit(config, {
       whatsappPhone: params.phone ?? '',
@@ -23,18 +24,17 @@ export async function createAndSendOtp(
     return;
   }
 
-  const supabase = getSupabaseAdmin(config);
+  const pool = getDb(config);
   const code = generateOtpCode();
-  const expiresAt = new Date(Date.now() + config.otpExpiresMinutes * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + config.otpExpiresMinutes * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace('T', ' ');
 
-  const { error } = await supabase.from('otp_codes').insert({
-    phone: params.phone ?? null,
-    cpf: params.cpf,
-    email: params.email,
-    code,
-    expires_at: expiresAt
-  });
-  if (error) throw error;
+  await pool.query(
+    'INSERT INTO otp_codes (id, phone, cpf, email, code, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [randomUUID(), params.phone ?? null, params.cpf, params.email, code, expiresAt]
+  );
 
   await sendOtpEmail(config, { to: params.email, code, cpf: params.cpf });
   await logAudit(config, {
@@ -49,7 +49,6 @@ export async function verifyOtp(
   config: AppConfig,
   params: { cpf: string; email: string; code: string }
 ): Promise<boolean> {
-  // Modo mock: sempre considera o código válido para facilitar testes
   if (config.otpMock) {
     await logAudit(config, {
       whatsappPhone: '',
@@ -60,45 +59,39 @@ export async function verifyOtp(
     return true;
   }
 
-  const supabase = getSupabaseAdmin(config);
-  // Busca o último OTP gerado para o CPF/e-mail
-  const { data, error } = await supabase
-    .from('otp_codes')
-    .select('id, code, expires_at, used_at, attempts')
-    .eq('cpf', params.cpf)
-    .eq('email', params.email)
-    .order('created_at', { ascending: false })
-    .limit(1);
-  if (error) throw error;
-  if (!data || data.length === 0) return false;
+  const pool = getDb(config);
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT id, code, expires_at, used_at, attempts FROM otp_codes
+     WHERE cpf = ? AND email = ?
+     ORDER BY created_at DESC LIMIT 1`,
+    [params.cpf, params.email]
+  );
+  const list = rows as RowDataPacket[];
+  if (list.length === 0) return false;
 
-  const record = data[0] as any;
+  const record = list[0] as { id: string; code: string; expires_at: string | Date; used_at: string | Date | null; attempts: number };
   const now = new Date();
 
-  // Expirado ou já usado
   if (record.used_at) return false;
   if (new Date(record.expires_at).getTime() < now.getTime()) return false;
   if ((record.attempts ?? 0) >= config.otpMaxAttempts) return false;
 
   const isValid = String(record.code) === String(params.code);
+  const nowStr = now.toISOString().slice(0, 19).replace('T', ' ');
 
   if (isValid) {
-    const { error: updErr } = await supabase
-      .from('otp_codes')
-      .update({ used_at: now.toISOString(), attempts: (record.attempts ?? 0) + 1 })
-      .eq('id', record.id);
-    if (updErr) throw updErr;
+    await pool.query(
+      'UPDATE otp_codes SET used_at = ?, attempts = ? WHERE id = ?',
+      [nowStr, (record.attempts ?? 0) + 1, record.id]
+    );
     await logAudit(config, { whatsappPhone: '', cpf: params.cpf, action: 'otp_verified', payload: { email: params.email } });
     return true;
   } else {
-    const { error: incErr } = await supabase
-      .from('otp_codes')
-      .update({ attempts: (record.attempts ?? 0) + 1 })
-      .eq('id', record.id);
-    if (incErr) throw incErr;
+    await pool.query(
+      'UPDATE otp_codes SET attempts = ? WHERE id = ?',
+      [(record.attempts ?? 0) + 1, record.id]
+    );
     return false;
   }
 }
-
-
 

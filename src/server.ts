@@ -5,9 +5,16 @@ import { loadConfig } from './config.js';
 import { registerZapiRoutes } from './zapi/webhook.js';
 import { ZapiClient } from './zapi/client.js';
 import { registerHumanRoutes } from './human/routes.js';
+import { getDb } from './supabase/client.js';
+import { runMigrations } from './db/migrate.js';
 
 async function bootstrap(): Promise<void> {
   const config = loadConfig();
+
+  // Executa migrations automaticamente ao iniciar
+  const db = getDb(config);
+  await runMigrations(db);
+
   const app = Fastify({
     logger: {
       transport: process.env.NODE_ENV === 'production' ? undefined : {
@@ -18,6 +25,12 @@ async function bootstrap(): Promise<void> {
 
   app.get('/health', async () => {
     return { status: 'ok' };
+  });
+
+  // Redireciona raiz para o painel, preservando query string (?token= etc)
+  app.get('/', async (request, reply) => {
+    const qs = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
+    return reply.redirect(302, `/painel-atendimento/${qs}`);
   });
 
   // Arquivos estáticos do painel de atendimento humano

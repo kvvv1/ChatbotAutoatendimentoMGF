@@ -6,8 +6,11 @@ dotenvConfig({ path: 'docs/.env', override: false });
 
 export type AppConfig = {
   port: number;
-  supabaseUrl: string;
-  supabaseServiceRoleKey: string;
+  dbHost: string;
+  dbPort: number;
+  dbUser: string;
+  dbPassword: string;
+  dbDatabase: string;
   zapiBaseUrl: string;
   zapiInstanceId: string;
   zapiToken: string;
@@ -65,8 +68,11 @@ export type AppConfig = {
 export function loadConfig(): AppConfig {
   const {
     PORT,
-    SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY,
+    DB_SERVER,
+    DB_PORT,
+    DB_USER,
+    DB_PASSWORD,
+    DB_DATABASE,
     ZAPI_BASE_URL,
     ZAPI_INSTANCE_ID,
     ZAPI_TOKEN,
@@ -120,16 +126,21 @@ export function loadConfig(): AppConfig {
     DEMO_ID_ELETRONICO
   } = process.env;
 
-  if (!SUPABASE_URL) throw new Error('SUPABASE_URL não configurado');
-  if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY não configurado');
+  if (!DB_SERVER) throw new Error('DB_SERVER não configurado');
+  if (!DB_USER) throw new Error('DB_USER não configurado');
+  if (!DB_PASSWORD) throw new Error('DB_PASSWORD não configurado');
+  if (!DB_DATABASE) throw new Error('DB_DATABASE não configurado');
   if (!ZAPI_BASE_URL) throw new Error('ZAPI_BASE_URL não configurado');
   if (!ZAPI_INSTANCE_ID) throw new Error('ZAPI_INSTANCE_ID não configurado');
   if (!ZAPI_TOKEN) throw new Error('ZAPI_TOKEN não configurado');
 
   return {
     port: Number(PORT ?? 3000),
-    supabaseUrl: SUPABASE_URL,
-    supabaseServiceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+    dbHost: DB_SERVER,
+    dbPort: Number(DB_PORT ?? 3306),
+    dbUser: DB_USER,
+    dbPassword: DB_PASSWORD,
+    dbDatabase: DB_DATABASE,
     zapiBaseUrl: ZAPI_BASE_URL,
     zapiInstanceId: ZAPI_INSTANCE_ID,
     zapiToken: ZAPI_TOKEN,

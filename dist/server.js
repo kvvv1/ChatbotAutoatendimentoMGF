@@ -17,6 +17,15 @@ async function bootstrap() {
     app.get('/health', async () => {
         return { status: 'ok' };
     });
+    // Resposta amigavel na raiz para evitar confusao ao acessar o dominio da API no navegador.
+    app.get('/', async () => {
+        return {
+            service: 'chatbot-autoatendimento',
+            status: 'ok',
+            health: '/health',
+            panel: '/painel-atendimento/'
+        };
+    });
     // Arquivos estáticos do painel de atendimento humano
     await app.register(fastifyStatic, {
         root: path.join(process.cwd(), 'painel-atendimento'),

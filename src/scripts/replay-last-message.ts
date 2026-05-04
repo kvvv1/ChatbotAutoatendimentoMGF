@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { loadConfig } from '../config.js';
-import { getSupabaseAdmin } from '../supabase/client.js';
+import { getDb } from '../supabase/client.js';
+import type { RowDataPacket } from 'mysql2/promise';
 import { ZapiClient } from '../zapi/client.js';
 import { SupabaseSessionStore } from '../supabase/sessionStore.js';
 import { processMessage } from '../bot/flow.js';
@@ -17,40 +18,37 @@ async function replayLastMessage() {
 
     const phone = String(phoneArg).replace(/\D/g, '');
     if (!phone) {
-      console.error('Telefone inválido. Informe apenas números ou um número WhatsApp completo.');
+      console.error('Telefone invalido.');
       process.exit(1);
     }
 
-    console.log(`🔎 Buscando última mensagem de entrada para o telefone ${phone}...`);
+    console.log(`Buscando ultima mensagem de entrada para o telefone ${phone}...`);
 
     const config = loadConfig();
-    const supabase = getSupabaseAdmin(config);
+    const pool = getDb(config);
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, phone, direction, content, created_at')
-      .eq('phone', phone)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT id, phone, direction, content, created_at FROM messages WHERE phone = ? ORDER BY created_at DESC LIMIT 1',
+      [phone]
+    );
+    const list = rows as RowDataPacket[];
 
-    if (error) {
-      console.error('❌ Erro ao buscar mensagens:', error.message);
-      process.exit(1);
-    }
-
-    if (!data) {
-      console.log('ℹ️ Nenhuma mensagem encontrada para este telefone.');
+    if (list.length === 0) {
+      console.log('Nenhuma mensagem encontrada para este telefone.');
+      await pool.end();
       return;
     }
 
+    const data = list[0] as { id: string; phone: string; direction: string; content: string; created_at: string };
+
     if (data.direction !== 'in') {
-      console.log('ℹ️ A última mensagem já é de saída (do bot). Nada para reprocessar.');
+      console.log('A ultima mensagem ja e de saida (do bot). Nada para reprocessar.');
+      await pool.end();
       return;
     }
 
     const text = (data as any).content ?? '';
-    console.log(`📨 Reprocessando última mensagem de entrada: "${text}" (em ${data.created_at})`);
+    console.log(`Reprocessando ultima mensagem de entrada: "${text}" (em ${data.created_at})`);
 
     const sessionStore = new SupabaseSessionStore(config);
     const zapi = new ZapiClient(config);
@@ -58,11 +56,12 @@ async function replayLastMessage() {
     const replies = await processMessage(config, phone, text, sessionStore);
 
     if (!replies || replies.length === 0) {
-      console.log('ℹ️ Nenhuma resposta gerada pelo fluxo para esta mensagem.');
+      console.log('Nenhuma resposta gerada pelo fluxo para esta mensagem.');
+      await pool.end();
       return;
     }
 
-    console.log(`💬 Enviando ${replies.length} resposta(s) para o usuário...`);
+    console.log(`Enviando ${replies.length} resposta(s) para o usuario...`);
 
     for (const out of replies) {
       if (typeof out === 'string') {
@@ -144,9 +143,11 @@ async function replayLastMessage() {
       }
     }
 
-    console.log('✅ Reprocessamento concluído com sucesso.');
-  } catch (err: any) {
-    console.error('❌ Erro ao reprocessar última mensagem:', err?.message || err);
+    console.log('Reprocessamento concluido com sucesso.');
+    await pool.end();
+  } catch (err: unknown) {
+    const e = err as { message?: string };
+    console.error('Erro ao reprocessar ultima mensagem:', e?.message || err);
     process.exit(1);
   }
 }

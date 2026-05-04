@@ -1,4 +1,5 @@
 [build]
+  command = "npm run build:netlify"
   publish = "painel-atendimento"
 
 [[redirects]]
@@ -9,11 +10,5 @@
 [[redirects]]
   from = "/painel-atendimento/*"
   to = "/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/*"
-  to = "https://chatbotautoatendimentomgf.onrender.com/api/:splat"
   status = 200
   force = true

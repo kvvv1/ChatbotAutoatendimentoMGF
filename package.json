@@ -7,20 +7,22 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
+    "build:panel-config": "tsx src/scripts/generate-panel-config.ts",
+    "build:netlify": "npm run build:panel-config",
     "reset-sessions": "tsx src/scripts/reset-sessions.ts",
     "reset-session": "tsx src/scripts/reset-sessions.ts",
     "set-audios": "tsx src/scripts/generate-audio-env.ts",
     "set-video": "tsx src/scripts/generate-video-env.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.4",
+    "@fastify/static": "^7.0.1",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
-    "@fastify/static": "^7.0.1",
+    "mysql2": "^3.22.3",
     "nodemailer": "^6.9.15",
-    "zod": "^3.23.8",
+    "pino": "^9.5.0",
     "undici": "^6.19.8",
-    "pino": "^9.5.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.7.5",
@@ -29,4 +31,3 @@
     "typescript": "^5.6.3"
   }
 }
-

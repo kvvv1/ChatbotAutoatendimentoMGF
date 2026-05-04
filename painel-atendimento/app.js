@@ -58,6 +58,30 @@ let isRefreshingPanel = false;
 const DEFAULT_ATTENDANT_NAME = 'Atendente Humano';
 const ATTENDANT_STORAGE_KEY = 'human_panel_agent_name';
 
+function normalizeApiBaseUrl(rawValue) {
+  const raw = typeof rawValue === 'string' ? rawValue.trim() : '';
+  if (!raw) return '/api';
+
+  const withoutTrailingSlash = raw.replace(/\/+$/, '');
+  const normalized = /\/api$/i.test(withoutTrailingSlash)
+    ? withoutTrailingSlash
+    : withoutTrailingSlash + '/api';
+
+  if (/^https?:\/\//i.test(normalized) || normalized.startsWith('/')) {
+    return normalized;
+  }
+
+  return '/' + normalized;
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(window.APP_CONFIG?.apiBaseUrl);
+
+function apiUrl(path) {
+  const suffix = String(path || '');
+  if (!suffix) return API_BASE_URL;
+  return API_BASE_URL + (suffix.startsWith('/') ? suffix : '/' + suffix);
+}
+
 const attendantFromUrl = new URLSearchParams(window.location.search).get('atendente');
 if (attendantFromUrl && attendantFromUrl.trim()) {
   window.localStorage.setItem(ATTENDANT_STORAGE_KEY, attendantFromUrl.trim());
@@ -120,7 +144,7 @@ function initRealtimeStream() {
   }
 
   try {
-    realtimeStream = new EventSource('/api/human/stream');
+    realtimeStream = new EventSource(apiUrl('/human/stream'));
   } catch (err) {
     console.error(err);
     return;
@@ -329,7 +353,7 @@ async function loadAndRenderProfile(ticketId, force = false) {
 
   renderProfilePlaceholder('Carregando detalhes...');
   try {
-    const data = await fetchJson('/api/human-tickets/' + encodeURIComponent(ticketId) + '/profile', { retries: 1 });
+    const data = await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(ticketId) + '/profile'), { retries: 1 });
     profileCache.set(ticketId, data);
     if (currentTicket?.id === ticketId && profileOpen) {
       renderProfileData(data);
@@ -519,7 +543,7 @@ async function loadTickets(options = {}) {
     try {
       const status = statusFilterEl.value;
       const qs = status ? ('?status=' + encodeURIComponent(status)) : '';
-      const json = await fetchJson('/api/human-tickets' + qs, { retries: 1 });
+      const json = await fetchJson(apiUrl('/human-tickets' + qs), { retries: 1 });
       if (seq !== ticketsLoadSeq) return;
 
       ticketsCache = Array.isArray(json.data) ? json.data : [];
@@ -663,7 +687,7 @@ async function selectTicket(id, options = {}) {
       chatMessagesEl.innerHTML = '<div class="chat-empty">Carregando conversa...</div>';
     }
 
-    const json = await fetchJson('/api/human-tickets/' + encodeURIComponent(id), {
+    const json = await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(id)), {
       signal: controller.signal,
       retries: 1
     });
@@ -906,7 +930,7 @@ async function changeTicketStatus() {
   const newStatus = ticketStatusEl.value;
 
   try {
-    const json = await fetchJson('/api/human-tickets/' + encodeURIComponent(currentTicket.id) + '/status', {
+    const json = await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/status'), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
@@ -934,7 +958,7 @@ async function transferTicket() {
   setButtonBusy(transferButtonEl, true, 'Transferir', 'Transferindo...');
 
   try {
-    const json = await fetchJson('/api/human-tickets/' + encodeURIComponent(currentTicket.id) + '/assignee', {
+    const json = await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/assignee'), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assignedAttendant: target.trim() }),
@@ -961,7 +985,7 @@ async function closeTicketOneClick() {
   setButtonBusy(closeButtonEl, true, 'Encerrar', 'Encerrando...');
 
   try {
-    const json = await fetchJson('/api/human-tickets/' + encodeURIComponent(currentTicket.id) + '/status', {
+    const json = await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/status'), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'finalizado' }),
@@ -990,7 +1014,7 @@ async function addInternalNote() {
   setButtonBusy(addNoteButtonEl, true, 'Salvar anotacao', 'Salvando...');
 
   try {
-    await fetchJson('/api/human-tickets/' + encodeURIComponent(currentTicket.id) + '/notes', {
+    await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/notes'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1030,7 +1054,7 @@ async function sendMessage() {
   renderCurrentConversation();
 
   try {
-    await fetchJson('/api/human-tickets/' + encodeURIComponent(currentTicket.id) + '/send-message', {
+    await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/send-message'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text }),

@@ -22,6 +22,36 @@
 5. Webhook Z-API:
    - `POST /webhook/zapi` (configure na Z-API)
 
+### Multi-instância (rodando juntas)
+- A mesma imagem Docker pode atender varios municipios ao mesmo tempo.
+- Crie um arquivo por instancia (`.env.formiga`, `.env.sete-lagoas`, etc.) com portas diferentes.
+
+Para usar o login do registry da DigitalOcean deste projeto, utilize o config local em `.docker/config.json`:
+```powershell
+$env:DOCKER_CONFIG = "$PWD/.docker"
+docker pull registry.digitalocean.com/seu-registry/sua-imagem:tag
+```
+
+Exemplo (PowerShell), subindo duas instancias simultaneas:
+```powershell
+$env:ENV_FILE = ".env.formiga"
+docker compose --project-name chatbot-formiga up -d --build
+
+$env:ENV_FILE = ".env.sete-lagoas"
+docker compose --project-name chatbot-sete-lagoas up -d --build
+```
+
+Observacoes:
+- Cada `.env.*` precisa ter `PORT` diferente para evitar conflito.
+- O `container_name` ja usa `MUNICIPIO`, entao cada instancia fica identificada por municipio.
+
+### Netlify por instancia
+- O painel agora gera `painel-atendimento/config.js` no build com `PANEL_API_BASE_URL`.
+- Em cada site Netlify (um por municipio), configure:
+  - `PANEL_API_BASE_URL=https://chatbot.formiga.sistemagestcom.com.br` (exemplo)
+- Build command do Netlify: `npm run build:netlify`.
+- Assim o mesmo codigo do painel aponta para APIs diferentes sem alterar fonte.
+
 ### Supabase (migrar schema)
 - Com Supabase CLI: copie `supabase/` e rode:
   ```bash

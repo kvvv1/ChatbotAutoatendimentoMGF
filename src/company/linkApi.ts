@@ -108,6 +108,20 @@ export class LinkApiError extends Error {
   }
 }
 
+function getFetchCauseMessage(error: unknown): string {
+  try {
+    if (!error || typeof error !== 'object') return '';
+    const cause = (error as { cause?: unknown }).cause;
+    if (!cause || typeof cause !== 'object') return '';
+    const causeObj = cause as { code?: string; message?: string };
+    const code = causeObj.code ? ` (${causeObj.code})` : '';
+    const message = causeObj.message ? ` ${causeObj.message}` : '';
+    return `${code}${message}`.trim();
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Faz uma requisição POST para a API Link
  */
@@ -128,14 +142,21 @@ async function linkPost<T>(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     'Token': config.linkApiToken
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body)
-  });
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+  } catch (err) {
+    const causeDetails = getFetchCauseMessage(err);
+    throw new LinkApiError(`Falha de rede na API Link (${url}): ${err instanceof Error ? err.message : String(err)}${causeDetails ? ` | causa: ${causeDetails}` : ''}`);
+  }
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '');
@@ -169,13 +190,20 @@ async function linkGet<T>(
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     'Token': config.linkApiToken
   };
 
-  const res = await fetch(url, {
-    method: 'GET',
-    headers
-  });
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+  } catch (err) {
+    const causeDetails = getFetchCauseMessage(err);
+    throw new LinkApiError(`Falha de rede na API Link (${url}): ${err instanceof Error ? err.message : String(err)}${causeDetails ? ` | causa: ${causeDetails}` : ''}`);
+  }
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '');
