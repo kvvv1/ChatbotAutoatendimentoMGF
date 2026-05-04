@@ -63,6 +63,10 @@ export type AppConfig = {
   menuAudioUrl?: string;
   // Modo demonstração/simulação
   demoIdEletronico?: string;
+  // Evolution API (opcional, para suporte multi-canal)
+  evolutionBaseUrl?: string;
+  evolutionInstance?: string;
+  evolutionApiKey?: string;
 };
 
 export function loadConfig(): AppConfig {

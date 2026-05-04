@@ -19,9 +19,9 @@ export class EvolutionClient {
   private readonly apiKey: string;
 
   constructor(config: AppConfig) {
-    this.baseUrl = config.evolutionBaseUrl.replace(/\/+$/, '');
-    this.instance = config.evolutionInstance;
-    this.apiKey = config.evolutionApiKey;
+    this.baseUrl = (config.evolutionBaseUrl ?? '').replace(/\/+$/, '');
+    this.instance = config.evolutionInstance ?? '';
+    this.apiKey = config.evolutionApiKey ?? '';
   }
 
   private headers(): Record<string, string> {

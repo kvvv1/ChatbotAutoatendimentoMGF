@@ -66,6 +66,11 @@ export type LinkDadosCadastrais = {
   IDEletronico: string;
   EnderecoCorrespondencia: string;
   DCO: number;
+  // Campos opcionais para verificação de identidade
+  CPF?: string | number;
+  Celular?: string | number;
+  Telefone?: string | number;
+  Email?: string;
 };
 
 /** Leitura retornada pelo POST /Ultimas-Leituras */

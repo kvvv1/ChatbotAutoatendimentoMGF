@@ -1,3 +1,14 @@
+export type ChallengeOption = {
+  id: string;
+  text: string;
+};
+
+export type IdentityChallengeState = {
+  question: string;
+  options: ChallengeOption[];
+  correctId: string;
+};
+
 export type ConversationState =
   | { name: 'idle' }
   | { name: 'awaiting_login_id' }
