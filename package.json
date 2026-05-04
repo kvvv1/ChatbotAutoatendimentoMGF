@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
-    "build:panel-config": "tsx src/scripts/generate-panel-config.ts",
+    "build:panel-config": "node scripts/generate-panel-config.mjs",
     "build:netlify": "npm run build:panel-config",
     "reset-sessions": "tsx src/scripts/reset-sessions.ts",
     "reset-session": "tsx src/scripts/reset-sessions.ts",
