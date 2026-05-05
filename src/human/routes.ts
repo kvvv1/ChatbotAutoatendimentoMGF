@@ -22,6 +22,7 @@ import { fetchClienteByCpf, loginByIdEletronico } from '../company/cliente.js';
 import { fetchLigacoesByCpf } from '../company/ligacoes.js';
 import { fetchDadosCadastraisByImovelId, fetchDadosCadastraisByLigacao } from '../company/cadastro.js';
 import { publishHumanEvent, subscribeHumanEvents } from './events.js';
+import { getDb } from '../supabase/client.js';
 
 const statusSchema = z.enum(['pendente', 'em_atendimento', 'finalizado', 'cancelado', 'abertos']);
 
@@ -29,7 +30,7 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
   const zapi = new ZapiClient(config);
 
   function extractIdEletronicoFromText(value: string): string | null {
-    const m = String(value || '').match(/\b\d+@[A-Za-z]\b/);
+    const m = String(value || '').match(/\b\d+@[A-Za-z0-9]+\b/);
     return m ? m[0].trim() : null;
   }
 
@@ -395,5 +396,55 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
     publishHumanEvent({ type: 'ticket_update', phone: ticket.phone, at: new Date().toISOString() });
 
     return { note: created };
+  });
+
+  // ── Respostas Rápidas ─────────────────────────────────────────────────────
+  const { randomUUID } = await import('node:crypto');
+  const db = getDb(config);
+
+  app.get('/api/quick-replies', async (_request, reply: FastifyReply) => {
+    const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(
+      'SELECT id, titulo, conteudo, created_at, updated_at FROM quick_replies ORDER BY titulo ASC'
+    );
+    return { quickReplies: rows };
+  });
+
+  app.post('/api/quick-replies', async (request: FastifyRequest, reply: FastifyReply) => {
+    const body = request.body as { titulo?: string; conteudo?: string } | null;
+    const titulo = body?.titulo?.trim();
+    const conteudo = body?.conteudo?.trim();
+    if (!titulo || !conteudo) return reply.code(400).send({ error: 'titulo_e_conteudo_obrigatorios' });
+    const id = randomUUID();
+    await db.query(
+      'INSERT INTO quick_replies (id, titulo, conteudo) VALUES (?, ?, ?)',
+      [id, titulo, conteudo]
+    );
+    const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(
+      'SELECT id, titulo, conteudo, created_at, updated_at FROM quick_replies WHERE id = ?', [id]
+    );
+    return reply.code(201).send({ quickReply: (rows as any[])[0] });
+  });
+
+  app.put('/api/quick-replies/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { titulo?: string; conteudo?: string } | null;
+    const titulo = body?.titulo?.trim();
+    const conteudo = body?.conteudo?.trim();
+    if (!titulo || !conteudo) return reply.code(400).send({ error: 'titulo_e_conteudo_obrigatorios' });
+    await db.query(
+      'UPDATE quick_replies SET titulo = ?, conteudo = ?, updated_at = NOW(6) WHERE id = ?',
+      [titulo, conteudo, id]
+    );
+    const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(
+      'SELECT id, titulo, conteudo, created_at, updated_at FROM quick_replies WHERE id = ?', [id]
+    );
+    if (!(rows as any[]).length) return reply.code(404).send({ error: 'not_found' });
+    return { quickReply: (rows as any[])[0] };
+  });
+
+  app.delete('/api/quick-replies/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    await db.query('DELETE FROM quick_replies WHERE id = ?', [id]);
+    return { ok: true };
   });
 }

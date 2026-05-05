@@ -10,6 +10,7 @@ export type HumanTicket = {
   phone: string;
   status: HumanTicketStatus;
   assigned_attendant: string | null;
+  customer_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -93,14 +94,11 @@ function normalizeName(value: string): string {
 function extractNameFromGreetingText(text: string): string | null {
   const raw = String(text || '').trim();
   if (!raw) return null;
+  // Only match names wrapped in asterisks (e.g. "Olá, *THYAGO RAMOS*! 👋")
+  // The plain regex was removed because it incorrectly matched phrases like "boa tarde"
   const starred = raw.match(/ol[áa]\s*,?\s*\*+\s*([^*\n!,.]{2,80})\s*\*+/i);
   if (starred && starred[1]) {
     const n = normalizeName(starred[1]);
-    if (n) return n;
-  }
-  const plain = raw.match(/ol[áa]\s*,?\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' ]{1,80})[!,.]/i);
-  if (plain && plain[1]) {
-    const n = normalizeName(plain[1]);
     if (n) return n;
   }
   return null;
@@ -306,14 +304,12 @@ export async function listHumanTickets(
         if (msgTime > lastAgentOutAt) unreadCount += 1;
       }
 
-      const guessedName = guessCustomerNameFromMessages(msgs);
-
       return {
         ...t,
         customer_name:
+          (typeof t.customer_name === 'string' && t.customer_name.trim() ? t.customer_name.trim() : null) ??
           customerNameByPhone.get(t.phone) ??
           phoneVariants(t.phone).map((v) => customerNameByPhone.get(v)).find((n) => typeof n === 'string' && n.trim().length > 0) ??
-          guessedName ??
           null,
         last_message_preview: lastMessagePreview,
         last_message_at: lastMessageAt ?? t.created_at,
@@ -418,7 +414,8 @@ export async function updateHumanTicketStatus(
 
 export async function ensureOpenHumanTicket(
   config: AppConfig,
-  phone: string
+  phone: string,
+  customerName?: string | null
 ): Promise<HumanTicket | null> {
   try {
     const pool = getDb(config);
@@ -427,10 +424,21 @@ export async function ensureOpenHumanTicket(
       [phone]
     );
     const existing = existingRows as RowDataPacket[];
-    if (existing.length > 0) return existing[0] as unknown as HumanTicket;
+    if (existing.length > 0) {
+      const ticket = existing[0] as unknown as HumanTicket;
+      // Update name if we now have it and it wasn't set before
+      if (customerName && !ticket.customer_name) {
+        await pool.query('UPDATE human_tickets SET customer_name = ?, updated_at = NOW(6) WHERE id = ?', [customerName, ticket.id]);
+        ticket.customer_name = customerName;
+      }
+      return ticket;
+    }
 
     const newId = randomUUID();
-    await pool.query('INSERT INTO human_tickets (id, phone, status) VALUES (?, ?, ?)', [newId, phone, 'pendente']);
+    await pool.query(
+      'INSERT INTO human_tickets (id, phone, status, customer_name) VALUES (?, ?, ?, ?)',
+      [newId, phone, 'pendente', customerName ?? null]
+    );
     const [insertedRows] = await pool.query<RowDataPacket[]>('SELECT * FROM human_tickets WHERE id = ? LIMIT 1', [newId]);
     const inserted = insertedRows as RowDataPacket[];
     if (inserted.length === 0) return null;

@@ -271,9 +271,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         text = selectedId.trim();
       }
       if (!text && typeof textRaw === 'string') {
-        const textRawTrimmed = textRaw.trim();
-        const mappedFromText = mapTitleToCommand(textRawTrimmed);
-        text = mappedFromText || textRawTrimmed;
+        text = textRaw.trim();
       }
       // Heurística: varre o payload procurando um título conhecido quando id/título/texto não vieram nos campos padrão
       if (!text) {
@@ -346,23 +344,59 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         messageType.includes('location') ? '[Localização recebida]' :
         '[Mensagem recebida]';
 
+      // Tenta extrair URL real da mídia para exibição no painel
+      // Z-API envia imagens em payload.image.imageUrl e áudios em payload.audio.audioUrl
+      function extractMediaContent(): string | null {
+        if (messageType.includes('image')) {
+          const url =
+            (payload as any)?.image?.imageUrl ||
+            (payload as any)?.imageMessage?.imageUrl ||
+            (payload as any)?.message?.imageUrl ||
+            (payload as any)?.message?.image?.imageUrl;
+          if (typeof url === 'string' && url.startsWith('http')) {
+            const caption =
+              (payload as any)?.image?.caption ||
+              (payload as any)?.imageMessage?.caption ||
+              (payload as any)?.text?.message ||
+              '';
+            return JSON.stringify({ type: 'image', url, caption });
+          }
+        }
+        if (messageType.includes('audio')) {
+          const url =
+            (payload as any)?.audio?.audioUrl ||
+            (payload as any)?.audioMessage?.audioUrl ||
+            (payload as any)?.message?.audioUrl ||
+            (payload as any)?.message?.audio?.audioUrl;
+          if (typeof url === 'string' && url.startsWith('http')) {
+            return JSON.stringify({ type: 'audio', url });
+          }
+        }
+        return null;
+      }
+
       await logAudit(config, {
         whatsappPhone: phone,
         action: 'message_received',
         payload: { payload }
       });
-      // Log opcional de mensagem de entrada (preferindo título/texto exibido ao usuário)
-      const displayContent =
-        (typeof selectedTitle === 'string' && selectedTitle.trim().length > 0)
+
+      const mediaContent = extractMediaContent();
+      const displayContent = mediaContent ||
+        (typeof selectedTitle === 'string' && selectedTitle.trim().length > 0
           ? selectedTitle.trim()
           : (typeof textRaw === 'string' && textRaw.trim().length > 0)
             ? textRaw.trim()
-            : text || mediaPlaceholder;
+            : text || mediaPlaceholder);
       try {
         await logMessage(config, { phone, direction: 'in', content: displayContent });
         publishHumanEvent({ type: 'message', phone, at: new Date().toISOString() });
       } catch (e) {
         request.log.warn({ err: e }, 'Falha ao logar mensagem de entrada');
+      }
+
+      if (mediaContent) {
+        request.log.info({ phone, messageType }, 'Mídia recebida e registrada no painel.');
       }
 
       // Silenciar se houver atendimento humano ativo

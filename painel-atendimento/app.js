@@ -866,15 +866,14 @@ function renderMessages(messages) {
     originEl.className = 'msg-origin ' + origin.key;
     originEl.textContent = origin.label;
 
-    const textEl = document.createElement('div');
-    textEl.textContent = formatMessageContent(m);
+    const mediaEl = buildMessageMediaElement(m);
 
     const time = document.createElement('div');
     time.className = 'msg-time';
     time.textContent = formatDateTime(m.created_at);
 
     bubble.appendChild(originEl);
-    bubble.appendChild(textEl);
+    bubble.appendChild(mediaEl);
     bubble.appendChild(time);
 
     row.appendChild(bubble);
@@ -911,6 +910,56 @@ function renderNotes(notes) {
   });
 
   notesListEl.scrollTop = notesListEl.scrollHeight;
+}
+
+function buildMessageMediaElement(m) {
+  const raw = typeof m.content === 'string' ? m.content.trim() : '';
+  let parsed = null;
+  if (raw.startsWith('{')) {
+    try { parsed = JSON.parse(raw); } catch { parsed = null; }
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    const type = parsed.type;
+
+    if (type === 'image' && parsed.url) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-media-wrap';
+      const img = document.createElement('img');
+      img.className = 'msg-image';
+      img.src = parsed.url;
+      img.alt = parsed.caption || 'Imagem';
+      img.loading = 'lazy';
+      img.addEventListener('click', () => window.open(parsed.url, '_blank', 'noopener,noreferrer'));
+      wrap.appendChild(img);
+      if (parsed.caption) {
+        const cap = document.createElement('div');
+        cap.className = 'msg-caption';
+        cap.textContent = parsed.caption;
+        wrap.appendChild(cap);
+      }
+      return wrap;
+    }
+
+    if (type === 'audio' && parsed.url) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-media-wrap';
+      const audio = document.createElement('audio');
+      audio.className = 'msg-audio';
+      audio.controls = true;
+      audio.preload = 'metadata';
+      const source = document.createElement('source');
+      source.src = parsed.url;
+      audio.appendChild(source);
+      wrap.appendChild(audio);
+      return wrap;
+    }
+  }
+
+  // fallback: texto simples
+  const el = document.createElement('div');
+  el.textContent = formatMessageContent(m);
+  return el;
 }
 
 function formatMessageContent(m) {
@@ -1287,6 +1336,219 @@ async function refreshPanel() {
     isRefreshingPanel = false;
   }
 }
+
+// ── Respostas Rápidas ─────────────────────────────────────────────────────────
+const qrTriggerBtn = document.getElementById('quick-replies-btn');
+const qrPopover    = document.getElementById('quick-replies-popover');
+const qrSearch     = document.getElementById('qr-search');
+const qrListEl     = document.getElementById('qr-list');
+const qrEmptyEl    = document.getElementById('qr-empty');
+const qrManageBtn  = document.getElementById('qr-manage-btn');
+const qrModal      = document.getElementById('qr-modal');
+const qrModalClose = document.getElementById('qr-modal-close');
+const qrNewBtn     = document.getElementById('qr-new-btn');
+const qrManageList = document.getElementById('qr-manage-list');
+const qrEditModal  = document.getElementById('qr-edit-modal');
+const qrEditClose  = document.getElementById('qr-edit-close');
+const qrEditTitle  = document.getElementById('qr-edit-title');
+const qrTituloInput   = document.getElementById('qr-titulo-input');
+const qrConteudoInput = document.getElementById('qr-conteudo-input');
+const qrSaveBtn    = document.getElementById('qr-save-btn');
+const qrCancelBtn  = document.getElementById('qr-cancel-btn');
+
+let quickReplies = [];
+let qrEditingId = null;
+let qrSlashMode = false;
+
+async function loadQuickReplies() {
+  try {
+    const res = await fetch(`${window.APP_CONFIG?.apiBase || ''}/api/quick-replies`);
+    if (!res.ok) return;
+    const data = await res.json();
+    quickReplies = data.quickReplies || [];
+  } catch {}
+}
+
+function renderQrList(filter = '') {
+  const f = filter.toLowerCase().trim();
+  const filtered = f
+    ? quickReplies.filter(q => q.titulo.toLowerCase().includes(f) || q.conteudo.toLowerCase().includes(f))
+    : quickReplies;
+  qrListEl.innerHTML = '';
+  if (!filtered.length) {
+    qrEmptyEl.classList.remove('hidden');
+    return;
+  }
+  qrEmptyEl.classList.add('hidden');
+  filtered.forEach((q, idx) => {
+    const li = document.createElement('li');
+    li.dataset.id = q.id;
+    li.innerHTML = `<div class="qr-titulo">/${q.titulo}</div><div class="qr-preview">${q.conteudo}</div>`;
+    li.addEventListener('click', () => insertQuickReply(q.conteudo));
+    qrListEl.appendChild(li);
+  });
+}
+
+function insertQuickReply(conteudo) {
+  if (qrSlashMode) {
+    const val = messageInputEl.value;
+    const slashIdx = val.lastIndexOf('/');
+    messageInputEl.value = slashIdx >= 0 ? val.slice(0, slashIdx) + conteudo : conteudo;
+  } else {
+    const cur = messageInputEl.value;
+    messageInputEl.value = cur ? cur + '\n' + conteudo : conteudo;
+  }
+  closeQrPopover();
+  messageInputEl.focus();
+}
+
+function openQrPopover(filter = '') {
+  renderQrList(filter);
+  qrSearch.value = filter;
+  qrPopover.classList.remove('hidden');
+}
+
+function closeQrPopover() {
+  qrPopover.classList.add('hidden');
+  qrSlashMode = false;
+}
+
+qrTriggerBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (qrPopover.classList.contains('hidden')) {
+    loadQuickReplies().then(() => openQrPopover());
+  } else {
+    closeQrPopover();
+  }
+});
+
+qrSearch.addEventListener('input', () => renderQrList(qrSearch.value));
+
+messageInputEl.addEventListener('input', () => {
+  const val = messageInputEl.value;
+  const slashIdx = val.lastIndexOf('/');
+  if (slashIdx >= 0 && (slashIdx === 0 || val[slashIdx - 1] === '\n')) {
+    const term = val.slice(slashIdx + 1);
+    qrSlashMode = true;
+    loadQuickReplies().then(() => openQrPopover(term));
+  } else if (qrSlashMode) {
+    closeQrPopover();
+  }
+});
+
+messageInputEl.addEventListener('keydown', (e) => {
+  if (!qrPopover.classList.contains('hidden')) {
+    const items = qrListEl.querySelectorAll('li');
+    const active = qrListEl.querySelector('li.active');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = active ? active.nextElementSibling : items[0];
+      if (next) { active?.classList.remove('active'); next.classList.add('active'); next.scrollIntoView({ block: 'nearest' }); }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = active ? active.previousElementSibling : items[items.length - 1];
+      if (prev) { active?.classList.remove('active'); prev.classList.add('active'); prev.scrollIntoView({ block: 'nearest' }); }
+    } else if (e.key === 'Enter' && active) {
+      e.preventDefault();
+      const id = active.dataset.id;
+      const q = quickReplies.find(r => r.id === id);
+      if (q) insertQuickReply(q.conteudo);
+    } else if (e.key === 'Escape') {
+      closeQrPopover();
+    }
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (!qrPopover.classList.contains('hidden') && !qrPopover.contains(e.target) && e.target !== qrTriggerBtn) {
+    closeQrPopover();
+  }
+});
+
+// Gerenciamento
+qrManageBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeQrPopover();
+  openQrModal();
+});
+qrModalClose.addEventListener('click', () => qrModal.classList.add('hidden'));
+qrModal.addEventListener('click', (e) => { if (e.target === qrModal) qrModal.classList.add('hidden'); });
+
+async function openQrModal() {
+  await loadQuickReplies();
+  renderQrManageList();
+  qrModal.classList.remove('hidden');
+}
+
+function renderQrManageList() {
+  qrManageList.innerHTML = '';
+  if (!quickReplies.length) {
+    qrManageList.innerHTML = '<li style="color:var(--text-soft);font-size:13px;padding:8px 0">Nenhuma resposta cadastrada.</li>';
+    return;
+  }
+  quickReplies.forEach(q => {
+    const li = document.createElement('li');
+    li.className = 'qr-manage-item';
+    li.innerHTML = `
+      <div class="qr-manage-item-body">
+        <div class="qr-manage-item-titulo">/${q.titulo}</div>
+        <div class="qr-manage-item-preview">${q.conteudo}</div>
+      </div>
+      <div class="qr-manage-item-actions">
+        <button class="btn-edit" title="Editar">✏️</button>
+        <button class="btn-delete" title="Excluir">🗑</button>
+      </div>`;
+    li.querySelector('.btn-edit').addEventListener('click', () => openQrEditModal(q));
+    li.querySelector('.btn-delete').addEventListener('click', () => deleteQuickReply(q.id));
+    qrManageList.appendChild(li);
+  });
+}
+
+qrNewBtn.addEventListener('click', () => openQrEditModal(null));
+
+function openQrEditModal(q) {
+  qrEditingId = q ? q.id : null;
+  qrEditTitle.textContent = q ? 'Editar Resposta Rápida' : 'Nova Resposta Rápida';
+  qrTituloInput.value = q ? q.titulo : '';
+  qrConteudoInput.value = q ? q.conteudo : '';
+  qrEditModal.classList.remove('hidden');
+  qrTituloInput.focus();
+}
+
+qrEditClose.addEventListener('click', () => qrEditModal.classList.add('hidden'));
+qrCancelBtn.addEventListener('click', () => qrEditModal.classList.add('hidden'));
+qrEditModal.addEventListener('click', (e) => { if (e.target === qrEditModal) qrEditModal.classList.add('hidden'); });
+
+qrSaveBtn.addEventListener('click', async () => {
+  const titulo = qrTituloInput.value.trim();
+  const conteudo = qrConteudoInput.value.trim();
+  if (!titulo || !conteudo) { showToast('Preencha o título e a mensagem.', 'error'); return; }
+  try {
+    const url = qrEditingId
+      ? `${window.APP_CONFIG?.apiBase || ''}/api/quick-replies/${qrEditingId}`
+      : `${window.APP_CONFIG?.apiBase || ''}/api/quick-replies`;
+    const method = qrEditingId ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo, conteudo }) });
+    if (!res.ok) throw new Error();
+    qrEditModal.classList.add('hidden');
+    await loadQuickReplies();
+    renderQrManageList();
+    showToast(qrEditingId ? 'Resposta atualizada.' : 'Resposta criada.', 'success');
+  } catch { showToast('Erro ao salvar. Tente novamente.', 'error'); }
+});
+
+async function deleteQuickReply(id) {
+  if (!confirm('Excluir esta resposta rápida?')) return;
+  try {
+    await fetch(`${window.APP_CONFIG?.apiBase || ''}/api/quick-replies/${id}`, { method: 'DELETE' });
+    await loadQuickReplies();
+    renderQrManageList();
+    showToast('Resposta excluída.', 'success');
+  } catch { showToast('Erro ao excluir.', 'error'); }
+}
+
+loadQuickReplies();
+// ── fim Respostas Rápidas ─────────────────────────────────────────────────────
 
 setInterval(() => {
   if (!isBootstrapped) return;

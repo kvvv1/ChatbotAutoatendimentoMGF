@@ -147,6 +147,26 @@ const MIGRATIONS: Array<{ name: string; statements: string[] }> = [
     ]
   },
   {
+    name: '0005_quick_replies',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS quick_replies (
+        id CHAR(36) NOT NULL,
+        titulo VARCHAR(100) NOT NULL,
+        conteudo TEXT NOT NULL,
+        created_at DATETIME(6) DEFAULT NOW(6),
+        updated_at DATETIME(6) DEFAULT NOW(6),
+        PRIMARY KEY (id),
+        KEY quick_replies_titulo_idx (titulo)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    ]
+  },
+  {
+    name: '0006_human_tickets_customer_name',
+    statements: [
+      `ALTER TABLE human_tickets ADD COLUMN IF NOT EXISTS customer_name TEXT`
+    ]
+  },
+  {
     name: '0004_otp_codes',
     statements: [
       `CREATE TABLE IF NOT EXISTS otp_codes (
