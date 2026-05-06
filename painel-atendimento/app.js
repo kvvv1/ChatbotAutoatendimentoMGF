@@ -373,20 +373,36 @@ function renderProfileData(data) {
     ? `
       <div class="profile-section">
         <h3>Mídias do usuário</h3>
-        <div class="media-list">
-          ${media
-            .map((m) => {
-              const link = m.url
-                ? `<a class="media-link" href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer">Abrir mídia</a>`
-                : '';
+        <div class="media-gallery">
+          ${media.map((m) => {
+            const date = escapeHtml(formatDateTime(m.created_at));
+            if (m.type === 'image' && m.url) {
               return `
-                <div class="media-item">
-                  <div class="media-meta">${escapeHtml(m.label || 'Mídia')} | ${escapeHtml(formatDateTime(m.created_at))}</div>
-                  ${link || '<div class="profile-value">Arquivo sem URL disponível.</div>'}
-                </div>
-              `;
-            })
-            .join('')}
+                <div class="media-gallery-item">
+                  <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer" class="media-thumb-link">
+                    <img class="media-thumb" src="${escapeHtml(m.url)}" alt="Imagem" loading="lazy" />
+                  </a>
+                  <div class="media-gallery-meta">${date}</div>
+                </div>`;
+            }
+            if (m.type === 'audio' && m.url) {
+              return `
+                <div class="media-gallery-item media-gallery-item--audio">
+                  <audio class="media-gallery-audio" controls preload="metadata">
+                    <source src="${escapeHtml(m.url)}" />
+                  </audio>
+                  <div class="media-gallery-meta">${date}</div>
+                </div>`;
+            }
+            const link = m.url
+              ? `<a class="media-link" href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer">Abrir mídia</a>`
+              : '<span class="profile-value">Sem URL disponível.</span>';
+            return `
+              <div class="media-gallery-item media-gallery-item--other">
+                <div class="media-gallery-meta">${escapeHtml(m.label || 'Mídia')} | ${date}</div>
+                ${link}
+              </div>`;
+          }).join('')}
         </div>
       </div>
     `
@@ -690,6 +706,7 @@ function resetConversationPanel(subtitle) {
   messageInputEl.disabled = true;
   messageInputEl.value = '';
   sendButtonEl.disabled = true;
+  if (qrTriggerBtn) qrTriggerBtn.disabled = true;
 
   markActiveTicket();
   setProfileOpen(false);
@@ -719,6 +736,7 @@ function applyCurrentTicketHeader() {
   addNoteButtonEl.disabled = false;
   messageInputEl.disabled = false;
   sendButtonEl.disabled = false;
+  if (qrTriggerBtn) qrTriggerBtn.disabled = false;
 }
 
 function renderCurrentConversation(force = false) {
