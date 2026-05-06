@@ -22,6 +22,7 @@ const addNoteButtonEl = document.getElementById('add-note-button');
 const messageInputEl = document.getElementById('message-input');
 const sendButtonEl = document.getElementById('send-button');
 const toastRegionEl = document.getElementById('toast-region');
+const qrTriggerBtn = document.getElementById('quick-replies-btn');
 
 let currentTicket = null;
 let ticketsCache = [];
@@ -1363,7 +1364,6 @@ async function refreshPanel() {
 }
 
 // ── Respostas Rápidas ─────────────────────────────────────────────────────────
-const qrTriggerBtn = document.getElementById('quick-replies-btn');
 const qrPopover    = document.getElementById('quick-replies-popover');
 const qrSearch     = document.getElementById('qr-search');
 const qrListEl     = document.getElementById('qr-list');
