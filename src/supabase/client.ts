@@ -15,7 +15,7 @@ export function getDb(config: AppConfig): Pool {
       waitForConnections: true,
       connectionLimit: 10,
       enableKeepAlive: true,
-      timezone: '+00:00',
+      timezone: '-03:00', // MySQL server em horário de Brasília (UTC-3)
       multipleStatements: true
     });
   }

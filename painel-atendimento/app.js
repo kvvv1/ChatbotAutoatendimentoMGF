@@ -462,10 +462,10 @@ function formatStatusLabel(status) {
 }
 
 function formatDateTime(value) {
+  // Banco armazena em horário de São Paulo — normaliza formato e exibe direto em SP
   let v = typeof value === 'string' ? value.trim() : value;
-  // MySQL retorna sem sufixo de timezone — forçar leitura como UTC
   if (typeof v === 'string' && !v.includes('Z') && !v.includes('+')) {
-    v = v.replace(' ', 'T') + 'Z';
+    v = v.replace(' ', 'T');
   }
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return '-';
@@ -474,7 +474,7 @@ function formatDateTime(value) {
 
 function formatTime(value) {
   let v = typeof value === 'string' ? value.trim() : value;
-  if (typeof v === 'string' && !v.includes('Z') && !v.includes('+')) v = v.replace(' ', 'T') + 'Z';
+  if (typeof v === 'string' && !v.includes('Z') && !v.includes('+')) v = v.replace(' ', 'T');
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
