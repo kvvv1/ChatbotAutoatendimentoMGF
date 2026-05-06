@@ -338,6 +338,19 @@ export async function getHumanTicketById(
   }
 }
 
+export async function updateHumanTicketCustomerName(
+  config: AppConfig,
+  id: string,
+  customerName: string
+): Promise<void> {
+  try {
+    const pool = getDb(config);
+    await pool.query('UPDATE human_tickets SET customer_name = ?, updated_at = NOW(6) WHERE id = ?', [customerName, id]);
+  } catch (err) {
+    logDbError('updateHumanTicketCustomerName', err);
+  }
+}
+
 export async function updateHumanTicketAssignee(
   config: AppConfig,
   id: string,

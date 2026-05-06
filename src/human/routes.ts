@@ -10,6 +10,7 @@ import {
   getMessagesByPhone,
   updateHumanTicketStatus,
   updateHumanTicketAssignee,
+  updateHumanTicketCustomerName,
   listHumanTicketNotes,
   addHumanTicketNote,
   getCustomerByPhone,
@@ -243,6 +244,25 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
             ligacoes: []
           };
         }
+      }
+    }
+
+    // Se o ticket ainda não tem nome, tenta resolver pelo titular da ligação ou nome do cliente da API
+    if (!ticket.customer_name) {
+      let resolvedName: string | null = null;
+      if (apiProfile?.ligacoes?.length) {
+        const nomeTitular = apiProfile.ligacoes
+          .map((l) => l.cadastro?.nomeTitular)
+          .find((n) => typeof n === 'string' && n.trim().length > 0);
+        if (nomeTitular) resolvedName = nomeTitular.trim();
+      }
+      if (!resolvedName && apiProfile?.cliente?.nome) {
+        resolvedName = String(apiProfile.cliente.nome).trim() || null;
+      }
+      if (resolvedName) {
+        await updateHumanTicketCustomerName(config, ticket.id, resolvedName);
+        ticket.customer_name = resolvedName;
+        publishHumanEvent({ type: 'ticket_update', phone: ticket.phone, at: new Date().toISOString() });
       }
     }
 
