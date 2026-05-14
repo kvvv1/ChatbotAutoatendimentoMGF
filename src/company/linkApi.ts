@@ -264,9 +264,10 @@ export async function linkGetDadosCadastrais(
   config: AppConfig,
   imovelId: number
 ): Promise<LinkDadosCadastrais> {
-  return linkPost<LinkDadosCadastrais>(config, '/Dados-Cadastrais', {
-    ImovelID: imovelId
-  });
+  console.log('[linkApi] Buscando dados cadastrais para ImovelID:', imovelId);
+  const result = await linkPost<LinkDadosCadastrais>(config, '/Dados-Cadastrais', { ImovelID: imovelId });
+  console.log('[linkApi] Dados cadastrais recebidos:', JSON.stringify(result, null, 2));
+  return result;
 }
 
 /**

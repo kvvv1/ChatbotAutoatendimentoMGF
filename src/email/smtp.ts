@@ -19,7 +19,7 @@ export function createTransport(config: AppConfig) {
 
 export async function sendOtpEmail(
   config: AppConfig,
-  params: { to: string; code: string; cpf: string }
+  params: { to: string; code: string; identifier: string }
 ): Promise<void> {
   const transporter = createTransport(config);
   const subject = 'Seu código de verificação';
@@ -27,7 +27,7 @@ export async function sendOtpEmail(
     `Olá,`,
     ``,
     `Seu código de verificação é: ${params.code}`,
-    `CPF: ${params.cpf}`,
+    `Identificador: ${params.identifier}`,
     ``,
     `Este código expira em ${config.otpExpiresMinutes} minutos.`,
   ].join('\n');

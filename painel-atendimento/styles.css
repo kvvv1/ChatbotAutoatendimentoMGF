@@ -602,22 +602,63 @@ body {
   color: #1e2f38;
 }
 
-.media-list {
+.media-gallery {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
 
-.media-item {
+.media-gallery-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.media-gallery-item--audio,
+.media-gallery-item--other {
+  grid-column: 1 / -1;
+  background: #f4f7f9;
   border: 1px solid #e2e8ee;
   border-radius: 8px;
   padding: 8px 10px;
-  background: #fff;
 }
 
-.media-meta {
-  font-size: 11px;
-  color: #5f707a;
+.media-thumb-link {
+  display: block;
+  border-radius: 6px;
+  overflow: hidden;
+  aspect-ratio: 1;
+  background: #e2e8ee;
+}
+
+.media-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.15s;
+}
+.media-thumb:hover { opacity: 0.82; }
+
+.media-gallery-meta {
+  font-size: 10px;
+  color: #7a8f99;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-gallery-item--audio .media-gallery-meta,
+.media-gallery-item--other .media-gallery-meta {
+  text-align: left;
   margin-bottom: 4px;
+}
+
+.media-gallery-audio {
+  width: 100%;
+  height: 36px;
+  border-radius: 20px;
 }
 
 .media-link {

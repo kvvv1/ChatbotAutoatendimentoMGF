@@ -6,6 +6,8 @@ dotenvConfig({ path: 'docs/.env', override: false });
 
 export type AppConfig = {
   port: number;
+  entidadeNome: string;
+  entidadeNomeCompleto: string;
   dbHost: string;
   dbPort: number;
   dbUser: string;
@@ -127,7 +129,9 @@ export function loadConfig(): AppConfig {
     ATENDIMENTO_MAPS_ADDRESS,
     WELCOME_AUDIO_URL,
     MENU_AUDIO_URL,
-    DEMO_ID_ELETRONICO
+    DEMO_ID_ELETRONICO,
+    ENTIDADE_NOME,
+    ENTIDADE_NOME_COMPLETO
   } = process.env;
 
   if (!DB_SERVER) throw new Error('DB_SERVER não configurado');
@@ -195,7 +199,9 @@ export function loadConfig(): AppConfig {
     atendimentoMapsAddress: ATENDIMENTO_MAPS_ADDRESS,
     welcomeAudioUrl: WELCOME_AUDIO_URL,
     menuAudioUrl: MENU_AUDIO_URL,
-    demoIdEletronico: DEMO_ID_ELETRONICO
+    demoIdEletronico: DEMO_ID_ELETRONICO,
+    entidadeNome: ENTIDADE_NOME || 'SAAE',
+    entidadeNomeCompleto: ENTIDADE_NOME_COMPLETO || ENTIDADE_NOME || 'SAAE',
   };
 }
 

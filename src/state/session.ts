@@ -11,13 +11,51 @@ export type IdentityChallengeState = {
 
 export type ConversationState =
   | { name: 'idle' }
-  | { name: 'awaiting_login_id' }
+  | { name: 'awaiting_login_id'; humanBypassAttempts?: number }
   | { name: 'awaiting_confirm_id'; idEletronico: string }
   | { name: 'awaiting_login_cpf' }
   | { name: 'awaiting_confirm_cpf' ; cpf: string }
-  | { name: 'awaiting_login_email' ; cpf?: string; idEletronico?: string }
-  | { name: 'awaiting_confirm_email' ; cpf?: string; idEletronico?: string; email: string }
-  | { name: 'awaiting_login_otp' ; cpf?: string; idEletronico?: string; email: string }
+  | {
+      name: 'awaiting_login_email';
+      cpf?: string;
+      idEletronico?: string;
+      nomeCliente?: string;
+      imovelId?: number;
+      ligacaoId?: string;
+      ligacoes?: Array<{ id: string; imovelId?: number; idEletronico?: string; label: string; description?: string }>;
+    }
+  | {
+      name: 'awaiting_confirm_email';
+      cpf?: string;
+      idEletronico?: string;
+      email: string;
+      nomeCliente?: string;
+      imovelId?: number;
+      ligacaoId?: string;
+      ligacoes?: Array<{ id: string; imovelId?: number; idEletronico?: string; label: string; description?: string }>;
+    }
+  | {
+      name: 'awaiting_login_otp';
+      cpf?: string;
+      idEletronico?: string;
+      nomeCliente?: string;
+      imovelId?: number;
+      ligacaoId?: string;
+      ligacoes?: Array<{ id: string; imovelId?: number; idEletronico?: string; label: string; description?: string }>;
+      email: string;
+    }
+  | {
+      name: 'awaiting_identity_verification';
+      idEletronico?: string;
+      nomeCliente?: string;
+      imovelId?: number;
+      ligacaoId?: string;
+      ligacoes?: Array<{ id: string; imovelId?: number; idEletronico?: string; label: string; description?: string }>;
+      challenge: IdentityChallengeState;
+      secondaryChallenge?: IdentityChallengeState;
+      step: 'primary' | 'secondary';
+      attemptsLeft: number;
+    }
   | { name: 'main_menu' ; cpf?: string; idEletronico?: string; nomeCliente?: string; email?: string ; imovelId?: number; ligacaoId?: string ; menuAudioPlayed?: boolean }
   | { name: 'select_ligacao' ; cpf?: string; idEletronico?: string; nomeCliente?: string; email?: string ; menuAudioPlayed?: boolean }
   | { name: 'view_debitos' ; cpf?: string; idEletronico?: string; imovelId?: number; ligacaoId?: string ; menuAudioPlayed?: boolean }

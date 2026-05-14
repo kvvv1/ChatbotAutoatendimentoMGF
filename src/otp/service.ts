@@ -12,12 +12,12 @@ function generateOtpCode(): string {
 
 export async function createAndSendOtp(
   config: AppConfig,
-  params: { phone?: string; cpf: string; email: string }
+  params: { phone?: string; identifier: string; email: string }
 ): Promise<void> {
   if (config.otpMock) {
     await logAudit(config, {
       whatsappPhone: params.phone ?? '',
-      cpf: params.cpf,
+      cpf: params.identifier,
       action: 'otp_sent_mock',
       payload: { email: params.email }
     });
@@ -33,13 +33,13 @@ export async function createAndSendOtp(
 
   await pool.query(
     'INSERT INTO otp_codes (id, phone, cpf, email, code, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [randomUUID(), params.phone ?? null, params.cpf, params.email, code, expiresAt]
+    [randomUUID(), params.phone ?? null, params.identifier, params.email, code, expiresAt]
   );
 
-  await sendOtpEmail(config, { to: params.email, code, cpf: params.cpf });
+  await sendOtpEmail(config, { to: params.email, code, identifier: params.identifier });
   await logAudit(config, {
     whatsappPhone: params.phone ?? '',
-    cpf: params.cpf,
+    cpf: params.identifier,
     action: 'otp_sent',
     payload: { email: params.email }
   });
@@ -47,12 +47,12 @@ export async function createAndSendOtp(
 
 export async function verifyOtp(
   config: AppConfig,
-  params: { cpf: string; email: string; code: string }
+  params: { identifier: string; email: string; code: string }
 ): Promise<boolean> {
   if (config.otpMock) {
     await logAudit(config, {
       whatsappPhone: '',
-      cpf: params.cpf,
+      cpf: params.identifier,
       action: 'otp_verified_mock',
       payload: { email: params.email, code: params.code }
     });
@@ -64,7 +64,7 @@ export async function verifyOtp(
     `SELECT id, code, expires_at, used_at, attempts FROM otp_codes
      WHERE cpf = ? AND email = ?
      ORDER BY created_at DESC LIMIT 1`,
-    [params.cpf, params.email]
+    [params.identifier, params.email]
   );
   const list = rows as RowDataPacket[];
   if (list.length === 0) return false;
@@ -84,7 +84,7 @@ export async function verifyOtp(
       'UPDATE otp_codes SET used_at = ?, attempts = ? WHERE id = ?',
       [nowStr, (record.attempts ?? 0) + 1, record.id]
     );
-    await logAudit(config, { whatsappPhone: '', cpf: params.cpf, action: 'otp_verified', payload: { email: params.email } });
+    await logAudit(config, { whatsappPhone: '', cpf: params.identifier, action: 'otp_verified', payload: { email: params.email } });
     return true;
   } else {
     await pool.query(

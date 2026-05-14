@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import fastifyCors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { loadConfig } from './config.js';
@@ -23,6 +24,8 @@ async function bootstrap(): Promise<void> {
     }
   });
 
+  await app.register(fastifyCors, { origin: true });
+
   app.get('/health', async () => {
     return { status: 'ok' };
   });
@@ -37,6 +40,13 @@ async function bootstrap(): Promise<void> {
   await app.register(fastifyStatic, {
     root: path.join(process.cwd(), 'painel-atendimento'),
     prefix: '/painel-atendimento/'
+  });
+
+  // Arquivos estáticos de assets (vídeos, áudios, etc.)
+  await app.register(fastifyStatic, {
+    root: path.join(process.cwd(), 'assets'),
+    prefix: '/assets/',
+    decorateReply: false
   });
 
   await registerZapiRoutes(app, config);

@@ -101,9 +101,16 @@ function isHumanAttendantRequest(value: string): boolean {
   if (!normalized) return false;
   if (normalized === '0') return true;
   if (normalized.includes('falar com atendente')) return true;
+  if (normalized.includes('falar com humano')) return true;
   if (normalized.includes('com atendente')) return true;
   if (normalized.includes('atendimento humano')) return true;
+  if (normalized.includes('atendente humano')) return true;
+  if (normalized.includes('quero falar')) return true;
+  if (normalized.includes('preciso falar')) return true;
+  if (normalized.includes('quero atendente')) return true;
+  if (normalized.includes('preciso de atendente')) return true;
   if (normalized === 'atendente' || normalized.includes('atendente')) return true;
+  if (normalized === 'humano') return true;
   return false;
 }
 
@@ -356,6 +363,38 @@ export async function processMessage(
     // 0 - falar com atendente (cria/garante ticket humano no Supabase)
     if (isHumanAttendantRequest(text)) {
       try {
+        const authed = isAuthenticated(state);
+
+        if (!authed) {
+          const prevAttempts: number = (state as any)?.humanBypassAttempts ?? 0;
+          const attempts = prevAttempts + 1;
+
+          if (attempts >= 3) {
+            replies.push(
+              'Por questões de segurança e em conformidade com a *Lei Geral de Proteção de Dados (LGPD)*, ' +
+              'não é possível fornecer informações nem encaminhar para atendimento humano sem antes confirmar sua identidade.\n\n' +
+              'Informe seu *ID Eletrônico* (encontrado na sua conta de água) para prosseguir:'
+            );
+          } else if (attempts === 2) {
+            replies.push(
+              '⚠️ Antes de encaminhar para atendimento humano, precisamos confirmar quem você é.\n\n' +
+              'Informe seu *ID Eletrônico* para continuarmos:'
+            );
+          } else {
+            replies.push(
+              'Para falar com um atendente, precisamos primeiro validar sua identidade.\n\n' +
+              messages.askIdEletronico
+            );
+          }
+
+          await sessionStore.save({
+            phone,
+            state: { name: 'awaiting_login_id', humanBypassAttempts: attempts },
+            updatedAt: now
+          });
+          return replies;
+        }
+
         let protocoloMsg = '';
         try {
           const ticket = await ensureOpenHumanTicket(config, phone, (state as any)?.nomeCliente ?? null);
@@ -399,7 +438,7 @@ export async function processMessage(
       }
 
       replies.push('✅ Atendimento encerrado. Vamos começar novamente.');
-      replies.push(messages.welcome);
+      replies.push(messages.welcome(config.entidadeNome));
       if (config.welcomeAudioUrl) {
         replies.push({
           type: 'audio',
@@ -480,7 +519,7 @@ export async function processMessage(
 
     // Se está no estado inicial (idle)
     if (state.name === 'idle') {
-      replies.push(messages.welcome);
+      replies.push(messages.welcome(config.entidadeNome));
       if (config.welcomeAudioUrl) {
         replies.push({
           type: 'audio',
@@ -2105,7 +2144,7 @@ export async function processMessage(
           }
         } catch (err) {
           // Fallback absoluto - sempre retorna uma resposta
-          replies.push(messages.welcome);
+          replies.push(messages.welcome(config.entidadeNome));
           replies.push(messages.askIdEletronico);
         }
       }
