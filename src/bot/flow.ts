@@ -713,6 +713,9 @@ export async function processMessage(
             // Verifica se há email disponível para OTP
             const emailCadastrado = dadosVerificacao.Email;
             const temEmail = typeof emailCadastrado === 'string' && emailCadastrado.includes('@');
+            if (!temEmail) {
+              console.warn(`[OTP] Email ausente ou inválido para ID ${idEletronico} (valor: ${emailCadastrado ?? 'null'}) — seguindo para desafio de identidade`);
+            }
 
             if (temEmail) {
               try {

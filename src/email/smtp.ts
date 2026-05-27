@@ -32,12 +32,20 @@ export async function sendOtpEmail(
     `Este código expira em ${config.otpExpiresMinutes} minutos.`,
   ].join('\n');
 
-  await transporter.sendMail({
-    from: config.smtpFrom!,
-    to: params.to,
-    subject,
-    text
-  });
+  console.log(`[SMTP] Enviando OTP para ${params.to}...`);
+  try {
+    await transporter.sendMail({
+      from: config.smtpFrom!,
+      to: params.to,
+      subject,
+      text
+    });
+    console.log(`[SMTP] OTP enviado com sucesso para ${params.to}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[SMTP] ERRO ao enviar para ${params.to}:`, msg);
+    throw err;
+  }
 }
 
 

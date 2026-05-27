@@ -957,6 +957,13 @@ function buildMessageMediaElement(m) {
       img.alt = parsed.caption || 'Imagem';
       img.loading = 'lazy';
       img.addEventListener('click', () => window.open(parsed.url, '_blank', 'noopener,noreferrer'));
+      img.addEventListener('error', () => {
+        img.style.display = 'none';
+        const broken = document.createElement('div');
+        broken.className = 'msg-media-broken';
+        broken.textContent = '📷 Imagem indisponível';
+        wrap.insertBefore(broken, img);
+      });
       wrap.appendChild(img);
       if (parsed.caption) {
         const cap = document.createElement('div');
@@ -978,6 +985,54 @@ function buildMessageMediaElement(m) {
       source.src = parsed.url;
       audio.appendChild(source);
       wrap.appendChild(audio);
+      return wrap;
+    }
+
+    if (type === 'document') {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-media-wrap';
+      const link = document.createElement('a');
+      link.className = 'msg-doc-link';
+      link.href = parsed.url || '#';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      const fileName = parsed.caption || parsed.fileName || parsed.filename || 'Documento';
+      link.innerHTML = `<span class="msg-doc-icon">📄</span><span class="msg-doc-name">${escapeHtml(fileName)}</span>`;
+      if (!parsed.url) link.addEventListener('click', (e) => e.preventDefault());
+      wrap.appendChild(link);
+      return wrap;
+    }
+
+    if (type === 'video') {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-media-wrap';
+      if (parsed.url) {
+        const link = document.createElement('a');
+        link.className = 'msg-doc-link';
+        link.href = parsed.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.innerHTML = `<span class="msg-doc-icon">🎥</span><span class="msg-doc-name">${escapeHtml(parsed.caption || 'Vídeo')}</span>`;
+        wrap.appendChild(link);
+      } else {
+        const p = document.createElement('div');
+        p.className = 'msg-media-broken';
+        p.textContent = '🎥 Vídeo recebido';
+        wrap.appendChild(p);
+      }
+      return wrap;
+    }
+
+    if (parsed.url) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-media-wrap';
+      const link = document.createElement('a');
+      link.className = 'msg-doc-link';
+      link.href = parsed.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.innerHTML = `<span class="msg-doc-icon">📎</span><span class="msg-doc-name">${escapeHtml(parsed.caption || 'Arquivo')}</span>`;
+      wrap.appendChild(link);
       return wrap;
     }
   }
