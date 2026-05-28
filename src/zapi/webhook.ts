@@ -372,6 +372,22 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
             return JSON.stringify({ type: 'audio', url });
           }
         }
+        if (messageType.includes('document')) {
+          const url =
+            (payload as any)?.document?.documentUrl ||
+            (payload as any)?.documentMessage?.documentUrl ||
+            (payload as any)?.message?.documentUrl ||
+            (payload as any)?.message?.document?.documentUrl;
+          const fileName =
+            (payload as any)?.document?.fileName ||
+            (payload as any)?.document?.filename ||
+            (payload as any)?.documentMessage?.fileName ||
+            (payload as any)?.message?.fileName ||
+            'Documento';
+          if (typeof url === 'string' && url.startsWith('http')) {
+            return JSON.stringify({ type: 'document', url, caption: fileName });
+          }
+        }
         return null;
       }
 

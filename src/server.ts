@@ -6,6 +6,7 @@ import { loadConfig } from './config.js';
 import { registerZapiRoutes } from './zapi/webhook.js';
 import { ZapiClient } from './zapi/client.js';
 import { registerHumanRoutes } from './human/routes.js';
+import { registerBiRoutes } from './bi/routes.js';
 import { getDb } from './supabase/client.js';
 import { runMigrations } from './db/migrate.js';
 
@@ -51,6 +52,7 @@ async function bootstrap(): Promise<void> {
 
   await registerZapiRoutes(app, config);
   await registerHumanRoutes(app, config);
+  await registerBiRoutes(app, config);
 
   // Endpoint auxiliar para testes manuais de envio via Z-API
   app.post('/test/send', async (request, reply) => {

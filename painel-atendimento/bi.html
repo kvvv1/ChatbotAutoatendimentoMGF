@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard BI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,300..800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bar-h: 44px;
+
+      --bg:     #f1f5f9;
+      --card:   #ffffff;
+      --brd:    #e2e8f0;
+      --sh:     0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      --sh-md:  0 4px 20px rgba(0,0,0,.08);
+
+      --ink:    #0f172a;
+      --ink-2:  #475569;
+      --ink-3:  #94a3b8;
+
+      --blue:   #1d4ed8;
+      --blue-l: #eff6ff;
+      --blue-m: #3b82f6;
+      --grn:    #065f46;
+      --grn-l:  #ecfdf5;
+      --grn-m:  #10b981;
+      --amb:    #92400e;
+      --amb-l:  #fffbeb;
+      --amb-m:  #f59e0b;
+      --red:    #9f1239;
+      --red-l:  #fff1f2;
+      --red-m:  #f43f5e;
+      --vlt:    #4c1d95;
+      --vlt-l:  #f5f3ff;
+      --vlt-m:  #8b5cf6;
+      --tel:    #134e4a;
+      --tel-l:  #f0fdfa;
+      --tel-m:  #14b8a6;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--ink);
+      font-family: 'Inter', system-ui, sans-serif; font-size: 13px;
+      -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+    /* ── Shell layout ─────────────────────────────── */
+    .shell {
+      display: flex; flex-direction: column;
+      height: 100dvh;
+    }
+
+    /* ── Tab bar ──────────────────────────────────── */
+    .tab-bar {
+      height: var(--bar-h);
+      background: var(--card);
+      border-bottom: 1px solid var(--brd);
+      display: flex; align-items: stretch; justify-content: center;
+      padding: 0 16px;
+      overflow-x: auto; overflow-y: hidden;
+      flex-shrink: 0;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      position: relative;
+    }
+    .tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab-entity {
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      font-size: 12px; font-weight: 600; color: var(--ink-2);
+      background: var(--bg); padding: 3px 10px;
+      border-radius: 5px; border: 1px solid var(--brd);
+      white-space: nowrap; max-width: 200px;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .tab-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 13px; white-space: nowrap;
+      cursor: pointer; position: relative;
+      color: var(--ink-3); font-size: 12.5px; font-weight: 500;
+      border: none; background: none; font-family: inherit;
+      transition: color .15s; flex-shrink: 0;
+    }
+    .tab-item:hover { color: var(--ink); }
+    .tab-item.active { color: var(--blue); font-weight: 600; }
+    .tab-item.active::after {
+      content: ''; position: absolute; bottom: 0; left: 6px; right: 6px;
+      height: 2px; background: var(--blue); border-radius: 2px 2px 0 0;
+    }
+    .tab-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+    .tab-sep { width: 1px; background: var(--brd); margin: 10px 0; flex-shrink: 0; }
+
+    /* ── Date bar ─────────────────────────────────── */
+    .date-bar {
+      height: 40px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--brd);
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 16px;
+      flex-shrink: 0;
+      overflow-x: auto; overflow-y: hidden;
+      scrollbar-width: none;
+    }
+    .date-bar::-webkit-scrollbar { display: none; }
+
+    .date-bar-lbl { font-size: 10.5px; color: var(--ink-3); font-weight: 600; flex-shrink: 0; }
+    .date-bar-sep { width: 1px; height: 16px; background: var(--brd); margin: 0 2px; flex-shrink: 0; }
+
+    .preset-btn {
+      padding: 4px 9px; border-radius: 5px;
+      border: 1px solid var(--brd);
+      background: var(--card); color: var(--ink-2);
+      font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: all .15s; font-family: inherit;
+      flex-shrink: 0; line-height: 1;
+    }
+    .preset-btn:hover { border-color: var(--blue-m); color: var(--blue); }
+    .preset-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    .date-input-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .date-input-wrap label { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; }
+    .date-input {
+      padding: 4px 7px; border-radius: 5px;
+      border: 1px solid var(--brd); background: var(--card);
+      font-size: 11.5px; font-family: inherit; color: var(--ink);
+      width: 120px;
+    }
+    .date-input:focus { outline: none; border-color: var(--blue-m); }
+
+    .apply-btn {
+      padding: 5px 12px; border-radius: 5px; border: none;
+      background: var(--blue); color: #fff;
+      font-size: 11.5px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s; font-family: inherit; flex-shrink: 0;
+    }
+    .apply-btn:hover { opacity: .88; }
+
+    .period-lbl {
+      margin-left: auto; font-size: 11px; color: var(--ink-3);
+      flex-shrink: 0; padding-left: 8px; white-space: nowrap;
+    }
+
+    /* ── Content ──────────────────────────────────── */
+    .content { flex: 1; overflow-y: auto; padding: 18px 20px 32px; }
+    .content::-webkit-scrollbar { width: 5px; }
+    .content::-webkit-scrollbar-track { background: transparent; }
+    .content::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+    /* ── Sections ─────────────────────────────────── */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .section-head { margin-bottom: 16px; }
+    .section-head h2 { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .section-head p  { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
+
+    /* ── KPI grid ─────────────────────────────────── */
+    .kpi-grid { display: grid; gap: 12px; }
+    .kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .kpi-grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+    .kpi {
+      background: var(--card); border: 1px solid var(--brd);
+      border-radius: 10px; padding: 16px;
+      box-shadow: var(--sh);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .kpi-top { display: flex; align-items: flex-start; justify-content: space-between; }
+    .kpi-icon {
+      width: 34px; height: 34px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .kpi-icon svg { width: 18px; height: 18px; }
+    .kpi-val { font-size: 24px; font-weight: 800; color: var(--ink); line-height: 1; }
+    .kpi-lbl { font-size: 11.5px; color: var(--ink-2); font-weight: 500; }
+    .kpi-foot { display: flex; align-items: center; gap: 6px; }
+    .delta {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+    }
+    .delta.up   { background: var(--grn-l); color: var(--grn); }
+    .delta.down { background: var(--red-l); color: var(--red); }
+    .delta.flat { background: var(--bg);    color: var(--ink-2); }
+    .delta svg  { width: 11px; height: 11px; }
+    .delta-note { font-size: 10.5px; color: var(--ink-3); }
+
+    /* ── Cards ────────────────────────────────────── */
+    .card {
+      background: var(--card); border: 1px solid var(--brd);
+      border-radius: 10px; box-shadow: var(--sh);
+      overflow: hidden;
+    }
+    .card-head {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--brd);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-head h3 { font-size: 13px; font-weight: 700; color: var(--ink); }
+    .card-head span { font-size: 11px; color: var(--ink-3); }
+    .card-body { padding: 14px 16px; }
+
+    .chart-wrap { position: relative; }
+    .chart-wrap canvas { display: block; }
+
+    /* ── Row grids ────────────────────────────────── */
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .col-span-2 { grid-column: span 2; }
+
+    .gap-top { margin-top: 12px; }
+
+    /* ── Funil ────────────────────────────────────── */
+    .funnel { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+    .funnel-step { position: relative; }
+    .funnel-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+    .funnel-label { font-size: 12px; font-weight: 600; color: var(--ink); }
+    .funnel-vals { font-size: 11px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+    .funnel-pct { font-size: 11px; font-weight: 700; }
+    .funnel-bar-bg { height: 10px; border-radius: 99px; background: var(--bg); overflow: hidden; }
+    .funnel-bar-fill { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+    .funnel-conv { font-size: 10px; color: var(--ink-3); margin-top: 2px; }
+    .funnel-drop { display: flex; align-items: center; gap: 4px; padding: 4px 0 2px 4px; }
+    .funnel-drop svg { width: 10px; height: 10px; color: var(--red-m); }
+    .funnel-drop span { font-size: 10px; color: var(--ink-3); }
+
+    /* ── Table ────────────────────────────────────── */
+    .tbl { width: 100%; border-collapse: collapse; }
+    .tbl th {
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--ink-3); text-align: left; padding: 8px 10px;
+      border-bottom: 1px solid var(--brd);
+    }
+    .tbl td { font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--brd); color: var(--ink); }
+    .tbl tr:last-child td { border-bottom: none; }
+    .tbl-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 99px;
+      font-size: 10.5px; font-weight: 600;
+    }
+
+    /* ── Ticket pending list ──────────────────────── */
+    .pending-list { display: flex; flex-direction: column; gap: 8px; }
+    .pending-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: var(--bg); border-radius: 8px;
+    }
+    .pending-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--blue-l); color: var(--blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    .pending-info { flex: 1; min-width: 0; }
+    .pending-phone { font-size: 12px; font-weight: 600; color: var(--ink); }
+    .pending-wait { font-size: 11px; color: var(--ink-3); }
+    .pending-badge {
+      font-size: 10.5px; font-weight: 700; padding: 3px 8px;
+      border-radius: 99px; background: var(--amb-l); color: var(--amb);
+    }
+
+    /* ── Status dots / badges ─────────────────────── */
+    .badge-pen  { background: var(--amb-l); color: var(--amb); }
+      .badge-abe  { background: var(--blue-l); color: var(--blue); }
+      .badge-fin  { background: var(--grn-l);  color: var(--grn); }
+    .badge-pau  { background: var(--bg);     color: var(--ink-2); }
+
+    /* ── OTP gauge ────────────────────────────────── */
+    .otp-rate {
+      display: flex; flex-direction: column; align-items: center; padding: 8px 0 4px;
+    }
+    .otp-rate-val { font-size: 36px; font-weight: 800; color: var(--grn); }
+    .otp-rate-lbl { font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+    .otp-bar-bg { height: 8px; border-radius: 99px; background: var(--bg); margin: 12px 0 4px; }
+    .otp-bar-fill { height: 100%; border-radius: 99px; background: var(--grn-m); transition: width .6s; }
+
+    /* ── Donut legend ─────────────────────────────── */
+    .donut-legend { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .legend-row { display: flex; align-items: center; gap: 8px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .legend-key { font-size: 11.5px; color: var(--ink-2); flex: 1; }
+    .legend-val { font-size: 12px; font-weight: 700; color: var(--ink); }
+    .legend-pct { font-size: 10.5px; color: var(--ink-3); min-width: 32px; text-align: right; }
+
+    /* ── Attendant bar mini ───────────────────────── */
+    .att-bar-bg { height: 5px; border-radius: 99px; background: var(--bg); margin-top: 3px; }
+    .att-bar-fill { height: 100%; border-radius: 99px; background: var(--blue-m); }
+
+    /* ── Empty state ──────────────────────────────── */
+    .empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 32px 16px; color: var(--ink-3); gap: 8px;
+    }
+    .empty svg { width: 32px; height: 32px; opacity: .4; }
+    .empty p { font-size: 12px; }
+
+    /* ── Sparkline ────────────────────────────────── */
+    .sparkline-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .sparkline-card {
+      background: var(--card); border: 1px solid var(--brd);
+      border-radius: 10px; padding: 14px 16px;
+      box-shadow: var(--sh);
+    }
+    .sparkline-meta { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+    .sparkline-lbl { font-size: 11.5px; color: var(--ink-2); font-weight: 500; }
+    .sparkline-val { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1; }
+
+    /* ── Fin summary ──────────────────────────────── */
+    .fin-total {
+      text-align: center; padding: 16px 0 12px;
+      border-bottom: 1px solid var(--brd);
+    }
+    .fin-total-val { font-size: 28px; font-weight: 800; color: var(--ink); }
+    .fin-total-lbl { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+
+    /* ── Drawer ───────────────────────────────────── */
+    .drawer-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(15,23,42,.45);
+      opacity: 0; pointer-events: none;
+      transition: opacity .25s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: min(560px, 92vw);
+      background: var(--card);
+      box-shadow: -8px 0 40px rgba(0,0,0,.15);
+      display: flex; flex-direction: column;
+      z-index: 201;
+      transform: translateX(100%);
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--brd);
+      flex-shrink: 0;
+    }
+    .drawer-back {
+      width: 30px; height: 30px; border-radius: 7px;
+      border: 1px solid var(--brd); background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0; color: var(--ink-2);
+      transition: background .15s;
+    }
+    .drawer-back:hover { background: var(--brd); }
+    .drawer-back svg { width: 15px; height: 15px; }
+    .drawer-title-wrap { flex: 1; min-width: 0; }
+    .drawer-title { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+    .drawer-subtitle { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+    .drawer-close {
+      width: 30px; height: 30px; border-radius: 7px;
+      border: 1px solid var(--brd); background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--ink-2);
+      transition: background .15s;
+    }
+    .drawer-close:hover { background: var(--bg); }
+    .drawer-close svg { width: 16px; height: 16px; }
+
+    .drawer-filters {
+      display: flex; gap: 6px; flex-wrap: wrap;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--brd);
+      flex-shrink: 0;
+    }
+    .df-btn {
+      padding: 4px 10px; border-radius: 5px;
+      border: 1px solid var(--brd); background: var(--bg);
+      color: var(--ink-2); font-size: 11.5px; font-weight: 500;
+      cursor: pointer; transition: all .15s; font-family: inherit;
+    }
+    .df-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .df-btn.active { background: var(--blue-l); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+
+    .drawer-body {
+      flex: 1; overflow-y: auto; padding: 0;
+    }
+    .drawer-body::-webkit-scrollbar { width: 4px; }
+    .drawer-body::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
+
+    .drawer-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .drawer-table th {
+      position: sticky; top: 0; background: var(--bg);
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--ink-3); padding: 8px 12px; text-align: left;
+      border-bottom: 1px solid var(--brd); z-index: 1;
+    }
+    .drawer-table td {
+      padding: 9px 12px; border-bottom: 1px solid var(--brd);
+      color: var(--ink); vertical-align: middle;
+    }
+    .drawer-table tr:hover td { background: #f8fafc; }
+    .drawer-table tr:last-child td { border-bottom: none; }
+    .dt-link {
+      color: var(--blue); cursor: pointer; font-weight: 600;
+      text-decoration: none;
+    }
+    .dt-link:hover { text-decoration: underline; }
+    .dt-mono { font-family: 'Menlo','Consolas',monospace; font-size: 11px; color: var(--ink-2); }
+
+    .drawer-footer {
+      padding: 12px 18px;
+      border-top: 1px solid var(--brd);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .drawer-count { font-size: 11.5px; color: var(--ink-3); }
+    .load-more-btn {
+      padding: 6px 14px; border-radius: 6px;
+      border: 1px solid var(--brd); background: var(--bg);
+      color: var(--ink-2); font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: all .15s; font-family: inherit;
+    }
+    .load-more-btn:hover { background: var(--brd); }
+    .load-more-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Msg bubble ───────────────────────────────── */
+    .msg-list { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; }
+    .msg-row { display: flex; gap: 8px; }
+    .msg-row.out { flex-direction: row-reverse; }
+    .msg-bubble {
+      max-width: 78%; padding: 8px 11px;
+      border-radius: 10px; font-size: 12px; line-height: 1.5;
+      word-break: break-word;
+    }
+    .msg-row.in  .msg-bubble { background: var(--bg); color: var(--ink); border-radius: 3px 10px 10px 10px; }
+    .msg-row.out .msg-bubble { background: var(--blue-l); color: var(--blue); border-radius: 10px 3px 10px 10px; }
+    .msg-time { font-size: 9.5px; color: var(--ink-3); margin-top: 3px; text-align: right; }
+    .msg-dir-lbl {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      color: var(--ink-3); padding-top: 3px;
+    }
+    .msg-separator { text-align: center; font-size: 10.5px; color: var(--ink-3); padding: 8px 0; }
+
+    /* ── Status badges ────────────────────────────── */
+    .sb { display:inline-block; padding:2px 8px; border-radius:99px; font-size:10.5px; font-weight:600; }
+    .sb-pend { background:var(--amb-l); color:var(--amb); }
+    .sb-open { background:var(--blue-l); color:var(--blue); }
+    .sb-fin  { background:var(--grn-l);  color:var(--grn);  }
+    .sb-exp  { background:var(--red-l);  color:var(--red);  }
+    .sb-ok   { background:var(--grn-l);  color:var(--grn);  }
+    .sb-try  { background:var(--amb-l);  color:var(--amb);  }
+    .sb-def  { background:var(--bg);     color:var(--ink-2);}
+
+    /* ── Loading overlay ──────────────────────────── */
+    #loader {
+      position: fixed; inset: 0;
+      background: rgba(15,23,42,.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999; backdrop-filter: blur(2px);
+      transition: opacity .25s;
+    }
+    #loader.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(255,255,255,.15);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div id="loader"><div class="spinner"></div></div>
+
+<!-- ── Drawer ────────────────────────────────────── -->
+<div class="drawer-overlay" id="drw-overlay" onclick="drwClose()"></div>
+<div class="drawer" id="drw">
+  <div class="drawer-head">
+    <button class="drawer-back" id="drw-back" onclick="drwBack()" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="drawer-title-wrap">
+      <div class="drawer-title" id="drw-title">—</div>
+      <div class="drawer-subtitle" id="drw-subtitle"></div>
+    </div>
+    <button class="drawer-close" onclick="drwClose()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-filters" id="drw-filters" style="display:none"></div>
+  <div class="drawer-body" id="drw-body"></div>
+  <div class="drawer-footer">
+    <span class="drawer-count" id="drw-count"></span>
+    <button class="load-more-btn" id="drw-more" onclick="drwLoadMore()" disabled>Carregar mais</button>
+  </div>
+</div>
+
+<div class="shell">
+
+  <!-- ── Tab bar ─────────────────────────────────────── -->
+  <nav class="tab-bar" id="tab-bar">
+    <div class="tab-entity" id="sb-entidade">—</div>
+    <button class="tab-item active" data-sec="home" onclick="go('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      Início
+    </button>
+    <button class="tab-item" data-sec="sessions" onclick="go('sessions')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      Sessões
+    </button>
+    <button class="tab-item" data-sec="clicks" onclick="go('clicks')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Menu &amp; Interações
+    </button>
+    <button class="tab-item" data-sec="tickets" onclick="go('tickets')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+      Tickets
+    </button>
+    <button class="tab-item" data-sec="otp" onclick="go('otp')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      Autenticação OTP
+    </button>
+    <button class="tab-item" data-sec="volume" onclick="go('volume')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      Volume
+    </button>
+    <button class="tab-item" data-sec="financeiro" onclick="go('financeiro')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="1" x2="12" y2="23"/>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      Financeiro
+    </button>
+  </nav>
+
+  <!-- ── Date bar ─────────────────────────────────────── -->
+  <div class="date-bar">
+    <span class="date-bar-lbl">Período:</span>
+    <button class="preset-btn" data-d="7"   onclick="setPreset(7)">7d</button>
+    <button class="preset-btn active" data-d="30"  onclick="setPreset(30)">30d</button>
+    <button class="preset-btn" data-d="90"  onclick="setPreset(90)">90d</button>
+    <button class="preset-btn" data-d="365" onclick="setPreset(365)">1a</button>
+    <div class="date-bar-sep"></div>
+    <div class="date-input-wrap">
+      <label>De</label>
+      <input type="date" class="date-input" id="inp-from" />
+    </div>
+    <div class="date-input-wrap">
+      <label>Até</label>
+      <input type="date" class="date-input" id="inp-to" />
+    </div>
+    <button class="apply-btn" onclick="applyDate()">Aplicar</button>
+    <span class="period-lbl" id="tb-period">—</span>
+  </div>
+
+  <!-- ── Content ────────────────────────────────────── -->
+  <main class="content">
+
+    <!-- ════════ INÍCIO ════════ -->
+    <section id="sec-home" class="section active">
+      <div class="kpi-grid kpi-grid-4" id="home-kpis" style="margin-bottom:14px;"></div>
+      <div class="row-2">
+        <div class="card">
+          <div class="card-head"><h3>Funil de Conversão</h3></div>
+          <div class="card-body"><div id="home-funnel" class="funnel"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Mensagens por Dia</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:180px">
+              <canvas id="chart-msgs-day"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row-2 gap-top">
+        <div class="card">
+          <div class="card-head"><h3>Tickets por Status</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:160px"><canvas id="chart-home-tk-status"></canvas></div>
+            <div id="home-tk-legend" class="donut-legend"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Cliques no Menu</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:160px"><canvas id="chart-home-clicks"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ SESSÕES ════════ -->
+    <section id="sec-sessions" class="section">
+      <div class="kpi-grid kpi-grid-4 gap-top" id="sess-kpis"></div>
+      <div class="row-2 gap-top">
+        <div class="card">
+          <div class="card-head"><h3>Funil de Conversão</h3></div>
+          <div class="card-body"><div id="sess-funnel" class="funnel"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Novos vs. Recorrentes</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:180px"><canvas id="chart-new-ret"></canvas></div>
+            <div id="new-ret-legend" class="donut-legend"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ MENU & INTERAÇÕES ════════ -->
+    <section id="sec-clicks" class="section">
+      <div class="kpi-grid kpi-grid-3" id="clicks-kpis" style="margin-bottom:14px;"></div>
+      <div class="card">
+        <div class="card-head"><h3>Distribuição de Cliques</h3></div>
+        <div class="card-body">
+          <div class="chart-wrap" style="height:220px"><canvas id="chart-clicks-bar"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ TICKETS ════════ -->
+    <section id="sec-tickets" class="section">
+      <div class="kpi-grid kpi-grid-3" id="tk-kpis" style="margin-bottom:14px;"></div>
+      <div class="row-2">
+        <div class="card">
+          <div class="card-head"><h3>Chamados por Dia</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:180px"><canvas id="chart-tk-day"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Por Status (total acumulado)</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:160px"><canvas id="chart-tk-status"></canvas></div>
+            <div id="tk-status-legend" class="donut-legend"></div>
+          </div>
+        </div>
+      </div>
+      <div class="row-2 gap-top">
+        <div class="card">
+          <div class="card-head"><h3>Top Atendentes</h3></div>
+          <div class="card-body" id="top-att"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Aguardando Atendimento</h3><span id="pending-count"></span></div>
+          <div class="card-body" id="pending-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ OTP ════════ -->
+    <section id="sec-otp" class="section">
+      <div class="kpi-grid kpi-grid-4" id="otp-kpis" style="margin-bottom:14px;"></div>
+      <div class="row-2">
+        <div class="card">
+          <div class="card-head"><h3>Taxa de Sucesso</h3></div>
+          <div class="card-body">
+            <div class="otp-rate">
+              <div class="otp-rate-val" id="otp-rate-val">—%</div>
+              <div class="otp-rate-lbl">OTPs utilizados com sucesso</div>
+            </div>
+            <div class="otp-bar-bg"><div class="otp-bar-fill" id="otp-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Distribuição de Status</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:160px"><canvas id="chart-otp-dist"></canvas></div>
+            <div id="otp-dist-legend" class="donut-legend"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ VOLUME ════════ -->
+    <section id="sec-volume" class="section">
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-head"><h3>Mensagens por Dia</h3></div>
+        <div class="card-body">
+          <div class="chart-wrap" style="height:200px"><canvas id="chart-vol-day"></canvas></div>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="card">
+          <div class="card-head"><h3>Por Hora do Dia</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:180px"><canvas id="chart-vol-hour"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Por Dia da Semana</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:180px"><canvas id="chart-vol-dow"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ FINANCEIRO ════════ -->
+    <section id="sec-financeiro" class="section">
+      <div class="kpi-grid kpi-grid-2" id="fin-kpis" style="margin-bottom:14px;"></div>
+      <div class="row-2">
+        <div class="card">
+          <div class="card-head"><h3>Faturas por Status</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:160px"><canvas id="chart-fin-status"></canvas></div>
+            <div id="fin-status-legend" class="donut-legend"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Resumo Financeiro</h3></div>
+          <div class="card-body" id="fin-summary"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ── Globals ─────────────────────────────────────── */
+const BASE = window.APP_CONFIG?.apiBaseUrl ?? '';
+let DATA = null;
+let ACTIVE = 'home';
+let CHARTS = {};
+
+const SECTION_TITLES = {
+  home:       'Início',
+  sessions:   'Sessões',
+  clicks:     'Menu & Interações',
+  tickets:    'Tickets de Atendimento',
+  otp:        'Autenticação OTP',
+  volume:     'Volume de Mensagens',
+  financeiro: 'Financeiro',
+};
+
+/* ── Date helpers ────────────────────────────────── */
+const pad = n => String(n).padStart(2,'0');
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function daysAgoStr(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n + 1);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function fmtDt(raw) {
+  const s = String(raw instanceof Date ? raw.toISOString() : raw).slice(0,10);
+  const [, m, d] = s.split('-');
+  return `${d}/${m}`;
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function fmtMins(n) {
+  if (n === null || n === undefined) return '—';
+  if (n === 0) return '< 1 min';
+  if (n < 60) return `${n} min`;
+  const h = Math.floor(n/60), m = n%60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+function fmtMoney(v) {
+  return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}
+function n(v) { return Number(v||0).toLocaleString('pt-BR'); }
+
+/* ── Preset / date init ──────────────────────────── */
+let currentPreset = 30;
+function initDates() {
+  document.getElementById('inp-to').value = todayStr();
+  document.getElementById('inp-from').value = daysAgoStr(30);
+}
+function setPreset(d) {
+  currentPreset = d;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.d) === d));
+  document.getElementById('inp-from').value = daysAgoStr(d);
+  document.getElementById('inp-to').value   = todayStr();
+}
+function applyDate() { load(); }
+
+function getDateParams() {
+  const from = document.getElementById('inp-from').value;
+  const to   = document.getElementById('inp-to').value;
+  if (from && to) return `from=${from}&to=${to}`;
+  return `days=${currentPreset}`;
+}
+
+/* ── Nav ──────────────────────────────────────────── */
+function go(sec) {
+  ACTIVE = sec;
+  document.querySelectorAll('.tab-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.sec === sec)
+  );
+  document.querySelectorAll('.section').forEach(el =>
+    el.classList.toggle('active', el.id === `sec-${sec}`)
+  );
+  if (DATA) paint(sec);
+}
+
+/* ── Load ─────────────────────────────────────────── */
+async function load() {
+  showLoader(true);
+  try {
+    const qs = getDateParams();
+    const [info, metrics] = await Promise.all([
+      fetch(`${BASE}/api/bi/info`).then(r => r.json()),
+      fetch(`${BASE}/api/bi/metrics?${qs}`).then(r => r.json()),
+    ]);
+    if (info.entidade) {
+      document.getElementById('sb-entidade').textContent = info.entidade;
+      document.title = `BI · ${info.entidade}`;
+    }
+    DATA = metrics;
+    updatePeriodLabel();
+    paint(ACTIVE);
+  } catch(e) {
+    console.error(e);
+  } finally {
+    showLoader(false);
+  }
+}
+
+function updatePeriodLabel() {
+  if (!DATA?.period) return;
+  const { from, to } = DATA.period;
+  document.getElementById('tb-period').textContent = `${fmtDate(from)} – ${fmtDate(to)}`;
+}
+
+function showLoader(v) {
+  document.getElementById('loader').classList.toggle('hidden', !v);
+}
+
+/* ── Chart helpers ───────────────────────────────── */
+const PALETTE = ['#3b82f6','#10b981','#f59e0b','#f43f5e','#8b5cf6','#14b8a6','#fb923c','#6366f1'];
+
+function kill(id) { if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; } }
+
+function bar(id, labels, datasets, opts = {}) {
+  kill(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  CHARTS[id] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: opts.legend ?? false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8', maxRotation: 45, ...(opts.xTicks||{}) } },
+        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, color: '#94a3b8' }, beginAtZero: true },
+      },
+      ...opts.extra,
+    }
+  });
+}
+
+function line(id, labels, datasets, opts = {}) {
+  kill(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  CHARTS[id] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8', maxTicksLimit: 10 } },
+        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, color: '#94a3b8' }, beginAtZero: true },
+      },
+      elements: { point: { radius: 2 }, line: { tension: .35 } },
+      ...opts,
+    }
+  });
+}
+
+function donut(id, labels, data, colors) {
+  kill(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  CHARTS[id] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      cutout: '68%',
+    }
+  });
+}
+
+/* ── Delta badge ─────────────────────────────────── */
+function deltaBadge(d, invert = false) {
+  if (d === null || d === undefined) return '';
+  const up = invert ? d < 0 : d > 0;
+  const cls = d === 0 ? 'flat' : up ? 'up' : 'down';
+  const arrow = d === 0
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>`
+    : up
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`;
+  return `<span class="delta ${cls}">${arrow}${Math.abs(d)}%</span>`;
+}
+
+/* ── KPI card ─────────────────────────────────────── */
+function kpiCard({ icon, label, value, delta: d, note, color = 'blue', invertDelta = false, onclick: oc = '' }) {
+  const bg  = `var(--${color}-l)`;
+  const clr = `var(--${color}-m)`;
+  const clickable = oc ? `style="cursor:pointer" onclick="${oc}"` : '';
+  const hoverStyle = oc ? `onmouseenter="this.style.boxShadow='var(--sh-md)'" onmouseleave="this.style.boxShadow=''"` : '';
+  return `
+    <div class="kpi" ${clickable} ${hoverStyle}>
+      <div class="kpi-top">
+        <div>
+          <div class="kpi-val">${value}</div>
+          <div class="kpi-lbl">${label}</div>
+        </div>
+        <div class="kpi-icon" style="background:${bg};color:${clr}">${icon}</div>
+      </div>
+      <div class="kpi-foot">
+        ${deltaBadge(d, invertDelta)}
+        <span class="delta-note">${oc ? `<span style="color:var(--blue);font-size:10px">Ver detalhes →</span>` : (note ?? 'vs. período anterior')}</span>
+      </div>
+    </div>`;
+}
+
+/* ── Icon strings ────────────────────────────────── */
+const IC = {
+  users:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  shield:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  ticket:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+  clock:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  lock:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  check:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  dollar:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+  msg:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+};
+
+/* ── Funnel render ───────────────────────────────── */
+function renderFunnel(el, steps) {
+  if (!el) return;
+  const max = steps[0]?.value || 1;
+  const colors = ['#3b82f6','#8b5cf6','#f59e0b','#10b981','#1d4ed8'];
+  el.innerHTML = steps.map((s, i) => {
+    const pct = max > 0 ? Math.round((s.value / max) * 100) : 0;
+    const convFromPrev = i > 0 && steps[i-1].value > 0
+      ? Math.round((s.value / steps[i-1].value) * 100) : null;
+    const dropped = i > 0 ? steps[i-1].value - s.value : 0;
+    return `
+      <div class="funnel-step">
+        <div class="funnel-meta">
+          <span class="funnel-label">${s.label}</span>
+          <div class="funnel-vals">
+            <span style="font-weight:700;color:var(--ink)">${n(s.value)}</span>
+            <span class="funnel-pct" style="color:${colors[i]}">${pct}%</span>
+          </div>
+        </div>
+        <div class="funnel-bar-bg">
+          <div class="funnel-bar-fill" style="width:${pct}%;background:${colors[i]}"></div>
+        </div>
+        ${i > 0 && dropped > 0 ? `
+        <div class="funnel-drop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <span>${n(dropped)} saíram • ${convFromPrev !== null ? convFromPrev+'% converteram' : ''}</span>
+        </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+/* ── Paint dispatcher ────────────────────────────── */
+function paint(sec) {
+  if (!DATA) return;
+  const fn = { home: paintHome, sessions: paintSessions, clicks: paintClicks,
+               tickets: paintTickets, otp: paintOtp, volume: paintVolume,
+               financeiro: paintFinanceiro }[sec];
+  if (fn) fn();
+}
+
+/* ════════ HOME ════════ */
+function paintHome() {
+  const { overview, funnel, volume, tickets, menuClicks } = DATA;
+
+  // KPIs
+  document.getElementById('home-kpis').innerHTML = [
+    kpiCard({ icon: IC.users,  label: 'Usuários únicos',  value: n(overview.uniqueUsers), delta: overview.uniqueUsersDelta, color: 'blue', onclick: "openSessions('all')" }),
+    kpiCard({ icon: IC.shield, label: 'Autenticados',     value: n(overview.authenticatedUsers), delta: overview.authenticatedUsersDelta, color: 'vlt', onclick: "openSessions('authenticated')" }),
+    kpiCard({ icon: IC.ticket, label: 'Tickets abertos',  value: n(overview.tickets), delta: overview.ticketsDelta, color: 'amb', onclick: "openTickets('')" }),
+    kpiCard({ icon: IC.lock,   label: 'OTP enviados',     value: n(overview.otpTotal), delta: overview.otpTotalDelta, color: 'tel', onclick: "openOtp('all')" }),
+  ].join('');
+
+  // Funnel
+  renderFunnel(document.getElementById('home-funnel'), funnel ?? []);
+
+  // Mensagens por dia
+  const perDay = volume?.perDay ?? [];
+  line('chart-msgs-day',
+    perDay.map(r => fmtDt(r.day)),
+    [{
+      label: 'Mensagens',
+      data: perDay.map(r => r.count),
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,.08)',
+      fill: true,
+    }]
+  );
+
+  // Tickets donut
+  const byStatus = tickets?.byStatus ?? [];
+  const tkColors = byStatus.map(r => {
+    const s = (r.status||'').toLowerCase();
+    return s==='finalizado' ? '#10b981' : s==='pendente' ? '#f59e0b' : s==='aberto'||s==='em_atendimento' ? '#3b82f6' : '#94a3b8';
+  });
+  donut('chart-home-tk-status', byStatus.map(r => fmtStatus(r.status)), byStatus.map(r => r.count), tkColors);
+  const tkTotal = byStatus.reduce((a,r) => a + Number(r.count), 0);
+  document.getElementById('home-tk-legend').innerHTML = byStatus.map((r, i) => `
+    <div class="legend-row">
+      <div class="legend-dot" style="background:${tkColors[i]}"></div>
+      <span class="legend-key">${fmtStatus(r.status)}</span>
+      <span class="legend-val">${n(r.count)}</span>
+      <span class="legend-pct">${tkTotal > 0 ? Math.round(r.count/tkTotal*100) : 0}%</span>
+    </div>`).join('');
+
+  // Clicks bar
+  const mc = menuClicks;
+  bar('chart-home-clicks',
+    ['Vídeo','Consumo','2ª Via','Localização','Atendente'],
+    [{
+      data: [mc.video, mc.consumo, mc.segundaVia, mc.localizacao, mc.atendente],
+      backgroundColor: PALETTE,
+      borderRadius: 5,
+    }]
+  );
+}
+
+/* ════════ SESSÕES ════════ */
+function paintSessions() {
+  const { sessions, funnel } = DATA;
+
+  document.getElementById('sess-kpis').innerHTML = [
+    kpiCard({ icon: IC.users,  label: 'Usuários únicos',    value: n(sessions.uniqueUsers),      delta: sessions.uniqueUsersDelta,       color: 'blue', onclick: "openSessions('all')" }),
+    kpiCard({ icon: IC.shield, label: 'Autenticados',       value: n(sessions.authenticatedUsers),delta: sessions.authenticatedUsersDelta, color: 'vlt',  onclick: "openSessions('authenticated')" }),
+    kpiCard({ icon: IC.msg,    label: 'Verificação perguntas', value: n(sessions.challengeUsers ?? 0), delta: null, color: 'amb', note: 'sem e-mail cadastrado' }),
+    kpiCard({ icon: IC.msg,    label: 'Msgs/sessão (média)', value: sessions.avgMsgsPerSession ? sessions.avgMsgsPerSession.toFixed(1) : '—', delta: null, color: 'tel', note: 'mensagens por conversa' }),
+  ].join('');
+
+  renderFunnel(document.getElementById('sess-funnel'), funnel ?? []);
+
+  // New vs returning donut
+  const nw = sessions.newUsers ?? 0;
+  const rt = sessions.returningUsers ?? 0;
+  donut('chart-new-ret', ['Novos','Recorrentes'], [nw, rt], ['#3b82f6','#10b981']);
+  const nr = nw + rt;
+  document.getElementById('new-ret-legend').innerHTML = [
+    { label: 'Novos usuários',   val: nw, c: '#3b82f6' },
+    { label: 'Recorrentes',      val: rt, c: '#10b981' },
+  ].map(it => `
+    <div class="legend-row">
+      <div class="legend-dot" style="background:${it.c}"></div>
+      <span class="legend-key">${it.label}</span>
+      <span class="legend-val">${n(it.val)}</span>
+      <span class="legend-pct">${nr > 0 ? Math.round(it.val/nr*100) : 0}%</span>
+    </div>`).join('');
+}
+
+/* ════════ CLICKS ════════ */
+function paintClicks() {
+  const mc = DATA.menuClicks;
+  const items = [
+    { label: 'Vídeo Tutorial',  val: mc.video,      delta: mc.videoDelta,      color: 'blue' },
+    { label: 'Histórico Consumo',val: mc.consumo,   delta: mc.consumoDelta,    color: 'grn' },
+    { label: '2ª Via de Conta', val: mc.segundaVia, delta: mc.segundaViaDelta, color: 'amb' },
+    { label: 'Localização',     val: mc.localizacao,delta: mc.localizacaoDelta, color: 'tel' },
+    { label: 'Falar c/ Atendente',val: mc.atendente,delta: mc.atendenteDelta,  color: 'vlt' },
+  ];
+  document.getElementById('clicks-kpis').innerHTML = items.slice(0,3).map(it =>
+    kpiCard({ icon: IC.msg, label: it.label, value: n(it.val), delta: it.delta, color: it.color })
+  ).join('') + items.slice(3).map(it =>
+    kpiCard({ icon: IC.msg, label: it.label, value: n(it.val), delta: it.delta, color: it.color })
+  ).join('');
+
+  bar('chart-clicks-bar',
+    items.map(i => i.label),
+    [{
+      data: items.map(i => i.val),
+      backgroundColor: PALETTE,
+      borderRadius: 6,
+    }]
+  );
+}
+
+/* ════════ TICKETS ════════ */
+function fmtStatus(s) {
+  const m = { pendente:'Pendente', aberto:'Em Atendimento', em_atendimento:'Em Atendimento', finalizado:'Finalizado', pausado:'Pausado' };
+  return m[(s||'').toLowerCase()] || s || '—';
+}
+
+function paintTickets() {
+  const { tickets } = DATA;
+
+  document.getElementById('tk-kpis').innerHTML = [
+    kpiCard({ icon: IC.ticket, label: 'Total no período', value: n(tickets.total), delta: tickets.totalDelta, color: 'blue', onclick: "openTickets('')" }),
+    kpiCard({ icon: IC.clock,  label: 'Tempo médio',      value: fmtMins(tickets.avgTimeMinutes), delta: tickets.avgTimeDelta, color: 'amb', invertDelta: true, note: 'menor é melhor' }),
+    kpiCard({ icon: IC.users,  label: 'Aguardando',       value: n(tickets.pendingSemAtendente?.length ?? 0), delta: null, color: 'red', onclick: "openTickets('pendente')" }),
+  ].join('');
+
+  // Per day line
+  const pd = tickets.perDay ?? [];
+  bar('chart-tk-day', pd.map(r => fmtDt(r.day)), [{
+    data: pd.map(r => r.count),
+    backgroundColor: '#3b82f6',
+    borderRadius: 4,
+  }]);
+
+  // By status donut (clickable segments)
+  const bs = tickets.byStatus ?? [];
+  const colors = bs.map(r => {
+    const s = (r.status||'').toLowerCase();
+    return s==='finalizado' ? '#10b981' : s==='pendente' ? '#f59e0b' : s==='aberto'||s==='em_atendimento' ? '#3b82f6' : '#94a3b8';
+  });
+  kill('chart-tk-status');
+  const tkStatusCtx = document.getElementById('chart-tk-status');
+  if (tkStatusCtx) {
+    CHARTS['chart-tk-status'] = new Chart(tkStatusCtx, {
+      type: 'doughnut',
+      data: { labels: bs.map(r => fmtStatus(r.status)), datasets: [{ data: bs.map(r => r.count), backgroundColor: colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        cutout: '68%',
+        onClick(_, els) {
+          if (els.length) openTickets(bs[els[0].index]?.status ?? '');
+        },
+        onHover(e) { e.native.target.style.cursor = 'pointer'; },
+      }
+    });
+  }
+  const tot = bs.reduce((a,r) => a+Number(r.count), 0);
+  document.getElementById('tk-status-legend').innerHTML = bs.map((r,i) => `
+    <div class="legend-row" style="cursor:pointer" onclick="openTickets('${r.status}')">
+      <div class="legend-dot" style="background:${colors[i]}"></div>
+      <span class="legend-key">${fmtStatus(r.status)}</span>
+      <span class="legend-val">${n(r.count)}</span>
+      <span class="legend-pct">${tot > 0 ? Math.round(r.count/tot*100) : 0}%</span>
+    </div>`).join('');
+
+  // Top attendants
+  const topAtt = tickets.topAttendants ?? [];
+  const maxTot = Math.max(...topAtt.map(a => a.total), 1);
+  document.getElementById('top-att').innerHTML = topAtt.length
+    ? `<table class="tbl">
+        <thead><tr><th>Atendente</th><th>Chamados</th><th>Finalizados</th><th>T. Médio</th></tr></thead>
+        <tbody>${topAtt.map(a => `
+          <tr style="cursor:pointer" onclick="openAttendantTickets('${(a.assigned_attendant||'').replace(/'/g,"\\'")}')">
+            <td>
+              <div style="font-weight:600;color:var(--blue)">${a.assigned_attendant}</div>
+              <div class="att-bar-bg"><div class="att-bar-fill" style="width:${Math.round(a.total/maxTot*100)}%"></div></div>
+            </td>
+            <td><strong>${n(a.total)}</strong></td>
+            <td>${n(a.finalizados)}</td>
+            <td>${fmtMins(a.avg_min)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`
+    : `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><p>Nenhum ticket com atendente atribuído no período</p></div>`;
+
+  // Pending
+  const pending = tickets.pendingSemAtendente ?? [];
+  document.getElementById('pending-count').textContent = pending.length ? `${pending.length} aguardando` : '';
+  document.getElementById('pending-list').innerHTML = pending.length
+    ? `<div class="pending-list">${pending.map(t => `
+        <div class="pending-item" style="cursor:pointer" onclick="openMessages('${t.phone}')">
+          <div class="pending-avatar">${String(t.phone||'?').slice(-2)}</div>
+          <div class="pending-info">
+            <div class="pending-phone" style="color:var(--blue)">${t.phone}</div>
+            <div class="pending-wait">Desde ${fmtDate(String(t.created_at).slice(0,10))}</div>
+          </div>
+          <div class="pending-badge">${t.minutos_aguardando}min</div>
+        </div>`).join('')}</div>`
+    : `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="20 6 9 17 4 12"/></svg><p>Nenhum ticket aguardando</p></div>`;
+}
+
+/* ════════ OTP ════════ */
+function paintOtp() {
+  const { otp } = DATA;
+
+  document.getElementById('otp-kpis').innerHTML = [
+    kpiCard({ icon: IC.lock,  label: 'OTPs enviados',   value: n(otp.total),     delta: otp.totalDelta,   color: 'blue', onclick: "openOtp('all')"     }),
+    kpiCard({ icon: IC.check, label: 'Verificados',     value: n(otp.success),   delta: otp.successDelta, color: 'grn',  onclick: "openOtp('used')"    }),
+    kpiCard({ icon: IC.clock, label: 'Expirados',       value: n(otp.expired),   delta: null,             color: 'amb',  onclick: "openOtp('expired')" }),
+    kpiCard({ icon: IC.msg,   label: 'Com tentativas',  value: n(otp.withErrors),delta: null,             color: 'red',  onclick: "openOtp('errors')"  }),
+  ].join('');
+
+  const rate = otp.successRate ?? 0;
+  document.getElementById('otp-rate-val').textContent = `${rate}%`;
+  document.getElementById('otp-bar').style.width = `${rate}%`;
+
+  // Donut
+  const d = [otp.success, otp.expired, otp.withErrors > 0 ? otp.withErrors : 0];
+  const dl = ['Verificados','Expirados','Com Tentativas'];
+  const dc = ['#10b981','#f59e0b','#f43f5e'];
+  donut('chart-otp-dist', dl, d, dc);
+  const dtot = d.reduce((a,v) => a+v, 0);
+  document.getElementById('otp-dist-legend').innerHTML = dl.map((l,i) => `
+    <div class="legend-row">
+      <div class="legend-dot" style="background:${dc[i]}"></div>
+      <span class="legend-key">${l}</span>
+      <span class="legend-val">${n(d[i])}</span>
+      <span class="legend-pct">${dtot > 0 ? Math.round(d[i]/dtot*100) : 0}%</span>
+    </div>`).join('');
+}
+
+/* ════════ VOLUME ════════ */
+function paintVolume() {
+  const { volume } = DATA;
+
+  // Per day
+  const pd = volume?.perDay ?? [];
+  line('chart-vol-day',
+    pd.map(r => fmtDt(r.day)),
+    [{
+      label: 'Mensagens',
+      data: pd.map(r => r.count),
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,.1)',
+      fill: true,
+    }]
+  );
+
+  // By hour
+  const hours = Array.from({length:24}, (_,i) => i);
+  const hourMap = Object.fromEntries((volume?.byHour ?? []).map(r => [r.hour, r.count]));
+  bar('chart-vol-hour',
+    hours.map(h => `${String(h).padStart(2,'0')}h`),
+    [{ data: hours.map(h => hourMap[h] ?? 0), backgroundColor: '#3b82f6', borderRadius: 3 }]
+  );
+
+  // By DOW
+  const dows = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const dowMap = Object.fromEntries((volume?.byDow ?? []).map(r => [r.dow, r.count]));
+  bar('chart-vol-dow',
+    dows,
+    [{ data: Array.from({length:7}, (_,i) => dowMap[i+1] ?? 0), backgroundColor: '#8b5cf6', borderRadius: 4 }]
+  );
+}
+
+/* ════════ FINANCEIRO ════════ */
+function paintFinanceiro() {
+  const { financeiro } = DATA;
+  const hasFin = financeiro && (financeiro.total > 0 || (financeiro.byStatus?.length > 0));
+
+  document.getElementById('fin-kpis').innerHTML = [
+    kpiCard({ icon: IC.dollar, label: 'Faturas geradas', value: n(financeiro?.total ?? 0), delta: financeiro?.totalDelta ?? null, color: 'blue', onclick: "openFinanceiro('')" }),
+    kpiCard({ icon: IC.dollar, label: 'Valor total',     value: fmtMoney(financeiro?.valorTotal ?? 0), delta: null, color: 'grn', note: 'no período' }),
+  ].join('');
+
+  if (!hasFin) {
+    const msg = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><p>Sem faturas com vencimento no período selecionado.<br><small style="color:var(--ink-3)">Tente ampliar o intervalo de datas.</small></p></div>`;
+    document.querySelector('#chart-fin-status')?.closest('.card-body') && (document.querySelector('#chart-fin-status').closest('.card-body').innerHTML = msg);
+    document.getElementById('fin-summary').innerHTML = msg;
+    return;
+  }
+
+  const bs = financeiro?.byStatus ?? [];
+  const colors = PALETTE.slice(0, bs.length);
+  donut('chart-fin-status', bs.map(r => r.status || '—'), bs.map(r => r.count), colors);
+  const btot = bs.reduce((a,r) => a + Number(r.count), 0);
+  document.getElementById('fin-status-legend').innerHTML = bs.map((r,i) => `
+    <div class="legend-row">
+      <div class="legend-dot" style="background:${colors[i]}"></div>
+      <span class="legend-key">${r.status || '—'}</span>
+      <span class="legend-val">${n(r.count)}</span>
+      <span class="legend-pct">${btot > 0 ? Math.round(r.count/btot*100) : 0}%</span>
+    </div>`).join('');
+
+  document.getElementById('fin-summary').innerHTML = `
+    <div class="fin-total">
+      <div class="fin-total-val">${fmtMoney(financeiro.valorTotal)}</div>
+      <div class="fin-total-lbl">valor total em faturas no período</div>
+    </div>
+    <table class="tbl" style="margin-top:12px">
+      <thead><tr><th>Status</th><th>Qtd</th><th>Valor</th></tr></thead>
+      <tbody>${bs.map(r => `
+        <tr>
+          <td>${r.status || '—'}</td>
+          <td>${n(r.count)}</td>
+          <td>${fmtMoney(r.valor)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+/* ════════════════════════════════════════════════════
+   DRAWER — Drill-down / Auditoria
+═══════════════════════════════════════════════════════ */
+const DRW = {
+  stack: [],       // navigation stack [{title,subtitle,load}]
+  current: null,   // current view state
+  offset: 0,
+  total: 0,
+  filter: 'all',
+  rows: [],
+};
+
+/* ── Open / close ─────────────────────────────────── */
+function drwOpen(title, subtitle, loadFn, filters = []) {
+  DRW.stack = [];
+  DRW.current = { title, subtitle, loadFn, filters };
+  DRW.offset = 0;
+  DRW.rows = [];
+  DRW.filter = filters[0]?.value ?? 'all';
+
+  document.getElementById('drw-title').textContent = title;
+  document.getElementById('drw-subtitle').textContent = subtitle ?? '';
+  document.getElementById('drw-back').style.display = 'none';
+
+  renderFilters(filters);
+  document.getElementById('drw-overlay').classList.add('open');
+  document.getElementById('drw').classList.add('open');
+  drwFetch();
+}
+
+function drwClose() {
+  document.getElementById('drw-overlay').classList.remove('open');
+  document.getElementById('drw').classList.remove('open');
+  DRW.stack = [];
+}
+
+function drwBack() {
+  if (DRW.stack.length === 0) return;
+  const prev = DRW.stack.pop();
+  DRW.current = prev;
+  DRW.offset = 0;
+  DRW.rows = [];
+  DRW.filter = prev.filters?.[0]?.value ?? 'all';
+  document.getElementById('drw-title').textContent = prev.title;
+  document.getElementById('drw-subtitle').textContent = prev.subtitle ?? '';
+  document.getElementById('drw-back').style.display = DRW.stack.length > 0 ? '' : 'none';
+  renderFilters(prev.filters ?? []);
+  drwFetch();
+}
+
+function drwPush(title, subtitle, loadFn, filters = []) {
+  DRW.stack.push(DRW.current);
+  DRW.current = { title, subtitle, loadFn, filters };
+  DRW.offset = 0;
+  DRW.rows = [];
+  DRW.filter = filters[0]?.value ?? 'all';
+  document.getElementById('drw-title').textContent = title;
+  document.getElementById('drw-subtitle').textContent = subtitle ?? '';
+  document.getElementById('drw-back').style.display = '';
+  renderFilters(filters);
+  drwFetch();
+}
+
+/* ── Filters bar ──────────────────────────────────── */
+function renderFilters(filters) {
+  const el = document.getElementById('drw-filters');
+  if (!filters || filters.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = filters.map(f =>
+    `<button class="df-btn${f.value === DRW.filter ? ' active' : ''}"
+      onclick="drwSetFilter('${f.value}')">${f.label}</button>`
+  ).join('');
+}
+
+function drwSetFilter(v) {
+  DRW.filter = v;
+  DRW.offset = 0;
+  DRW.rows = [];
+  renderFilters(DRW.current.filters);
+  drwFetch();
+}
+
+/* ── Fetch & render ───────────────────────────────── */
+async function drwFetch() {
+  document.getElementById('drw-body').innerHTML =
+    `<div class="empty" style="padding:48px 16px">
+      <div class="spinner" style="border-color:rgba(0,0,0,.1);border-top-color:var(--blue);width:28px;height:28px;border-width:2px"></div>
+    </div>`;
+  document.getElementById('drw-more').disabled = true;
+
+  try {
+    const data = await DRW.current.loadFn(DRW.filter, DRW.offset);
+    DRW.total  = data.total ?? 0;
+    DRW.rows   = DRW.offset === 0 ? (data.rows ?? []) : [...DRW.rows, ...(data.rows ?? [])];
+    DRW.current.renderFn(DRW.rows, data);
+    document.getElementById('drw-count').textContent =
+      `${DRW.rows.length} de ${n(DRW.total)} registros`;
+    const moreBtn = document.getElementById('drw-more');
+    moreBtn.disabled = DRW.rows.length >= DRW.total;
+  } catch(e) {
+    document.getElementById('drw-body').innerHTML =
+      `<div class="empty"><p>Erro: ${e.message}</p></div>`;
+  }
+}
+
+async function drwLoadMore() {
+  DRW.offset = DRW.rows.length;
+  await drwFetch();
+}
+
+/* ── Date range for detail queries ───────────────── */
+function detailQS(extra = '') {
+  const from = document.getElementById('inp-from').value;
+  const to   = document.getElementById('inp-to').value;
+  let qs = from && to ? `from=${from}&to=${to}` : `days=${currentPreset}`;
+  if (extra) qs += `&${extra}`;
+  return qs;
+}
+
+/* ════════ SESSIONS DRILL-DOWN ════════ */
+function openSessions(filter = 'all') {
+  const filters = [
+    { label: 'Todos',         value: 'all'           },
+    { label: 'Autenticados',  value: 'authenticated'  },
+    { label: 'Novos',         value: 'new'            },
+    { label: 'Recorrentes',   value: 'returning'      },
+  ];
+  drwOpen('Usuários & Sessões', 'Detalhe por telefone', loadSessions, filters);
+  DRW.current.renderFn = renderSessionsTable;
+  DRW.filter = filter;
+  renderFilters(filters);
+  drwFetch();
+}
+
+async function loadSessions(filter, offset) {
+  const r = await fetch(`${BASE}/api/bi/detail/sessions?${detailQS(`filter=${filter}&limit=50&offset=${offset}`)}`);
+  return r.json();
+}
+
+function renderSessionsTable(rows) {
+  if (!rows.length) { document.getElementById('drw-body').innerHTML = emptyState('Nenhum registro encontrado'); return; }
+  document.getElementById('drw-body').innerHTML = `
+    <table class="drawer-table">
+      <thead><tr>
+        <th>Telefone</th><th>Mensagens</th><th>Primeiro contato</th><th>Último contato</th><th>Auth</th>
+      </tr></thead>
+      <tbody>${rows.map(r => `
+        <tr>
+          <td>
+            <a class="dt-link" onclick="openMessages('${r.phone}')">${r.phone}</a>
+          </td>
+          <td>${n(r.msg_count)}</td>
+          <td class="dt-mono">${r.primeiro_contato ?? '—'}</td>
+          <td class="dt-mono">${r.ultimo_contato ?? '—'}</td>
+          <td>
+            ${r.autenticado
+              ? `<span class="sb sb-ok">Sim</span>`
+              : `<span class="sb sb-def">Não</span>`}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+/* ════════ MESSAGES DRILL-DOWN ════════ */
+function openMessages(phone) {
+  drwPush(
+    `Conversa: ${phone}`,
+    'Histórico de mensagens',
+    (_, offset) => fetch(`${BASE}/api/bi/detail/messages?${detailQS(`phone=${encodeURIComponent(phone)}&limit=100&offset=${offset}`)}`).then(r => r.json()),
+    []
+  );
+  DRW.current.renderFn = renderMessages;
+}
+
+function renderMessages(rows, data) {
+  if (!rows.length) { document.getElementById('drw-body').innerHTML = emptyState('Nenhuma mensagem encontrada'); return; }
+
+  let html = `<div class="msg-list">`;
+  let lastDate = '';
+  for (const m of rows) {
+    const dateStr = (m.criado_em ?? '').slice(0, 10);
+    if (dateStr !== lastDate) {
+      html += `<div class="msg-separator">${fmtDate(dateStr)}</div>`;
+      lastDate = dateStr;
+    }
+    const dir = m.direction === 'out' ? 'out' : 'in';
+    const label = dir === 'out' ? 'Bot' : 'Usuário';
+    const content = String(m.content ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    html += `
+      <div class="msg-row ${dir}">
+        <div>
+          <div class="msg-dir-lbl">${label}</div>
+          <div class="msg-bubble">${content}</div>
+          <div class="msg-time">${(m.criado_em ?? '').slice(11, 16)}</div>
+        </div>
+      </div>`;
+  }
+  html += `</div>`;
+  document.getElementById('drw-body').innerHTML = html;
+  // scroll to bottom for messages
+  const body = document.getElementById('drw-body');
+  body.scrollTop = body.scrollHeight;
+}
+
+/* ════════ TICKETS DRILL-DOWN ════════ */
+function openTickets(statusFilter = '') {
+  const filters = [
+    { label: 'Todos',           value: '' },
+    { label: 'Pendente',        value: 'pendente' },
+    { label: 'Em atendimento',  value: 'aberto' },
+    { label: 'Finalizado',      value: 'finalizado' },
+  ];
+  drwOpen('Tickets de Atendimento', 'Detalhe por ticket', loadTickets, filters);
+  DRW.current.renderFn = renderTicketsTable;
+  DRW.filter = statusFilter;
+  renderFilters(filters);
+  drwFetch();
+}
+
+async function loadTickets(filter, offset) {
+  const extra = filter ? `status=${filter}&` : '';
+  const r = await fetch(`${BASE}/api/bi/detail/tickets?${detailQS(`${extra}limit=50&offset=${offset}`)}`);
+  return r.json();
+}
+
+function renderTicketsTable(rows) {
+  if (!rows.length) { document.getElementById('drw-body').innerHTML = emptyState('Nenhum ticket encontrado'); return; }
+  document.getElementById('drw-body').innerHTML = `
+    <table class="drawer-table">
+      <thead><tr>
+        <th>#</th><th>Telefone</th><th>Atendente</th><th>Status</th><th>Criado em</th><th>Duração</th>
+      </tr></thead>
+      <tbody>${rows.map(r => `
+        <tr>
+          <td class="dt-mono">${r.id}</td>
+          <td>
+            <a class="dt-link" onclick="openMessages('${r.phone}')">${r.phone}</a>
+          </td>
+          <td>${r.assigned_attendant}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td class="dt-mono">${r.criado_em ?? '—'}</td>
+          <td>${fmtMins(r.duracao_min)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function statusBadge(s) {
+  const m = {
+    pendente:       'sb-pend',
+    aberto:         'sb-open',
+    em_atendimento: 'sb-open',
+    finalizado:     'sb-fin',
+  };
+  return `<span class="sb ${m[(s||'').toLowerCase()]||'sb-def'}">${fmtStatus(s)}</span>`;
+}
+
+/* ════════ OTP DRILL-DOWN ════════ */
+function openOtp(filter = 'all') {
+  const filters = [
+    { label: 'Todos',           value: 'all'     },
+    { label: 'Verificados',     value: 'used'    },
+    { label: 'Expirados',       value: 'expired' },
+    { label: 'Com tentativas',  value: 'errors'  },
+  ];
+  drwOpen('Autenticação OTP', 'Detalhe por código', loadOtp, filters);
+  DRW.current.renderFn = renderOtpTable;
+  DRW.filter = filter;
+  renderFilters(filters);
+  drwFetch();
+}
+
+async function loadOtp(filter, offset) {
+  const r = await fetch(`${BASE}/api/bi/detail/otp?${detailQS(`filter=${filter}&limit=50&offset=${offset}`)}`);
+  return r.json();
+}
+
+function renderOtpTable(rows) {
+  if (!rows.length) { document.getElementById('drw-body').innerHTML = emptyState('Nenhum OTP encontrado'); return; }
+  document.getElementById('drw-body').innerHTML = `
+    <table class="drawer-table">
+      <thead><tr>
+        <th>Telefone</th><th>Status</th><th>Tentativas</th><th>Enviado em</th><th>Expira em</th><th>Usado em</th>
+      </tr></thead>
+      <tbody>${rows.map(r => `
+        <tr>
+          <td>
+            <a class="dt-link" onclick="openMessages('${r.phone}')">${r.phone}</a>
+          </td>
+          <td>${otpStatusBadge(r.status_otp)}</td>
+          <td>${r.attempts}</td>
+          <td class="dt-mono">${r.criado_em ?? '—'}</td>
+          <td class="dt-mono">${r.expira_em ?? '—'}</td>
+          <td class="dt-mono">${r.usado_em ?? '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function otpStatusBadge(s) {
+  const m = { verificado:'sb-ok', expirado:'sb-exp', com_tentativas:'sb-try', pendente:'sb-def' };
+  const labels = { verificado:'Verificado', expirado:'Expirado', com_tentativas:'Com tentativas', pendente:'Pendente' };
+  return `<span class="sb ${m[s]||'sb-def'}">${labels[s]||s}</span>`;
+}
+
+/* ════════ FINANCEIRO DRILL-DOWN ════════ */
+function openFinanceiro(statusFilter = '') {
+  drwOpen('Faturas', 'Detalhe por fatura',
+    async (filter, offset) => {
+      const extra = filter ? `status=${filter}&` : '';
+      const r = await fetch(`${BASE}/api/bi/detail/financeiro?${detailQS(`${extra}limit=50&offset=${offset}`)}`);
+      return r.json();
+    },
+    [{ label: 'Todas', value: '' }]
+  );
+  DRW.current.renderFn = renderFaturasTable;
+  DRW.filter = statusFilter;
+  drwFetch();
+}
+
+function renderFaturasTable(rows) {
+  if (!rows.length) { document.getElementById('drw-body').innerHTML = emptyState('Nenhuma fatura no período selecionado'); return; }
+  document.getElementById('drw-body').innerHTML = `
+    <table class="drawer-table">
+      <thead><tr>
+        <th>Identificador</th><th>Titular / Cliente</th><th>Ref.</th><th>Status</th><th>Valor</th><th>Vencimento</th>
+      </tr></thead>
+      <tbody>${rows.map(r => `
+        <tr>
+          <td class="dt-mono">${r.identificador || '—'}</td>
+          <td>
+            <div style="font-weight:600">${r.titular || '—'}</div>
+            <div class="dt-mono" style="font-size:10px">${r.cliente || ''}</div>
+          </td>
+          <td class="dt-mono">${r.referencia || '—'}</td>
+          <td>${faturaStatusBadge(r.status)}</td>
+          <td style="font-weight:700">${fmtMoney(r.valor)}</td>
+          <td class="dt-mono">${fmtDate(r.vencimento)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function faturaStatusBadge(s) {
+  const sl = (s || '').toLowerCase();
+  if (sl.includes('pag') || sl === 'pago' || sl === 'paga') return `<span class="sb sb-fin">${s}</span>`;
+  if (sl.includes('venc') || sl === 'vencida') return `<span class="sb sb-exp">${s}</span>`;
+  if (sl.includes('aberto') || sl.includes('aberta') || sl.includes('pendente')) return `<span class="sb sb-pend">${s}</span>`;
+  return `<span class="sb sb-def">${s || '—'}</span>`;
+}
+
+/* ── Utils ────────────────────────────────────────── */
+function emptyState(msg) {
+  return `<div class="empty" style="padding:48px 16px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <p>${msg}</p>
+  </div>`;
+}
+
+function openAttendantTickets(attendant) {
+  drwOpen(
+    `Tickets — ${attendant}`,
+    'Chamados deste atendente',
+    async (filter, offset) => {
+      const extra = filter && filter !== 'all' ? `status=${filter}&` : '';
+      const r = await fetch(`${BASE}/api/bi/detail/tickets?${detailQS(`${extra}attendant=${encodeURIComponent(attendant)}&limit=50&offset=${offset}`)}`);
+      return r.json();
+    },
+    [
+      { label: 'Todos',          value: 'all'       },
+      { label: 'Pendente',       value: 'pendente'  },
+      { label: 'Em atendimento', value: 'aberto'    },
+      { label: 'Finalizado',     value: 'finalizado'},
+    ]
+  );
+  DRW.current.renderFn = renderTicketsTable;
+}
+
+// Keyboard: close drawer on Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') drwClose(); });
+
+/* ── Init ─────────────────────────────────────────── */
+function init() {
+  initDates();
+  load();
+}
+
+init();
+</script>
+</body>
+</html>

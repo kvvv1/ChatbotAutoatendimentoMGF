@@ -96,23 +96,6 @@ function normalizeUserText(value: string): string {
   }
 }
 
-function isHumanAttendantRequest(value: string): boolean {
-  const normalized = normalizeUserText(value || '');
-  if (!normalized) return false;
-  if (normalized === '0') return true;
-  if (normalized.includes('falar com atendente')) return true;
-  if (normalized.includes('falar com humano')) return true;
-  if (normalized.includes('com atendente')) return true;
-  if (normalized.includes('atendimento humano')) return true;
-  if (normalized.includes('atendente humano')) return true;
-  if (normalized.includes('quero falar')) return true;
-  if (normalized.includes('preciso falar')) return true;
-  if (normalized.includes('quero atendente')) return true;
-  if (normalized.includes('preciso de atendente')) return true;
-  if (normalized === 'atendente' || normalized.includes('atendente')) return true;
-  if (normalized === 'humano') return true;
-  return false;
-}
 
 async function sendLigacoesSelection(
   config: AppConfig,
@@ -358,73 +341,6 @@ export async function processMessage(
     }
 
     const state = session.state || { name: 'idle' as const };
-
-    // Comandos globais (processados antes da verificação de estado)
-    // 0 - falar com atendente (cria/garante ticket humano no Supabase)
-    if (isHumanAttendantRequest(text)) {
-      try {
-        const authed = isAuthenticated(state);
-
-        if (!authed) {
-          const prevAttempts: number = (state as any)?.humanBypassAttempts ?? 0;
-          const attempts = prevAttempts + 1;
-
-          if (attempts >= 3) {
-            replies.push(
-              'Por questões de segurança e em conformidade com a *Lei Geral de Proteção de Dados (LGPD)*, ' +
-              'não é possível fornecer informações nem encaminhar para atendimento humano sem antes confirmar sua identidade.\n\n' +
-              'Informe seu *ID Eletrônico* (encontrado na sua conta de água) para prosseguir:'
-            );
-          } else if (attempts === 2) {
-            replies.push(
-              '⚠️ Antes de encaminhar para atendimento humano, precisamos confirmar quem você é.\n\n' +
-              'Informe seu *ID Eletrônico* para continuarmos:'
-            );
-          } else {
-            replies.push(
-              'Para falar com um atendente, precisamos primeiro validar sua identidade.\n\n' +
-              messages.askIdEletronico
-            );
-          }
-
-          await sessionStore.save({
-            phone,
-            state: { name: 'awaiting_login_id', humanBypassAttempts: attempts },
-            updatedAt: now
-          });
-          return replies;
-        }
-
-        let protocoloMsg = '';
-        try {
-          const ticket = await ensureOpenHumanTicket(config, phone, (state as any)?.nomeCliente ?? null);
-          if (ticket) {
-            const shortId = ticket.id.slice(0, 8);
-            protocoloMsg = `\n\n🔢 Protocolo do atendimento humano: *${shortId}*`;
-          }
-        } catch {
-          // Falha ao registrar ticket não impede a mensagem ao usuário
-        }
-
-        // Tenta buscar telefone da autarquia para contato alternativo
-        let telefoneMsg = '';
-        try {
-          const autarquia = await fetchDadosAutarquia(config);
-          if (autarquia.telefone) {
-            const telFormatado = formatarTelefone(autarquia.telefone);
-            telefoneMsg = `\n\n📞 Você também pode ligar para: *${telFormatado}*`;
-          }
-        } catch {
-          // Ignora erro - usa apenas a mensagem padrão
-        }
-
-        replies.push(messages.humanContact + protocoloMsg + telefoneMsg);
-        await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
-      } catch {
-        // Mesmo se falhar ao salvar sessão, retorna a resposta já montada
-      }
-      return replies;
-    }
 
     // ENCERRAR ATENDIMENTO - reseta completamente a sessão e volta ao início
     if (normalizedText === 'encerrar atendimento') {
@@ -1134,6 +1050,38 @@ export async function processMessage(
                 showMenuAfter = true;
               }
               break;
+            case '0': {
+              // 0️⃣ Falar com atendente — só disponível via menu (usuário já autenticado neste estado)
+              try {
+                let protocoloMsg = '';
+                try {
+                  const ticket = await ensureOpenHumanTicket(config, phone, (state as any)?.nomeCliente ?? null);
+                  if (ticket) {
+                    const shortId = ticket.id.slice(0, 8);
+                    protocoloMsg = `\n\n🔢 Protocolo do atendimento humano: *${shortId}*`;
+                  }
+                } catch {
+                  // Falha ao registrar ticket não impede a mensagem ao usuário
+                }
+
+                let telefoneMsg = '';
+                try {
+                  const autarquia = await fetchDadosAutarquia(config);
+                  if (autarquia.telefone) {
+                    const telFormatado = formatarTelefone(autarquia.telefone);
+                    telefoneMsg = `\n\n📞 Você também pode ligar para: *${telFormatado}*`;
+                  }
+                } catch {
+                  // Ignora erro
+                }
+
+                replies.push(messages.humanContact + protocoloMsg + telefoneMsg);
+                await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
+              } catch {
+                replies.push(messages.humanContact);
+              }
+              break;
+            }
             default:
               replies.push(menuInteractive());
           }

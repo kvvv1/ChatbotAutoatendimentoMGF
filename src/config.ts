@@ -1,7 +1,7 @@
 import { config as dotenvConfig } from 'dotenv';
 
-// Carrega .env padrão, depois complementa com docs/.env (sem sobrescrever o que já existir)
-dotenvConfig();
+// Carrega o .env definido em ENV_FILE (ex: .env.formiga), ou .env padrão
+dotenvConfig({ path: process.env.ENV_FILE ?? '.env' });
 dotenvConfig({ path: 'docs/.env', override: false });
 
 export type AppConfig = {
