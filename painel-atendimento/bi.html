@@ -1035,18 +1035,21 @@ function renderAuthPaths(el, funnel) {
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`,
       label: 'Sessão cacheada',
+      tooltip: 'Usuário recorrente reconhecido automaticamente. Já havia se autenticado antes e voltou dentro do prazo de validade da sessão — o bot o identificou sem pedir nada.',
       value: funnel[1]?.value ?? 0,
       barColor: 'var(--grn-m)', pctBg: 'var(--grn-l)', pctColor: 'var(--grn)', iconBg: 'var(--grn-l)', iconClr: 'var(--grn-m)',
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M3 21v-1a9 9 0 0 1 9-9h0a9 9 0 0 1 9 9v1"/><line x1="9" y1="11" x2="9" y2="11"/><line x1="15" y1="11" x2="15" y2="11"/></svg>`,
       label: 'Verificação perguntas',
+      tooltip: 'Usuário sem e-mail cadastrado. Como não pode receber código OTP, o bot faz perguntas de confirmação de identidade (ex.: nome, CPF) para autenticar.',
       value: funnel[2]?.value ?? 0,
       barColor: 'var(--amb-m)', pctBg: 'var(--amb-l)', pctColor: 'var(--amb)', iconBg: 'var(--amb-l)', iconClr: 'var(--amb-m)',
     },
     {
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
       label: 'Solicitaram OTP',
+      tooltip: 'Usuário com e-mail cadastrado. Recebeu um código de 6 dígitos por e-mail para confirmar a identidade. "OTP verificado" indica quantos inseriram o código corretamente.',
       value: funnel[3]?.value ?? 0,
       subLabel: 'OTP verificado', subValue: funnel[4]?.value ?? 0,
       barColor: 'var(--blue-m)', pctBg: 'var(--blue-l)', pctColor: 'var(--blue)', iconBg: 'var(--blue-l)', iconClr: 'var(--blue-m)',
@@ -1067,7 +1070,7 @@ function renderAuthPaths(el, funnel) {
           const pct = Math.round(p.value / total * 100);
           const subPct = p.subValue !== undefined && p.value > 0 ? Math.round(p.subValue / p.value * 100) : 0;
           return `
-            <div class="auth-path">
+            <div class="auth-path" title="${p.tooltip}">
               <div class="auth-path-head">
                 <div class="auth-path-icon" style="background:${p.iconBg};color:${p.iconClr}">${p.icon}</div>
                 <div class="auth-path-lbl">${p.label}</div>
