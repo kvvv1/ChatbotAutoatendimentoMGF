@@ -208,11 +208,9 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
       function normalize(s: string): string {
         return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
       }
-      function isHumanRequestText(value: unknown): boolean {
-        if (typeof value !== 'string') return false;
-        const t = normalize(value);
-        if (!t) return false;
-        return t === '0' || t.includes('falar com atendente') || t.includes('com atendente') || t.includes('atendimento humano') || t.includes('atendente');
+      function isHumanRequestText(_value: unknown): boolean {
+        // Desativado: nenhum texto pode acionar atendimento humano — só opção '0' do menu autenticado
+        return false;
       }
       function mapTitleToCommand(title: string): string | undefined {
         const t = normalize(title);
@@ -257,8 +255,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         if (t.includes('atendimento presencial') || (t.includes('localizacao') && t.includes('presencial'))) return '8';
         // 1 - Vídeo orientativo/explicativo
         if (t.includes('video') && (t.includes('orientativo') || t.includes('explicativo'))) return '1';
-        // 0 - Falar com atendente
-        if (t.includes('falar com atendente') || t.includes('atendente')) return '0';
+        // '0' não deve ser mapeado por texto — só via seleção explícita do menu autenticado
         return undefined;
       }
 
@@ -425,14 +422,6 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         request.log.warn({ err: e }, 'Falha na checagem de atendimento humano');
       }
 
-      // Fallback simples: se o payload indicar pedido de atendente, garante ticket aberto.
-      try {
-        if (isHumanRequestText(selectedTitle) || isHumanRequestText(textRaw) || isHumanRequestText(text)) {
-          await ensureOpenHumanTicket(config, phone);
-        }
-      } catch (e) {
-        request.log.warn({ err: e, phone }, 'Falha ao garantir ticket humano pelo webhook');
-      }
 
       // Sem texto/interação utilizável para bot: apenas registra no painel e encerra.
       if (!text) {
