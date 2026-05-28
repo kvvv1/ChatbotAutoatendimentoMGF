@@ -461,12 +461,17 @@ body {
 
 .msg-audio {
   width: 100%;
-  min-width: 200px;
-  max-width: 300px;
-  height: 36px;
+  min-width: 220px;
+  max-width: 320px;
+  height: 40px;
   border-radius: 20px;
   outline: none;
+  display: block;
+  background: transparent;
+  accent-color: #1e5a8a;
 }
+/* Evita que o player pisque ao receber foco */
+.msg-audio:focus { outline: none; }
 
 .msg-doc-link {
   display: inline-flex;

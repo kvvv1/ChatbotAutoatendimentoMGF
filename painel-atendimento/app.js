@@ -831,6 +831,32 @@ async function refreshCurrentTicket(options = {}) {
   await selectTicket(currentTicket.id, { silent: true, keepScroll: options.keepScroll !== false });
 }
 
+function buildMessageRow(m, ticketStart) {
+  const origin = getMessageOrigin(m, ticketStart);
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (m.direction === 'in' ? 'in' : 'out');
+  row.dataset.msgId = String(m.id || m.created_at);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg ' + (m.direction === 'in' ? 'in' : 'out') + ' ' + origin.key;
+
+  const originEl = document.createElement('div');
+  originEl.className = 'msg-origin ' + origin.key;
+  originEl.textContent = origin.label;
+
+  const mediaEl = buildMessageMediaElement(m);
+
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = formatDateTime(m.created_at);
+
+  bubble.appendChild(originEl);
+  bubble.appendChild(mediaEl);
+  bubble.appendChild(time);
+  row.appendChild(bubble);
+  return row;
+}
+
 function renderMessages(messages) {
   const wasNearBottom = (chatMessagesEl.scrollHeight - chatMessagesEl.scrollTop - chatMessagesEl.clientHeight) < 80;
 
@@ -839,76 +865,50 @@ function renderMessages(messages) {
     return;
   }
 
-  chatMessagesEl.innerHTML = '';
-
-  let dividerInserted = false;
   let ticketStart = null;
-
   try {
-    if (currentTicket?.created_at) {
-      ticketStart = new Date(currentTicket.created_at);
+    if (currentTicket?.created_at) ticketStart = new Date(currentTicket.created_at);
+  } catch { ticketStart = null; }
+
+  // Renderização incremental: não destrói elementos existentes (mantém áudio/vídeo em reprodução)
+  const existingRows = chatMessagesEl.querySelectorAll('.msg-row[data-msg-id]');
+  const existingCount = existingRows.length;
+
+  if (existingCount > 0 && existingCount <= messages.length) {
+    const lastExistingId = existingRows[existingRows.length - 1].dataset.msgId;
+    const matchMsg = messages[existingCount - 1];
+    if (matchMsg && String(matchMsg.id || matchMsg.created_at) === lastExistingId) {
+      // Só adiciona as mensagens novas no final
+      const newMsgs = messages.slice(existingCount);
+      newMsgs.forEach(m => chatMessagesEl.appendChild(buildMessageRow(m, ticketStart)));
+      if (wasNearBottom && newMsgs.length > 0) chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+      return;
     }
-  } catch {
-    ticketStart = null;
   }
+
+  // Rebuild completo (primeira carga ou mudança de ticket)
+  chatMessagesEl.innerHTML = '';
+  let dividerInserted = false;
 
   messages.forEach((m) => {
     const msgDate = new Date(m.created_at);
-    const origin = getMessageOrigin(m, ticketStart);
-
     if (!dividerInserted && ticketStart instanceof Date && !Number.isNaN(ticketStart.getTime()) && msgDate >= ticketStart) {
       const dividerRow = document.createElement('div');
       dividerRow.className = 'divider-row';
-
       const divider = document.createElement('div');
       divider.className = 'divider';
-
-      const left = document.createElement('div');
-      left.className = 'divider-line';
-
-      const text = document.createElement('div');
-      text.className = 'divider-text';
-      text.textContent = 'Inicio do atendimento humano';
-
-      const right = document.createElement('div');
-      right.className = 'divider-line';
-
-      divider.appendChild(left);
-      divider.appendChild(text);
-      divider.appendChild(right);
+      const left = document.createElement('div'); left.className = 'divider-line';
+      const text = document.createElement('div'); text.className = 'divider-text'; text.textContent = 'Inicio do atendimento humano';
+      const right = document.createElement('div'); right.className = 'divider-line';
+      divider.appendChild(left); divider.appendChild(text); divider.appendChild(right);
       dividerRow.appendChild(divider);
       chatMessagesEl.appendChild(dividerRow);
-
       dividerInserted = true;
     }
-
-    const row = document.createElement('div');
-    row.className = 'msg-row ' + (m.direction === 'in' ? 'in' : 'out');
-
-    const bubble = document.createElement('div');
-    bubble.className = 'msg ' + (m.direction === 'in' ? 'in' : 'out') + ' ' + origin.key;
-
-    const originEl = document.createElement('div');
-    originEl.className = 'msg-origin ' + origin.key;
-    originEl.textContent = origin.label;
-
-    const mediaEl = buildMessageMediaElement(m);
-
-    const time = document.createElement('div');
-    time.className = 'msg-time';
-    time.textContent = formatDateTime(m.created_at);
-
-    bubble.appendChild(originEl);
-    bubble.appendChild(mediaEl);
-    bubble.appendChild(time);
-
-    row.appendChild(bubble);
-    chatMessagesEl.appendChild(row);
+    chatMessagesEl.appendChild(buildMessageRow(m, ticketStart));
   });
 
-  if (wasNearBottom) {
-    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-  }
+  if (wasNearBottom) chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
 
 function renderNotes(notes) {
