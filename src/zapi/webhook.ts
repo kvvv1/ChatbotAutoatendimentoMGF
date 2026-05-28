@@ -332,59 +332,61 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         (payload as any)?.messages?.[0]?.message?.type ||
         ''
       ).toLowerCase();
+      const p = payload as any;
       const mediaPlaceholder =
-        messageType.includes('audio') ? '[Audio recebido]' :
-        messageType.includes('image') ? '[Imagem recebida]' :
-        messageType.includes('video') ? '[Vídeo recebido]' :
-        messageType.includes('document') ? '[Documento recebido]' :
-        messageType.includes('sticker') ? '[Sticker recebido]' :
-        messageType.includes('location') ? '[Localização recebida]' :
+        (p?.audio || p?.audioMessage || p?.message?.audioMessage || messageType.includes('audio')) ? '[Audio recebido]' :
+        (p?.image || p?.imageMessage || p?.message?.imageMessage || messageType.includes('image')) ? '[Imagem recebida]' :
+        (p?.video || p?.videoMessage || p?.message?.videoMessage || messageType.includes('video')) ? '[Vídeo recebido]' :
+        (p?.document || p?.documentMessage || p?.message?.documentMessage || messageType.includes('document')) ? '[Documento recebido]' :
+        (p?.stickerMessage || p?.message?.stickerMessage || messageType.includes('sticker')) ? '[Sticker recebido]' :
+        (p?.locationMessage || p?.message?.locationMessage || messageType.includes('location')) ? '[Localização recebida]' :
         '[Mensagem recebida]';
 
-      // Tenta extrair URL real da mídia para exibição no painel
-      // Z-API envia imagens em payload.image.imageUrl e áudios em payload.audio.audioUrl
+      // Detecta mídia pela presença dos campos, não pelo messageType
+      // (Z-API envia type='ReceivedCallback', não 'image'/'audio'/'document')
       function extractMediaContent(): string | null {
-        if (messageType.includes('image')) {
-          const url =
-            (payload as any)?.image?.imageUrl ||
-            (payload as any)?.imageMessage?.imageUrl ||
-            (payload as any)?.message?.imageUrl ||
-            (payload as any)?.message?.image?.imageUrl;
-          if (typeof url === 'string' && url.startsWith('http')) {
-            const caption =
-              (payload as any)?.image?.caption ||
-              (payload as any)?.imageMessage?.caption ||
-              (payload as any)?.text?.message ||
-              '';
-            return JSON.stringify({ type: 'image', url, caption });
-          }
+        const p = payload as any;
+
+        // Imagem
+        const imgUrl =
+          p?.image?.imageUrl || p?.imageMessage?.imageUrl ||
+          p?.message?.imageUrl || p?.message?.image?.imageUrl ||
+          p?.message?.imageMessage?.imageUrl;
+        if (typeof imgUrl === 'string' && imgUrl.startsWith('http')) {
+          const caption = p?.image?.caption || p?.imageMessage?.caption || p?.text?.message || '';
+          return JSON.stringify({ type: 'image', url: imgUrl, caption });
         }
-        if (messageType.includes('audio')) {
-          const url =
-            (payload as any)?.audio?.audioUrl ||
-            (payload as any)?.audioMessage?.audioUrl ||
-            (payload as any)?.message?.audioUrl ||
-            (payload as any)?.message?.audio?.audioUrl;
-          if (typeof url === 'string' && url.startsWith('http')) {
-            return JSON.stringify({ type: 'audio', url });
-          }
+
+        // Áudio
+        const audioUrl =
+          p?.audio?.audioUrl || p?.audioMessage?.audioUrl ||
+          p?.message?.audioUrl || p?.message?.audio?.audioUrl ||
+          p?.message?.audioMessage?.audioUrl;
+        if (typeof audioUrl === 'string' && audioUrl.startsWith('http')) {
+          return JSON.stringify({ type: 'audio', url: audioUrl });
         }
-        if (messageType.includes('document')) {
-          const url =
-            (payload as any)?.document?.documentUrl ||
-            (payload as any)?.documentMessage?.documentUrl ||
-            (payload as any)?.message?.documentUrl ||
-            (payload as any)?.message?.document?.documentUrl;
+
+        // Documento / PDF
+        const docUrl =
+          p?.document?.documentUrl || p?.documentMessage?.documentUrl ||
+          p?.message?.documentUrl || p?.message?.document?.documentUrl ||
+          p?.message?.documentMessage?.documentUrl;
+        if (typeof docUrl === 'string' && docUrl.startsWith('http')) {
           const fileName =
-            (payload as any)?.document?.fileName ||
-            (payload as any)?.document?.filename ||
-            (payload as any)?.documentMessage?.fileName ||
-            (payload as any)?.message?.fileName ||
-            'Documento';
-          if (typeof url === 'string' && url.startsWith('http')) {
-            return JSON.stringify({ type: 'document', url, caption: fileName });
-          }
+            p?.document?.fileName || p?.document?.filename ||
+            p?.documentMessage?.fileName || p?.message?.fileName || 'Documento';
+          return JSON.stringify({ type: 'document', url: docUrl, caption: fileName });
         }
+
+        // Vídeo
+        const videoUrl =
+          p?.video?.videoUrl || p?.videoMessage?.videoUrl ||
+          p?.message?.videoUrl || p?.message?.video?.videoUrl;
+        if (typeof videoUrl === 'string' && videoUrl.startsWith('http')) {
+          const caption = p?.video?.caption || p?.videoMessage?.caption || '';
+          return JSON.stringify({ type: 'video', url: videoUrl, caption });
+        }
+
         return null;
       }
 
