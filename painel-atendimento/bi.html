@@ -1057,6 +1057,10 @@ function renderAuthPaths(el, funnel) {
       barColor: 'var(--blue-m)', pctBg: 'var(--blue-l)', pctColor: 'var(--blue)', iconBg: 'var(--blue-l)', iconClr: 'var(--blue-m)',
     },
   ];
+  const notAuth = Math.max(0, total
+    - (funnel[1]?.value ?? 0)
+    - (funnel[2]?.value ?? 0)
+    - (funnel[3]?.value ?? 0));
   el.innerHTML = `
     <div class="auth-paths">
       <div class="auth-total">
@@ -1068,7 +1072,7 @@ function renderAuthPaths(el, funnel) {
       </div>
       <div class="auth-split-arrow">3 caminhos de autenticação</div>
       <div class="auth-paths-row">
-        ${paths.map(p => {
+        ${paths.map((p, _i) => {
           const pct = Math.round(p.value / total * 100);
           const subPct = p.subValue !== undefined && p.value > 0 ? Math.round(p.subValue / p.value * 100) : 0;
           return `
@@ -1093,6 +1097,18 @@ function renderAuthPaths(el, funnel) {
             </div>`;
         }).join('')}
       </div>
+      ${notAuth > 0 ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--brd)" title="Usuários que enviaram mensagem mas não concluíram nenhum fluxo de autenticação no período.">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span style="font-size:11.5px;color:var(--ink-2);font-weight:600">Não autenticaram</span>
+          <span style="font-size:10.5px;color:var(--ink-3)">enviaram mensagem mas não concluíram autenticação</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px;font-weight:800;color:var(--ink)">${n(notAuth)}</span>
+          <span style="font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:99px;background:var(--red-l);color:var(--red)">${Math.round(notAuth/total*100)}%</span>
+        </div>
+      </div>` : ''}
     </div>`;
 }
 
