@@ -215,19 +215,52 @@
 
     .gap-top { margin-top: 12px; }
 
-    /* ── Funil ────────────────────────────────────── */
-    .funnel { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
-    .funnel-step { position: relative; }
-    .funnel-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
-    .funnel-label { font-size: 12px; font-weight: 600; color: var(--ink); }
-    .funnel-vals { font-size: 11px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
-    .funnel-pct { font-size: 11px; font-weight: 700; }
-    .funnel-bar-bg { height: 10px; border-radius: 99px; background: var(--bg); overflow: hidden; }
-    .funnel-bar-fill { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.4,0,.2,1); }
-    .funnel-conv { font-size: 10px; color: var(--ink-3); margin-top: 2px; }
-    .funnel-drop { display: flex; align-items: center; gap: 4px; padding: 4px 0 2px 4px; }
-    .funnel-drop svg { width: 10px; height: 10px; color: var(--red-m); }
-    .funnel-drop span { font-size: 10px; color: var(--ink-3); }
+    /* ── Auth paths ──────────────────────────────── */
+    .auth-paths { display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
+
+    /* Linha de entrada — usuários únicos */
+    .auth-total { padding: 10px 14px; background: var(--blue-l); border-radius: 10px; border: 1px solid #bfdbfe; }
+    .auth-total-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .auth-total-lbl { font-size: 12px; font-weight: 700; color: var(--blue); }
+    .auth-total-val { font-size: 20px; font-weight: 800; color: var(--blue); }
+    .auth-total-bar { height: 6px; border-radius: 99px; background: #93c5fd; }
+
+    /* Seta de split */
+    .auth-split-arrow {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: var(--ink-3); padding: 0 4px;
+    }
+    .auth-split-arrow::before, .auth-split-arrow::after {
+      content: ''; flex: 1; height: 1px; background: var(--brd);
+    }
+
+    /* 3 colunas de caminhos */
+    .auth-paths-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    .auth-path {
+      border-radius: 10px; border: 1px solid var(--brd);
+      background: var(--card); overflow: hidden;
+    }
+    .auth-path-head {
+      padding: 8px 10px 6px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .auth-path-icon { font-size: 15px; }
+    .auth-path-lbl { font-size: 10.5px; font-weight: 700; color: var(--ink-2); line-height: 1.3; }
+    .auth-path-val { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1; }
+    .auth-path-pct { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; display: inline-block; margin-top: 2px; }
+    .auth-path-bar { height: 4px; }
+    .auth-path-bar-fill { height: 100%; transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+    /* sub-etapa OTP verificado */
+    .auth-path-sub {
+      margin: 0 8px 8px; padding: 6px 8px;
+      background: var(--bg); border-radius: 7px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .auth-path-sub-lbl { font-size: 10px; color: var(--ink-3); font-weight: 600; }
+    .auth-path-sub-val { font-size: 13px; font-weight: 800; color: var(--grn); }
+    .auth-path-sub-pct { font-size: 10px; color: var(--ink-3); }
 
     /* ── Table ────────────────────────────────────── */
     .tbl { width: 100%; border-collapse: collapse; }
@@ -582,7 +615,7 @@
       <div class="kpi-grid kpi-grid-4" id="home-kpis" style="margin-bottom:14px;"></div>
       <div class="row-2">
         <div class="card">
-          <div class="card-head"><h3>Funil de Conversão</h3></div>
+          <div class="card-head"><h3>Caminhos de Autenticação</h3></div>
           <div class="card-body"><div id="home-funnel" class="funnel"></div></div>
         </div>
         <div class="card">
@@ -616,7 +649,7 @@
       <div class="kpi-grid kpi-grid-4 gap-top" id="sess-kpis"></div>
       <div class="row-2 gap-top">
         <div class="card">
-          <div class="card-head"><h3>Funil de Conversão</h3></div>
+          <div class="card-head"><h3>Caminhos de Autenticação</h3></div>
           <div class="card-body"><div id="sess-funnel" class="funnel"></div></div>
         </div>
         <div class="card">
@@ -992,6 +1025,68 @@ function renderFunnel(el, steps) {
   }).join('');
 }
 
+/* ── Auth paths render (parallel, not sequential) ── */
+function renderAuthPaths(el, funnel) {
+  if (!el) return;
+  if (!funnel || funnel.length < 5) { renderFunnel(el, funnel ?? []); return; }
+  const total = funnel[0]?.value || 1;
+  const paths = [
+    {
+      icon: '⚡', label: 'Sessão cacheada',
+      value: funnel[1]?.value ?? 0,
+      barColor: 'var(--grn-m)', pctBg: 'var(--grn-l)', pctColor: 'var(--grn)',
+    },
+    {
+      icon: '🪪', label: 'Verificação perguntas',
+      value: funnel[2]?.value ?? 0,
+      barColor: 'var(--amb-m)', pctBg: 'var(--amb-l)', pctColor: 'var(--amb)',
+    },
+    {
+      icon: '🔐', label: 'Solicitaram OTP',
+      value: funnel[3]?.value ?? 0,
+      subLabel: 'OTP verificado', subValue: funnel[4]?.value ?? 0,
+      barColor: 'var(--blue-m)', pctBg: 'var(--blue-l)', pctColor: 'var(--blue)',
+    },
+  ];
+  el.innerHTML = `
+    <div class="auth-paths">
+      <div class="auth-total">
+        <div class="auth-total-top">
+          <span class="auth-total-lbl">Usuários únicos</span>
+          <span class="auth-total-val">${n(funnel[0]?.value ?? 0)}</span>
+        </div>
+        <div class="auth-total-bar" style="width:100%"></div>
+      </div>
+      <div class="auth-split-arrow">3 caminhos de autenticação</div>
+      <div class="auth-paths-row">
+        ${paths.map(p => {
+          const pct = Math.round(p.value / total * 100);
+          const subPct = p.subValue !== undefined && p.value > 0 ? Math.round(p.subValue / p.value * 100) : 0;
+          return `
+            <div class="auth-path">
+              <div class="auth-path-head">
+                <div class="auth-path-icon">${p.icon}</div>
+                <div class="auth-path-lbl">${p.label}</div>
+                <div class="auth-path-val">${n(p.value)}</div>
+                <span class="auth-path-pct" style="background:${p.pctBg};color:${p.pctColor}">${pct}% do total</span>
+              </div>
+              <div class="auth-path-bar" style="background:var(--bg)">
+                <div class="auth-path-bar-fill" style="width:${pct}%;background:${p.barColor}"></div>
+              </div>
+              ${p.subValue !== undefined ? `
+              <div class="auth-path-sub">
+                <span class="auth-path-sub-lbl">${p.subLabel}</span>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="auth-path-sub-val">${n(p.subValue)}</span>
+                  <span class="auth-path-sub-pct">${subPct}%</span>
+                </div>
+              </div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 /* ── Paint dispatcher ────────────────────────────── */
 function paint(sec) {
   if (!DATA) return;
@@ -1013,8 +1108,8 @@ function paintHome() {
     kpiCard({ icon: IC.lock,   label: 'OTP enviados',     value: n(overview.otpTotal), delta: overview.otpTotalDelta, color: 'tel', onclick: "openOtp('all')" }),
   ].join('');
 
-  // Funnel
-  renderFunnel(document.getElementById('home-funnel'), funnel ?? []);
+  // Funil (caminhos paralelos de autenticação)
+  renderAuthPaths(document.getElementById('home-funnel'), funnel ?? []);
 
   // Mensagens por dia
   const perDay = volume?.perDay ?? [];
@@ -1068,7 +1163,7 @@ function paintSessions() {
     kpiCard({ icon: IC.msg,    label: 'Msgs/sessão (média)', value: sessions.avgMsgsPerSession ? sessions.avgMsgsPerSession.toFixed(1) : '—', delta: null, color: 'tel', note: 'mensagens por conversa' }),
   ].join('');
 
-  renderFunnel(document.getElementById('sess-funnel'), funnel ?? []);
+  renderAuthPaths(document.getElementById('sess-funnel'), funnel ?? []);
 
   // New vs returning donut
   const nw = sessions.newUsers ?? 0;
