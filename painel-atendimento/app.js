@@ -948,15 +948,24 @@ function buildMessageMediaElement(m) {
   if (parsed && typeof parsed === 'object') {
     const type = parsed.type;
 
-    if (type === 'image' && parsed.url) {
+    // Normaliza campos: mensagens de entrada usam `url`, saída usa `audioUrl`/`audio`/`video`/`document`
+    const audioSrc = parsed.url || parsed.audioUrl || parsed.audio;
+    const imgSrc   = parsed.url || parsed.imageUrl || parsed.image;
+    const videoSrc = parsed.url || parsed.video;
+    const docSrc   = parsed.url || parsed.document; // pode ser base64 ou URL
+    const fileName = parsed.caption || parsed.fileName || parsed.filename || 'Documento';
+
+    if (type === 'image' && imgSrc) {
       const wrap = document.createElement('div');
       wrap.className = 'msg-media-wrap';
       const img = document.createElement('img');
       img.className = 'msg-image';
-      img.src = parsed.url;
+      img.src = imgSrc;
       img.alt = parsed.caption || 'Imagem';
       img.loading = 'lazy';
-      img.addEventListener('click', () => window.open(parsed.url, '_blank', 'noopener,noreferrer'));
+      if (!imgSrc.startsWith('data:')) {
+        img.addEventListener('click', () => window.open(imgSrc, '_blank', 'noopener,noreferrer'));
+      }
       img.addEventListener('error', () => {
         img.style.display = 'none';
         const broken = document.createElement('div');
@@ -974,7 +983,7 @@ function buildMessageMediaElement(m) {
       return wrap;
     }
 
-    if (type === 'audio' && parsed.url) {
+    if (type === 'audio' && audioSrc) {
       const wrap = document.createElement('div');
       wrap.className = 'msg-media-wrap';
       const audio = document.createElement('audio');
@@ -982,53 +991,58 @@ function buildMessageMediaElement(m) {
       audio.controls = true;
       audio.preload = 'metadata';
       const source = document.createElement('source');
-      source.src = parsed.url;
+      source.src = audioSrc;
       audio.appendChild(source);
       wrap.appendChild(audio);
       return wrap;
     }
 
-    if (type === 'document') {
+    if (type === 'document' && docSrc) {
       const wrap = document.createElement('div');
       wrap.className = 'msg-media-wrap';
       const link = document.createElement('a');
       link.className = 'msg-doc-link';
-      link.href = parsed.url || '#';
+      link.href = docSrc;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      const fileName = parsed.caption || parsed.fileName || parsed.filename || 'Documento';
+      if (docSrc.startsWith('data:application/pdf')) link.download = fileName;
       link.innerHTML = `<span class="msg-doc-icon">📄</span><span class="msg-doc-name">${escapeHtml(fileName)}</span>`;
-      if (!parsed.url) link.addEventListener('click', (e) => e.preventDefault());
       wrap.appendChild(link);
+      return wrap;
+    }
+
+    if (type === 'document') {
+      // documento sem URL/base64 — exibe placeholder
+      const wrap = document.createElement('div');
+      wrap.className = 'msg-media-wrap';
+      wrap.innerHTML = `<span class="msg-media-broken">📄 ${escapeHtml(fileName)}</span>`;
       return wrap;
     }
 
     if (type === 'video') {
       const wrap = document.createElement('div');
       wrap.className = 'msg-media-wrap';
-      if (parsed.url) {
+      if (videoSrc && !videoSrc.startsWith('data:')) {
         const link = document.createElement('a');
         link.className = 'msg-doc-link';
-        link.href = parsed.url;
+        link.href = videoSrc;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.innerHTML = `<span class="msg-doc-icon">🎥</span><span class="msg-doc-name">${escapeHtml(parsed.caption || 'Vídeo')}</span>`;
         wrap.appendChild(link);
       } else {
-        const p = document.createElement('div');
-        p.className = 'msg-media-broken';
-        p.textContent = '🎥 Vídeo recebido';
-        wrap.appendChild(p);
+        wrap.innerHTML = `<span class="msg-media-broken">🎥 ${escapeHtml(parsed.caption || 'Vídeo enviado')}</span>`;
       }
       return wrap;
     }
 
-    if (parsed.url) {
+    const anyUrl = parsed.url || parsed.audioUrl || parsed.audio || parsed.video || parsed.document;
+    if (anyUrl && !anyUrl.startsWith('data:')) {
       const wrap = document.createElement('div');
       wrap.className = 'msg-media-wrap';
       const link = document.createElement('a');
       link.className = 'msg-doc-link';
-      link.href = parsed.url;
+      link.href = anyUrl;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.innerHTML = `<span class="msg-doc-icon">📎</span><span class="msg-doc-name">${escapeHtml(parsed.caption || 'Arquivo')}</span>`;
