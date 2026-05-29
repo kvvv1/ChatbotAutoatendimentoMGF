@@ -65,7 +65,6 @@ export async function registerBiRoutes(app: FastifyInstance, config: AppConfig):
         funnelOtpAttempts,
         funnelOtpVerified,
         challengeStarted,
-        cachedSessionUsers,
 
         // ── Menu clicks ───────────────────────────────────────────────────────
         clickVideo,
@@ -184,24 +183,6 @@ export async function registerBiRoutes(app: FastifyInstance, config: AppConfig):
              AND content LIKE '%Para confirmar sua identidade, precisamos de algumas informações%'
              AND DATE(created_at) BETWEEN ? AND ?`,
           [from, to]
-        ),
-        // Sessão cacheada: autenticados que NÃO fizeram OTP e NÃO passaram pelo challenge
-        q<RowDataPacket>(
-          `SELECT COUNT(DISTINCT m.phone) AS total FROM messages m
-           WHERE m.direction = 'out'
-             AND m.content LIKE 'Olá, *%*! 👋'
-             AND DATE(m.created_at) BETWEEN ? AND ?
-             AND NOT EXISTS (
-               SELECT 1 FROM otp_codes o
-               WHERE o.phone = m.phone AND DATE(o.created_at) BETWEEN ? AND ?
-             )
-             AND NOT EXISTS (
-               SELECT 1 FROM messages mc
-               WHERE mc.phone = m.phone AND mc.direction = 'out'
-                 AND mc.content LIKE '%Para confirmar sua identidade, precisamos de algumas informações%'
-                 AND DATE(mc.created_at) BETWEEN ? AND ?
-             )`,
-          [from, to, from, to, from, to]
         ),
 
         // ── Menu clicks ───────────────────────────────────────────────────────
@@ -443,9 +424,10 @@ export async function registerBiRoutes(app: FastifyInstance, config: AppConfig):
           avgTicketMinutesDelta: avgMin && avgMinPrev ? delta(avgMin, avgMinPrev) : null,
         },
 
+        // Funil: usuários únicos > reconhecidos > verificação por perguntas > OTP > verificado
         funnel: [
           { label: 'Usuários únicos',           value: totalUsers },
-          { label: 'Sessão cacheada',           value: Number(cachedSessionUsers[0]?.total ?? 0) },
+          { label: 'Reconhecidos / Auth',       value: authUsers },
           { label: 'Verificação por perguntas', value: Number(challengeStarted[0]?.total ?? 0) },
           { label: 'Solicitaram OTP',           value: Number(funnelOtpAttempts[0]?.total ?? 0) },
           { label: 'OTP verificado',            value: Number(funnelOtpVerified[0]?.total ?? 0) },
@@ -461,11 +443,6 @@ export async function registerBiRoutes(app: FastifyInstance, config: AppConfig):
           returningUsers: Number(returningUsers[0]?.total ?? 0),
           avgMsgsPerSession: avgMsgsPerSession[0]?.avg_msgs != null ? Number(avgMsgsPerSession[0].avg_msgs) : null,
           challengeUsers: Number(challengeStarted[0]?.total ?? 0),
-          cachedUsers: Number(cachedSessionUsers[0]?.total ?? 0),
-          notAuthenticated: Math.max(0, totalUsers
-            - Number(cachedSessionUsers[0]?.total ?? 0)
-            - Number(challengeStarted[0]?.total ?? 0)
-            - Number(funnelOtpAttempts[0]?.total ?? 0)),
         },
 
         menuClicks: {
