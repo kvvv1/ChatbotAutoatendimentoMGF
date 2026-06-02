@@ -143,15 +143,15 @@ export async function registerBiRoutes(app: FastifyInstance, config: AppConfig):
            ) t`,
           [from, to]
         ),
-        // Recorrentes: têm mensagens antes do período
+        // Recorrentes: voltou em mais de 1 dia distinto no período OU tinha mensagem antes
         q<RowDataPacket>(
-          `SELECT COUNT(DISTINCT m.phone) AS total
-           FROM messages m
-           WHERE m.direction = 'in' AND DATE(m.created_at) BETWEEN ? AND ?
-             AND EXISTS (
-               SELECT 1 FROM messages m2
-               WHERE m2.phone = m.phone AND m2.direction = 'in' AND DATE(m2.created_at) < ?
-             )`,
+          `SELECT COUNT(DISTINCT phone) AS total FROM (
+             SELECT phone FROM messages
+             WHERE direction = 'in' AND DATE(created_at) BETWEEN ? AND ?
+             GROUP BY phone
+             HAVING COUNT(DISTINCT DATE(created_at)) > 1
+                 OR MIN(DATE(created_at)) < ?
+           ) t`,
           [from, to, from]
         ),
         // Média de mensagens por sessão (phone+dia)
