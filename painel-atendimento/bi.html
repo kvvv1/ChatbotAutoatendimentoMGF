@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,300..800&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -215,19 +216,55 @@
 
     .gap-top { margin-top: 12px; }
 
-    /* ── Funil ────────────────────────────────────── */
-    .funnel { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
-    .funnel-step { position: relative; }
-    .funnel-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
-    .funnel-label { font-size: 12px; font-weight: 600; color: var(--ink); }
-    .funnel-vals { font-size: 11px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
-    .funnel-pct { font-size: 11px; font-weight: 700; }
-    .funnel-bar-bg { height: 10px; border-radius: 99px; background: var(--bg); overflow: hidden; }
-    .funnel-bar-fill { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.4,0,.2,1); }
-    .funnel-conv { font-size: 10px; color: var(--ink-3); margin-top: 2px; }
-    .funnel-drop { display: flex; align-items: center; gap: 4px; padding: 4px 0 2px 4px; }
-    .funnel-drop svg { width: 10px; height: 10px; color: var(--red-m); }
-    .funnel-drop span { font-size: 10px; color: var(--ink-3); }
+    /* ── Auth paths ──────────────────────────────── */
+    .auth-paths { display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
+
+    /* Linha de entrada — usuários únicos */
+    .auth-total { padding: 10px 14px; background: var(--blue-l); border-radius: 10px; border: 1px solid #bfdbfe; }
+    .auth-total-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .auth-total-lbl { font-size: 12px; font-weight: 700; color: var(--blue); }
+    .auth-total-val { font-size: 20px; font-weight: 800; color: var(--blue); }
+    .auth-total-bar { height: 6px; border-radius: 99px; background: #93c5fd; }
+
+    /* Seta de split */
+    .auth-split-arrow {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: var(--ink-3); padding: 0 4px;
+    }
+    .auth-split-arrow::before, .auth-split-arrow::after {
+      content: ''; flex: 1; height: 1px; background: var(--brd);
+    }
+
+    /* 3 colunas de caminhos */
+    .auth-paths-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    .auth-path {
+      border-radius: 10px; border: 1px solid var(--brd);
+      background: var(--card); overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .auth-path-head {
+      padding: 8px 10px 6px;
+      display: flex; flex-direction: column; gap: 2px;
+      flex: 1;
+    }
+    .auth-path-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .auth-path-icon svg { width: 15px; height: 15px; }
+    .auth-path-lbl { font-size: 10.5px; font-weight: 700; color: var(--ink-2); line-height: 1.3; }
+    .auth-path-val { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1; }
+    .auth-path-pct { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; display: inline-block; margin-top: 2px; }
+    .auth-path-bar { height: 4px; }
+    .auth-path-bar-fill { height: 100%; transition: width .6s cubic-bezier(.4,0,.2,1); }
+
+    /* sub-etapa OTP verificado */
+    .auth-path-sub {
+      margin: 0 8px 8px; padding: 6px 8px;
+      background: var(--bg); border-radius: 7px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .auth-path-sub-lbl { font-size: 10px; color: var(--ink-3); font-weight: 600; }
+    .auth-path-sub-val { font-size: 13px; font-weight: 800; color: var(--grn); }
+    .auth-path-sub-pct { font-size: 10px; color: var(--ink-3); }
 
     /* ── Table ────────────────────────────────────── */
     .tbl { width: 100%; border-collapse: collapse; }
@@ -529,7 +566,7 @@
         <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
         <polyline points="10 9 9 9 8 9"/>
       </svg>
-      Tickets
+      Atendimentos
     </button>
     <button class="tab-item" data-sec="otp" onclick="go('otp')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -582,8 +619,10 @@
       <div class="kpi-grid kpi-grid-4" id="home-kpis" style="margin-bottom:14px;"></div>
       <div class="row-2">
         <div class="card">
-          <div class="card-head"><h3>Funil de Conversão</h3></div>
-          <div class="card-body"><div id="home-funnel" class="funnel"></div></div>
+          <div class="card-head"><h3>Chamados por Dia</h3></div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:180px"><canvas id="chart-home-tk-day"></canvas></div>
+          </div>
         </div>
         <div class="card">
           <div class="card-head"><h3>Mensagens por Dia</h3></div>
@@ -616,7 +655,7 @@
       <div class="kpi-grid kpi-grid-4 gap-top" id="sess-kpis"></div>
       <div class="row-2 gap-top">
         <div class="card">
-          <div class="card-head"><h3>Funil de Conversão</h3></div>
+          <div class="card-head"><h3>Caminhos de Autenticação</h3></div>
           <div class="card-body"><div id="sess-funnel" class="funnel"></div></div>
         </div>
         <div class="card">
@@ -742,6 +781,13 @@
 <script>
 /* ── Globals ─────────────────────────────────────── */
 const BASE = window.APP_CONFIG?.apiBaseUrl ?? '';
+const API_KEY = window.APP_CONFIG?.apiSecret ?? '';
+function authFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    headers: { ...(options.headers || {}), ...(API_KEY ? { Authorization: 'Bearer ' + API_KEY } : {}) }
+  });
+}
 let DATA = null;
 let ACTIVE = 'home';
 let CHARTS = {};
@@ -828,8 +874,8 @@ async function load() {
   try {
     const qs = getDateParams();
     const [info, metrics] = await Promise.all([
-      fetch(`${BASE}/api/bi/info`).then(r => r.json()),
-      fetch(`${BASE}/api/bi/metrics?${qs}`).then(r => r.json()),
+      authFetch(`${BASE}/api/bi/info`).then(r => r.json()),
+      authFetch(`${BASE}/api/bi/metrics?${qs}`).then(r => r.json()),
     ]);
     if (info.entidade) {
       document.getElementById('sb-entidade').textContent = info.entidade;
@@ -869,13 +915,23 @@ function bar(id, labels, datasets, opts = {}) {
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: opts.legend ?? false } },
+      plugins: {
+        legend: { display: opts.legend ?? false },
+        datalabels: {
+          anchor: 'end', align: 'end',
+          color: '#475569',
+          font: { weight: 'bold', size: 10 },
+          formatter: v => v > 0 ? n(v) : '',
+        },
+      },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8', maxRotation: 45, ...(opts.xTicks||{}) } },
         y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, color: '#94a3b8' }, beginAtZero: true },
       },
+      layout: { padding: { top: 18 } },
       ...opts.extra,
-    }
+    },
+    plugins: [ChartDataLabels],
   });
 }
 
@@ -908,9 +964,21 @@ function donut(id, labels, data, colors) {
     data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 4 }] },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          color: '#fff',
+          font: { weight: 'bold', size: 11 },
+          formatter: (value, ctx) => {
+            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+            const pct = total > 0 ? Math.round(value / total * 100) : 0;
+            return pct > 4 ? `${pct}%` : '';
+          },
+        },
+      },
       cutout: '68%',
-    }
+    },
+    plugins: [ChartDataLabels],
   });
 }
 
@@ -928,13 +996,14 @@ function deltaBadge(d, invert = false) {
 }
 
 /* ── KPI card ─────────────────────────────────────── */
-function kpiCard({ icon, label, value, delta: d, note, color = 'blue', invertDelta = false, onclick: oc = '' }) {
+function kpiCard({ icon, label, value, delta: d, note, color = 'blue', invertDelta = false, onclick: oc = '', tooltip = '' }) {
   const bg  = `var(--${color}-l)`;
   const clr = `var(--${color}-m)`;
   const clickable = oc ? `style="cursor:pointer" onclick="${oc}"` : '';
   const hoverStyle = oc ? `onmouseenter="this.style.boxShadow='var(--sh-md)'" onmouseleave="this.style.boxShadow=''"` : '';
+  const tip = tooltip ? `title="${tooltip}"` : '';
   return `
-    <div class="kpi" ${clickable} ${hoverStyle}>
+    <div class="kpi" ${clickable} ${hoverStyle} ${tip}>
       <div class="kpi-top">
         <div>
           <div class="kpi-val">${value}</div>
@@ -992,6 +1061,90 @@ function renderFunnel(el, steps) {
   }).join('');
 }
 
+/* ── Auth paths render (parallel, not sequential) ── */
+function renderAuthPaths(el, funnel) {
+  if (!el) return;
+  if (!funnel || funnel.length < 5) { renderFunnel(el, funnel ?? []); return; }
+  const total = funnel[0]?.value || 1;
+  const paths = [
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`,
+      label: 'Sessão cacheada',
+      tooltip: 'Usuário recorrente reconhecido automaticamente. Já havia se autenticado antes e voltou dentro do prazo de validade da sessão — o bot o identificou sem pedir nada.',
+      value: funnel[1]?.value ?? 0,
+      barColor: 'var(--grn-m)', pctBg: 'var(--grn-l)', pctColor: 'var(--grn)', iconBg: 'var(--grn-l)', iconClr: 'var(--grn-m)',
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M3 21v-1a9 9 0 0 1 9-9h0a9 9 0 0 1 9 9v1"/><line x1="9" y1="11" x2="9" y2="11"/><line x1="15" y1="11" x2="15" y2="11"/></svg>`,
+      label: 'Verificação perguntas',
+      tooltip: 'Usuário sem e-mail cadastrado. Como não pode receber código OTP, o bot faz perguntas de confirmação de identidade (ex.: nome, CPF) para autenticar.',
+      value: funnel[2]?.value ?? 0,
+      barColor: 'var(--amb-m)', pctBg: 'var(--amb-l)', pctColor: 'var(--amb)', iconBg: 'var(--amb-l)', iconClr: 'var(--amb-m)',
+    },
+    {
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+      label: 'Solicitaram OTP',
+      tooltip: 'Usuário com e-mail cadastrado. Recebeu um código de 6 dígitos por e-mail para confirmar a identidade. "OTP verificado" indica quantos inseriram o código corretamente.',
+      value: funnel[3]?.value ?? 0,
+      subLabel: 'OTP verificado', subValue: funnel[4]?.value ?? 0,
+      barColor: 'var(--blue-m)', pctBg: 'var(--blue-l)', pctColor: 'var(--blue)', iconBg: 'var(--blue-l)', iconClr: 'var(--blue-m)',
+    },
+  ];
+  const notAuth = Math.max(0, total
+    - (funnel[1]?.value ?? 0)
+    - (funnel[2]?.value ?? 0)
+    - (funnel[3]?.value ?? 0));
+  el.innerHTML = `
+    <div class="auth-paths">
+      <div class="auth-total">
+        <div class="auth-total-top">
+          <span class="auth-total-lbl">Usuários</span>
+          <span class="auth-total-val">${n(funnel[0]?.value ?? 0)}</span>
+        </div>
+        <div class="auth-total-bar" style="width:100%"></div>
+      </div>
+      <div class="auth-split-arrow">3 caminhos de autenticação</div>
+      <div class="auth-paths-row">
+        ${paths.map((p, _i) => {
+          const pct = Math.round(p.value / total * 100);
+          const subPct = p.subValue !== undefined && p.value > 0 ? Math.round(p.subValue / p.value * 100) : 0;
+          return `
+            <div class="auth-path" title="${p.tooltip}">
+              <div class="auth-path-head">
+                <div class="auth-path-icon" style="background:${p.iconBg};color:${p.iconClr}">${p.icon}</div>
+                <div class="auth-path-lbl">${p.label}</div>
+                <div class="auth-path-val">${n(p.value)}</div>
+                <span class="auth-path-pct" style="background:${p.pctBg};color:${p.pctColor}">${pct}% do total</span>
+              </div>
+              <div class="auth-path-bar" style="background:var(--bg)">
+                <div class="auth-path-bar-fill" style="width:${pct}%;background:${p.barColor}"></div>
+              </div>
+              ${p.subValue !== undefined ? `
+              <div class="auth-path-sub">
+                <span class="auth-path-sub-lbl">${p.subLabel}</span>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="auth-path-sub-val">${n(p.subValue)}</span>
+                  <span class="auth-path-sub-pct">${subPct}%</span>
+                </div>
+              </div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>
+      ${notAuth > 0 ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--brd)" title="Usuários que enviaram mensagem mas não concluíram nenhum fluxo de autenticação no período.">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span style="font-size:11.5px;color:var(--ink-2);font-weight:600">Não autenticaram</span>
+          <span style="font-size:10.5px;color:var(--ink-3)">enviaram mensagem mas não concluíram autenticação</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px;font-weight:800;color:var(--ink)">${n(notAuth)}</span>
+          <span style="font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:99px;background:var(--red-l);color:var(--red)">${Math.round(notAuth/total*100)}%</span>
+        </div>
+      </div>` : ''}
+    </div>`;
+}
+
 /* ── Paint dispatcher ────────────────────────────── */
 function paint(sec) {
   if (!DATA) return;
@@ -1007,14 +1160,19 @@ function paintHome() {
 
   // KPIs
   document.getElementById('home-kpis').innerHTML = [
-    kpiCard({ icon: IC.users,  label: 'Usuários únicos',  value: n(overview.uniqueUsers), delta: overview.uniqueUsersDelta, color: 'blue', onclick: "openSessions('all')" }),
-    kpiCard({ icon: IC.shield, label: 'Autenticados',     value: n(overview.authenticatedUsers), delta: overview.authenticatedUsersDelta, color: 'vlt', onclick: "openSessions('authenticated')" }),
-    kpiCard({ icon: IC.ticket, label: 'Tickets abertos',  value: n(overview.tickets), delta: overview.ticketsDelta, color: 'amb', onclick: "openTickets('')" }),
-    kpiCard({ icon: IC.lock,   label: 'OTP enviados',     value: n(overview.otpTotal), delta: overview.otpTotalDelta, color: 'tel', onclick: "openOtp('all')" }),
+    kpiCard({ icon: IC.users,  label: 'Usuários',            value: n(overview.uniqueUsers),      delta: overview.uniqueUsersDelta,  color: 'blue', onclick: "openSessions('all')",  tooltip: 'Total de pessoas distintas que enviaram mensagem para o bot no período selecionado.' }),
+    kpiCard({ icon: IC.ticket, label: 'Atendimentos abertos',value: n(overview.tickets),           delta: overview.ticketsDelta,       color: 'amb',  onclick: "openTickets('')",       tooltip: 'Atendimentos humanos abertos no período. Clique para ver a lista detalhada.' }),
+    kpiCard({ icon: IC.msg,    label: '2ª Via de conta',     value: n(menuClicks.segundaVia),      delta: menuClicks.segundaViaDelta,  color: 'grn',                                    tooltip: 'Quantidade de vezes que o menu "2ª Via de conta" foi acessado no período.' }),
+    kpiCard({ icon: IC.users,  label: 'Falar c/ Atendente',  value: n(menuClicks.atendente),       delta: menuClicks.atendenteDelta,   color: 'vlt',  onclick: "openTickets('')",       tooltip: 'Quantidade de vezes que alguém solicitou falar com um atendente humano no período.' }),
   ].join('');
 
-  // Funnel
-  renderFunnel(document.getElementById('home-funnel'), funnel ?? []);
+  // Chamados por dia (home)
+  const homePd = tickets?.perDay ?? [];
+  bar('chart-home-tk-day', homePd.map(r => fmtDt(r.day)), [{
+    data: homePd.map(r => r.count),
+    backgroundColor: '#3b82f6',
+    borderRadius: 4,
+  }]);
 
   // Mensagens por dia
   const perDay = volume?.perDay ?? [];
@@ -1035,7 +1193,31 @@ function paintHome() {
     const s = (r.status||'').toLowerCase();
     return s==='finalizado' ? '#10b981' : s==='pendente' ? '#f59e0b' : s==='aberto'||s==='em_atendimento' ? '#3b82f6' : '#94a3b8';
   });
-  donut('chart-home-tk-status', byStatus.map(r => fmtStatus(r.status)), byStatus.map(r => r.count), tkColors);
+  kill('chart-home-tk-status');
+  const homeTkCtx = document.getElementById('chart-home-tk-status');
+  if (homeTkCtx) {
+    CHARTS['chart-home-tk-status'] = new Chart(homeTkCtx, {
+      type: 'doughnut',
+      data: { labels: byStatus.map(r => fmtStatus(r.status)), datasets: [{ data: byStatus.map(r => r.count), backgroundColor: tkColors, borderWidth: 2, borderColor: '#fff', hoverOffset: 4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            color: '#fff',
+            font: { weight: 'bold', size: 11 },
+            formatter: (value, ctx) => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? Math.round(value / total * 100) : 0;
+              return pct > 4 ? `${pct}%` : '';
+            },
+          },
+        },
+        cutout: '68%',
+      },
+      plugins: [ChartDataLabels],
+    });
+  }
   const tkTotal = byStatus.reduce((a,r) => a + Number(r.count), 0);
   document.getElementById('home-tk-legend').innerHTML = byStatus.map((r, i) => `
     <div class="legend-row">
@@ -1045,16 +1227,41 @@ function paintHome() {
       <span class="legend-pct">${tkTotal > 0 ? Math.round(r.count/tkTotal*100) : 0}%</span>
     </div>`).join('');
 
-  // Clicks bar
+  // Clicks bar com número no topo
   const mc = menuClicks;
-  bar('chart-home-clicks',
-    ['Vídeo','Consumo','2ª Via','Localização','Atendente'],
-    [{
-      data: [mc.video, mc.consumo, mc.segundaVia, mc.localizacao, mc.atendente],
-      backgroundColor: PALETTE,
-      borderRadius: 5,
-    }]
-  );
+  kill('chart-home-clicks');
+  const homeClicksCtx = document.getElementById('chart-home-clicks');
+  if (homeClicksCtx) {
+    CHARTS['chart-home-clicks'] = new Chart(homeClicksCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Vídeo','Consumo','2ª Via','Localização','Atendente'],
+        datasets: [{
+          data: [mc.video, mc.consumo, mc.segundaVia, mc.localizacao, mc.atendente],
+          backgroundColor: PALETTE,
+          borderRadius: 5,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            anchor: 'end', align: 'end',
+            color: '#475569',
+            font: { weight: 'bold', size: 11 },
+            formatter: v => v > 0 ? n(v) : '',
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
+          y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, color: '#94a3b8' }, beginAtZero: true },
+        },
+        layout: { padding: { top: 18 } },
+      },
+      plugins: [ChartDataLabels],
+    });
+  }
 }
 
 /* ════════ SESSÕES ════════ */
@@ -1062,13 +1269,13 @@ function paintSessions() {
   const { sessions, funnel } = DATA;
 
   document.getElementById('sess-kpis').innerHTML = [
-    kpiCard({ icon: IC.users,  label: 'Usuários únicos',    value: n(sessions.uniqueUsers),      delta: sessions.uniqueUsersDelta,       color: 'blue', onclick: "openSessions('all')" }),
-    kpiCard({ icon: IC.shield, label: 'Autenticados',       value: n(sessions.authenticatedUsers),delta: sessions.authenticatedUsersDelta, color: 'vlt',  onclick: "openSessions('authenticated')" }),
-    kpiCard({ icon: IC.msg,    label: 'Verificação perguntas', value: n(sessions.challengeUsers ?? 0), delta: null, color: 'amb', note: 'sem e-mail cadastrado' }),
-    kpiCard({ icon: IC.msg,    label: 'Msgs/sessão (média)', value: sessions.avgMsgsPerSession ? sessions.avgMsgsPerSession.toFixed(1) : '—', delta: null, color: 'tel', note: 'mensagens por conversa' }),
+    kpiCard({ icon: IC.users,  label: 'Usuários',               value: n(sessions.uniqueUsers),        delta: sessions.uniqueUsersDelta,        color: 'blue', onclick: "openSessions('all')",           tooltip: 'Total de pessoas distintas que enviaram mensagem para o bot no período.' }),
+    kpiCard({ icon: IC.shield, label: 'Autenticados',           value: n(sessions.authenticatedUsers), delta: sessions.authenticatedUsersDelta, color: 'vlt',  onclick: "openSessions('authenticated')", tooltip: 'Pessoas que completaram o processo de identificação com sucesso — via sessão ativa, perguntas ou código por e-mail.' }),
+    kpiCard({ icon: IC.msg,    label: 'Verificação perguntas',  value: n(sessions.challengeUsers ?? 0),delta: null, color: 'amb', note: 'sem e-mail cadastrado',       tooltip: 'Pessoas sem e-mail cadastrado que confirmaram a identidade respondendo perguntas (ex: nome e CPF).' }),
+    kpiCard({ icon: IC.msg,    label: 'Msgs/sessão (média)',    value: sessions.avgMsgsPerSession ? sessions.avgMsgsPerSession.toFixed(1) : '—', delta: null, color: 'tel', note: 'mensagens por conversa', tooltip: 'Média de mensagens trocadas por pessoa por dia. Indica o quanto as pessoas interagem com o bot.' }),
   ].join('');
 
-  renderFunnel(document.getElementById('sess-funnel'), funnel ?? []);
+  renderAuthPaths(document.getElementById('sess-funnel'), funnel ?? []);
 
   // New vs returning donut
   const nw = sessions.newUsers ?? 0;
@@ -1091,16 +1298,16 @@ function paintSessions() {
 function paintClicks() {
   const mc = DATA.menuClicks;
   const items = [
-    { label: 'Vídeo Tutorial',  val: mc.video,      delta: mc.videoDelta,      color: 'blue' },
-    { label: 'Histórico Consumo',val: mc.consumo,   delta: mc.consumoDelta,    color: 'grn' },
-    { label: '2ª Via de Conta', val: mc.segundaVia, delta: mc.segundaViaDelta, color: 'amb' },
-    { label: 'Localização',     val: mc.localizacao,delta: mc.localizacaoDelta, color: 'tel' },
-    { label: 'Falar c/ Atendente',val: mc.atendente,delta: mc.atendenteDelta,  color: 'vlt' },
+    { label: 'Vídeo Tutorial',    val: mc.video,      delta: mc.videoDelta,      color: 'blue', tooltip: 'Vezes que o usuário acessou o vídeo tutorial pelo menu do bot no período.' },
+    { label: 'Histórico Consumo', val: mc.consumo,    delta: mc.consumoDelta,    color: 'grn',  tooltip: 'Vezes que o histórico de consumo de água foi consultado pelo bot no período.' },
+    { label: '2ª Via de Conta',   val: mc.segundaVia, delta: mc.segundaViaDelta, color: 'amb',  tooltip: 'Vezes que a 2ª via de conta foi solicitada pelo menu do bot no período.' },
+    { label: 'Localização',       val: mc.localizacao,delta: mc.localizacaoDelta,color: 'tel',  tooltip: 'Vezes que o usuário pediu a localização/endereço da entidade pelo bot.' },
+    { label: 'Falar c/ Atendente',val: mc.atendente,  delta: mc.atendenteDelta,  color: 'vlt',  tooltip: 'Vezes que o usuário solicitou ser atendido por um humano pelo menu do bot.' },
   ];
   document.getElementById('clicks-kpis').innerHTML = items.slice(0,3).map(it =>
-    kpiCard({ icon: IC.msg, label: it.label, value: n(it.val), delta: it.delta, color: it.color })
+    kpiCard({ icon: IC.msg, label: it.label, value: n(it.val), delta: it.delta, color: it.color, tooltip: it.tooltip })
   ).join('') + items.slice(3).map(it =>
-    kpiCard({ icon: IC.msg, label: it.label, value: n(it.val), delta: it.delta, color: it.color })
+    kpiCard({ icon: IC.msg, label: it.label, value: n(it.val), delta: it.delta, color: it.color, tooltip: it.tooltip })
   ).join('');
 
   bar('chart-clicks-bar',
@@ -1123,9 +1330,9 @@ function paintTickets() {
   const { tickets } = DATA;
 
   document.getElementById('tk-kpis').innerHTML = [
-    kpiCard({ icon: IC.ticket, label: 'Total no período', value: n(tickets.total), delta: tickets.totalDelta, color: 'blue', onclick: "openTickets('')" }),
-    kpiCard({ icon: IC.clock,  label: 'Tempo médio',      value: fmtMins(tickets.avgTimeMinutes), delta: tickets.avgTimeDelta, color: 'amb', invertDelta: true, note: 'menor é melhor' }),
-    kpiCard({ icon: IC.users,  label: 'Aguardando',       value: n(tickets.pendingSemAtendente?.length ?? 0), delta: null, color: 'red', onclick: "openTickets('pendente')" }),
+    kpiCard({ icon: IC.ticket, label: 'Total no período', value: n(tickets.total),                          delta: tickets.totalDelta,   color: 'blue', onclick: "openTickets('')",       tooltip: 'Total de atendimentos humanos abertos no período. Clique para ver a lista completa.' }),
+    kpiCard({ icon: IC.clock,  label: 'Tempo médio',      value: fmtMins(tickets.avgTimeMinutes),           delta: tickets.avgTimeDelta, color: 'amb',  invertDelta: true, note: 'menor é melhor', tooltip: 'Tempo médio entre a abertura e o encerramento dos atendimentos finalizados. Quanto menor, melhor.' }),
+    kpiCard({ icon: IC.users,  label: 'Aguardando',       value: n(tickets.pendingSemAtendente?.length ?? 0),delta: null,                color: 'red',  onclick: "openTickets('pendente')", tooltip: 'Atendimentos aguardando um atendente ser atribuído. Clique para ver quem está esperando.' }),
   ].join('');
 
   // Per day line
@@ -1150,13 +1357,23 @@ function paintTickets() {
       data: { labels: bs.map(r => fmtStatus(r.status)), datasets: [{ data: bs.map(r => r.count), backgroundColor: colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 4 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        cutout: '68%',
-        onClick(_, els) {
-          if (els.length) openTickets(bs[els[0].index]?.status ?? '');
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            color: '#fff',
+            font: { weight: 'bold', size: 11 },
+            formatter: (value, ctx) => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? Math.round(value / total * 100) : 0;
+              return pct > 4 ? `${pct}%` : '';
+            },
+          },
         },
+        cutout: '68%',
+        onClick(_, els) { if (els.length) openTickets(bs[els[0].index]?.status ?? ''); },
         onHover(e) { e.native.target.style.cursor = 'pointer'; },
-      }
+      },
+      plugins: [ChartDataLabels],
     });
   }
   const tot = bs.reduce((a,r) => a+Number(r.count), 0);
@@ -1209,10 +1426,10 @@ function paintOtp() {
   const { otp } = DATA;
 
   document.getElementById('otp-kpis').innerHTML = [
-    kpiCard({ icon: IC.lock,  label: 'OTPs enviados',   value: n(otp.total),     delta: otp.totalDelta,   color: 'blue', onclick: "openOtp('all')"     }),
-    kpiCard({ icon: IC.check, label: 'Verificados',     value: n(otp.success),   delta: otp.successDelta, color: 'grn',  onclick: "openOtp('used')"    }),
-    kpiCard({ icon: IC.clock, label: 'Expirados',       value: n(otp.expired),   delta: null,             color: 'amb',  onclick: "openOtp('expired')" }),
-    kpiCard({ icon: IC.msg,   label: 'Com tentativas',  value: n(otp.withErrors),delta: null,             color: 'red',  onclick: "openOtp('errors')"  }),
+    kpiCard({ icon: IC.lock,  label: 'Emails de validação enviados (OTP)', value: n(otp.total),     delta: otp.totalDelta,   color: 'blue', onclick: "openOtp('all')",     tooltip: 'Total de e-mails com código de 6 dígitos enviados para validação de identidade no período.' }),
+    kpiCard({ icon: IC.check, label: 'Verificados',                       value: n(otp.success),   delta: otp.successDelta, color: 'grn',  onclick: "openOtp('used')",    tooltip: 'Pessoas que receberam o código e o digitaram corretamente dentro do prazo de validade.' }),
+    kpiCard({ icon: IC.clock, label: 'Expirados',                         value: n(otp.expired),   delta: null,             color: 'amb',  onclick: "openOtp('expired')", tooltip: 'Códigos que não foram utilizados antes de expirar. Pode indicar que o e-mail não foi recebido ou a pessoa desistiu.' }),
+    kpiCard({ icon: IC.msg,   label: 'Com tentativas',                    value: n(otp.withErrors),delta: null,             color: 'red',  onclick: "openOtp('errors')",  tooltip: 'Códigos onde o usuário tentou digitar o código pelo menos uma vez, mas não necessariamente com sucesso.' }),
   ].join('');
 
   const rate = otp.successRate ?? 0;
@@ -1274,8 +1491,8 @@ function paintFinanceiro() {
   const hasFin = financeiro && (financeiro.total > 0 || (financeiro.byStatus?.length > 0));
 
   document.getElementById('fin-kpis').innerHTML = [
-    kpiCard({ icon: IC.dollar, label: 'Faturas geradas', value: n(financeiro?.total ?? 0), delta: financeiro?.totalDelta ?? null, color: 'blue', onclick: "openFinanceiro('')" }),
-    kpiCard({ icon: IC.dollar, label: 'Valor total',     value: fmtMoney(financeiro?.valorTotal ?? 0), delta: null, color: 'grn', note: 'no período' }),
+    kpiCard({ icon: IC.dollar, label: 'Faturas geradas', value: n(financeiro?.total ?? 0),              delta: financeiro?.totalDelta ?? null, color: 'blue', onclick: "openFinanceiro('')", tooltip: 'Total de faturas com vencimento no período selecionado. Clique para ver a lista detalhada.' }),
+    kpiCard({ icon: IC.dollar, label: 'Valor total',     value: fmtMoney(financeiro?.valorTotal ?? 0), delta: null, color: 'grn', note: 'no período',                                             tooltip: 'Soma dos valores de todas as faturas com vencimento no período selecionado.' }),
   ].join('');
 
   if (!hasFin) {
@@ -1449,7 +1666,7 @@ function openSessions(filter = 'all') {
 }
 
 async function loadSessions(filter, offset) {
-  const r = await fetch(`${BASE}/api/bi/detail/sessions?${detailQS(`filter=${filter}&limit=50&offset=${offset}`)}`);
+  const r = await authFetch(`${BASE}/api/bi/detail/sessions?${detailQS(`filter=${filter}&limit=50&offset=${offset}`)}`);
   return r.json();
 }
 
@@ -1483,7 +1700,7 @@ function openMessages(phone) {
   drwPush(
     `Conversa: ${phone}`,
     'Histórico de mensagens',
-    (_, offset) => fetch(`${BASE}/api/bi/detail/messages?${detailQS(`phone=${encodeURIComponent(phone)}&limit=100&offset=${offset}`)}`).then(r => r.json()),
+    (_, offset) => authFetch(`${BASE}/api/bi/detail/messages?${detailQS(`phone=${encodeURIComponent(phone)}&limit=100&offset=${offset}`)}`).then(r => r.json()),
     []
   );
   DRW.current.renderFn = renderMessages;
@@ -1536,7 +1753,7 @@ function openTickets(statusFilter = '') {
 
 async function loadTickets(filter, offset) {
   const extra = filter ? `status=${filter}&` : '';
-  const r = await fetch(`${BASE}/api/bi/detail/tickets?${detailQS(`${extra}limit=50&offset=${offset}`)}`);
+  const r = await authFetch(`${BASE}/api/bi/detail/tickets?${detailQS(`${extra}limit=50&offset=${offset}`)}`);
   return r.json();
 }
 
@@ -1588,7 +1805,7 @@ function openOtp(filter = 'all') {
 }
 
 async function loadOtp(filter, offset) {
-  const r = await fetch(`${BASE}/api/bi/detail/otp?${detailQS(`filter=${filter}&limit=50&offset=${offset}`)}`);
+  const r = await authFetch(`${BASE}/api/bi/detail/otp?${detailQS(`filter=${filter}&limit=50&offset=${offset}`)}`);
   return r.json();
 }
 
@@ -1625,7 +1842,7 @@ function openFinanceiro(statusFilter = '') {
   drwOpen('Faturas', 'Detalhe por fatura',
     async (filter, offset) => {
       const extra = filter ? `status=${filter}&` : '';
-      const r = await fetch(`${BASE}/api/bi/detail/financeiro?${detailQS(`${extra}limit=50&offset=${offset}`)}`);
+      const r = await authFetch(`${BASE}/api/bi/detail/financeiro?${detailQS(`${extra}limit=50&offset=${offset}`)}`);
       return r.json();
     },
     [{ label: 'Todas', value: '' }]
@@ -1682,7 +1899,7 @@ function openAttendantTickets(attendant) {
     'Chamados deste atendente',
     async (filter, offset) => {
       const extra = filter && filter !== 'all' ? `status=${filter}&` : '';
-      const r = await fetch(`${BASE}/api/bi/detail/tickets?${detailQS(`${extra}attendant=${encodeURIComponent(attendant)}&limit=50&offset=${offset}`)}`);
+      const r = await authFetch(`${BASE}/api/bi/detail/tickets?${detailQS(`${extra}attendant=${encodeURIComponent(attendant)}&limit=50&offset=${offset}`)}`);
       return r.json();
     },
     [

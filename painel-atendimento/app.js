@@ -125,13 +125,53 @@ function getOperatorContext() {
   }
 }
 
+const ATTENDANT_AUTH_STORAGE_KEY = 'human_panel_auth';
+
+function getAttendantAuth() {
+  try {
+    const raw = window.localStorage.getItem(ATTENDANT_AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.token || !parsed?.attendant) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function isAttendantTokenExpired(token) {
+  try {
+    const payloadPart = String(token || '').split('.')[0];
+    const payload = JSON.parse(atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/')));
+    return !payload.exp || payload.exp < Math.floor(Date.now() / 1000);
+  } catch {
+    return true;
+  }
+}
+
+function logoutAttendant() {
+  window.localStorage.removeItem(ATTENDANT_AUTH_STORAGE_KEY);
+  window.location.href = '/painel-atendimento/login.html';
+}
+
+// Se essa instância exige login individual, garante uma sessão válida antes de
+// carregar qualquer coisa do painel — senão redireciona pro login.
+if (window.APP_CONFIG?.attendantAuthEnabled) {
+  const auth = getAttendantAuth();
+  if (!auth || isAttendantTokenExpired(auth.token)) {
+    logoutAttendant();
+  }
+}
+
 function getOperatorHeaders() {
   const ctx = getOperatorContext();
-  if (!ctx) return {};
   const headers = {};
-  if (ctx.nome) headers['x-panel-operator-name'] = ctx.nome;
-  if (ctx.email) headers['x-panel-operator-email'] = ctx.email;
-  if (ctx.id) headers['x-panel-operator-id'] = ctx.id;
+  if (ctx?.nome) headers['x-panel-operator-name'] = ctx.nome;
+  if (ctx?.email) headers['x-panel-operator-email'] = ctx.email;
+  if (ctx?.id) headers['x-panel-operator-id'] = ctx.id;
+  if (window.APP_CONFIG?.apiSecret) headers['Authorization'] = 'Bearer ' + window.APP_CONFIG.apiSecret;
+  const auth = getAttendantAuth();
+  if (auth?.token) headers['X-Attendant-Token'] = auth.token;
   return headers;
 }
 
@@ -152,6 +192,10 @@ if (attendantFromUrl && attendantFromUrl.trim()) {
 }
 
 function getAttendantName() {
+  // Login verificado tem prioridade sobre o mecanismo antigo (?atendente=/?token= não assinados)
+  const auth = getAttendantAuth();
+  if (auth?.attendant?.nome) return auth.attendant.nome;
+
   const saved = window.localStorage.getItem(ATTENDANT_STORAGE_KEY);
   if (saved && saved.trim()) return saved.trim();
   return DEFAULT_ATTENDANT_NAME;
@@ -208,7 +252,8 @@ function initRealtimeStream() {
   }
 
   try {
-    realtimeStream = new EventSource(apiUrl('/human/stream'));
+    const streamUrl = apiUrl('/human/stream') + (window.APP_CONFIG?.apiSecret ? '?key=' + encodeURIComponent(window.APP_CONFIG.apiSecret) : '');
+    realtimeStream = new EventSource(streamUrl);
   } catch (err) {
     console.error(err);
     return;
@@ -278,6 +323,10 @@ async function fetchJson(url, options = {}) {
           ...(fetchOptions.headers || {})
         }
       });
+      if (res.status === 401 && window.APP_CONFIG?.attendantAuthEnabled) {
+        logoutAttendant();
+        throw new Error('Sessão expirada');
+      }
       if (!res.ok) {
         const body = await res.text().catch(() => '');
         throw new Error((body && body.slice(0, 180)) || ('HTTP ' + res.status));
@@ -831,6 +880,32 @@ async function refreshCurrentTicket(options = {}) {
   await selectTicket(currentTicket.id, { silent: true, keepScroll: options.keepScroll !== false });
 }
 
+function buildMessageRow(m, ticketStart) {
+  const origin = getMessageOrigin(m, ticketStart);
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (m.direction === 'in' ? 'in' : 'out');
+  row.dataset.msgId = String(m.id || m.created_at);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg ' + (m.direction === 'in' ? 'in' : 'out') + ' ' + origin.key;
+
+  const originEl = document.createElement('div');
+  originEl.className = 'msg-origin ' + origin.key;
+  originEl.textContent = origin.label;
+
+  const mediaEl = buildMessageMediaElement(m);
+
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = formatDateTime(m.created_at);
+
+  bubble.appendChild(originEl);
+  bubble.appendChild(mediaEl);
+  bubble.appendChild(time);
+  row.appendChild(bubble);
+  return row;
+}
+
 function renderMessages(messages) {
   const wasNearBottom = (chatMessagesEl.scrollHeight - chatMessagesEl.scrollTop - chatMessagesEl.clientHeight) < 80;
 
@@ -839,76 +914,50 @@ function renderMessages(messages) {
     return;
   }
 
-  chatMessagesEl.innerHTML = '';
-
-  let dividerInserted = false;
   let ticketStart = null;
-
   try {
-    if (currentTicket?.created_at) {
-      ticketStart = new Date(currentTicket.created_at);
+    if (currentTicket?.created_at) ticketStart = new Date(currentTicket.created_at);
+  } catch { ticketStart = null; }
+
+  // Renderização incremental: não destrói elementos existentes (mantém áudio/vídeo em reprodução)
+  const existingRows = chatMessagesEl.querySelectorAll('.msg-row[data-msg-id]');
+  const existingCount = existingRows.length;
+
+  if (existingCount > 0 && existingCount <= messages.length) {
+    const lastExistingId = existingRows[existingRows.length - 1].dataset.msgId;
+    const matchMsg = messages[existingCount - 1];
+    if (matchMsg && String(matchMsg.id || matchMsg.created_at) === lastExistingId) {
+      // Só adiciona as mensagens novas no final
+      const newMsgs = messages.slice(existingCount);
+      newMsgs.forEach(m => chatMessagesEl.appendChild(buildMessageRow(m, ticketStart)));
+      if (wasNearBottom && newMsgs.length > 0) chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+      return;
     }
-  } catch {
-    ticketStart = null;
   }
+
+  // Rebuild completo (primeira carga ou mudança de ticket)
+  chatMessagesEl.innerHTML = '';
+  let dividerInserted = false;
 
   messages.forEach((m) => {
     const msgDate = new Date(m.created_at);
-    const origin = getMessageOrigin(m, ticketStart);
-
     if (!dividerInserted && ticketStart instanceof Date && !Number.isNaN(ticketStart.getTime()) && msgDate >= ticketStart) {
       const dividerRow = document.createElement('div');
       dividerRow.className = 'divider-row';
-
       const divider = document.createElement('div');
       divider.className = 'divider';
-
-      const left = document.createElement('div');
-      left.className = 'divider-line';
-
-      const text = document.createElement('div');
-      text.className = 'divider-text';
-      text.textContent = 'Inicio do atendimento humano';
-
-      const right = document.createElement('div');
-      right.className = 'divider-line';
-
-      divider.appendChild(left);
-      divider.appendChild(text);
-      divider.appendChild(right);
+      const left = document.createElement('div'); left.className = 'divider-line';
+      const text = document.createElement('div'); text.className = 'divider-text'; text.textContent = 'Inicio do atendimento humano';
+      const right = document.createElement('div'); right.className = 'divider-line';
+      divider.appendChild(left); divider.appendChild(text); divider.appendChild(right);
       dividerRow.appendChild(divider);
       chatMessagesEl.appendChild(dividerRow);
-
       dividerInserted = true;
     }
-
-    const row = document.createElement('div');
-    row.className = 'msg-row ' + (m.direction === 'in' ? 'in' : 'out');
-
-    const bubble = document.createElement('div');
-    bubble.className = 'msg ' + (m.direction === 'in' ? 'in' : 'out') + ' ' + origin.key;
-
-    const originEl = document.createElement('div');
-    originEl.className = 'msg-origin ' + origin.key;
-    originEl.textContent = origin.label;
-
-    const mediaEl = buildMessageMediaElement(m);
-
-    const time = document.createElement('div');
-    time.className = 'msg-time';
-    time.textContent = formatDateTime(m.created_at);
-
-    bubble.appendChild(originEl);
-    bubble.appendChild(mediaEl);
-    bubble.appendChild(time);
-
-    row.appendChild(bubble);
-    chatMessagesEl.appendChild(row);
+    chatMessagesEl.appendChild(buildMessageRow(m, ticketStart));
   });
 
-  if (wasNearBottom) {
-    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-  }
+  if (wasNearBottom) chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
 
 function renderNotes(notes) {
@@ -1265,7 +1314,7 @@ async function sendMessage() {
     await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/send-message'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, attendant: getAttendantName() }),
       retries: 1
     });
     messageInputEl.value = '';
@@ -1347,6 +1396,12 @@ function handleGlobalShortcuts(ev) {
     ev.preventDefault();
     if (!closeButtonEl.disabled) closeTicketOneClick();
   }
+}
+
+const logoutButtonEl = document.getElementById('logout-button');
+if (logoutButtonEl && window.APP_CONFIG?.attendantAuthEnabled) {
+  logoutButtonEl.classList.remove('hidden');
+  logoutButtonEl.addEventListener('click', logoutAttendant);
 }
 
 statusFilterEl.addEventListener('change', async () => {

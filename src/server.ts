@@ -5,10 +5,13 @@ import path from 'node:path';
 import { loadConfig } from './config.js';
 import { registerZapiRoutes } from './zapi/webhook.js';
 import { ZapiClient } from './zapi/client.js';
+import { registerMetaRoutes } from './meta/webhook.js';
 import { registerHumanRoutes } from './human/routes.js';
 import { registerBiRoutes } from './bi/routes.js';
 import { getDb } from './supabase/client.js';
 import { runMigrations } from './db/migrate.js';
+import { createApiAuthHook } from './security/apiAuth.js';
+import { createAttendantAuthHook } from './human/auth.js';
 
 async function bootstrap(): Promise<void> {
   const config = loadConfig();
@@ -27,14 +30,30 @@ async function bootstrap(): Promise<void> {
 
   await app.register(fastifyCors, { origin: true });
 
+  // Exige API_SECRET (se configurado) para acessar as rotas de dados do painel
+  app.addHook('preHandler', createApiAuthHook(config.apiSecret, ['/api/', '/test/']));
+
+  // Exige login individual do atendente (se ATTENDANT_AUTH_SECRET configurado) nas
+  // rotas do painel de atendimento humano — fecha a lacuna do token não-verificado antigo.
+  app.addHook('preHandler', createAttendantAuthHook(config, ['/api/human-tickets', '/api/quick-replies', '/api/contacts', '/api/human/stream']));
+
   app.get('/health', async () => {
     return { status: 'ok' };
   });
 
-  // Redireciona raiz para o painel, preservando query string (?token= etc)
-  app.get('/', async (request, reply) => {
-    const qs = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
-    return reply.redirect(302, `/painel-atendimento/${qs}`);
+  // Não redireciona mais pro painel — evita que a raiz do domínio vaze a existência
+  // do painel de atendimento pra quem só conhece o link base.
+  app.get('/', async (_request, reply) => {
+    return reply.code(404).send({ error: 'not_found' });
+  });
+
+  // Config.js gerado dinamicamente (nunca versionado) para o frontend do painel conhecer a chave de API desta instância
+  app.get('/painel-atendimento/config.js', async (_request, reply) => {
+    reply.type('application/javascript');
+    return `window.APP_CONFIG = Object.freeze(${JSON.stringify({
+      apiSecret: config.apiSecret || '',
+      attendantAuthEnabled: !!config.attendantAuthSecret
+    })});\n`;
   });
 
   // Arquivos estáticos do painel de atendimento humano
@@ -53,6 +72,13 @@ async function bootstrap(): Promise<void> {
   await registerZapiRoutes(app, config);
   await registerHumanRoutes(app, config);
   await registerBiRoutes(app, config);
+
+  // Cloud API oficial da Meta — só ativa quando a instância tiver WHATSAPP_PROVIDER=meta
+  // e as credenciais configuradas. Não afeta instâncias existentes rodando Z-API.
+  if (config.whatsappProvider === 'meta' && config.metaAccessToken && config.metaPhoneNumberId) {
+    await registerMetaRoutes(app, config);
+    app.log.info('Rotas da WhatsApp Cloud API (Meta) registradas em /webhook/meta');
+  }
 
   // Endpoint auxiliar para testes manuais de envio via Z-API
   app.post('/test/send', async (request, reply) => {

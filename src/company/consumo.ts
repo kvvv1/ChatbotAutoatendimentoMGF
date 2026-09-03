@@ -49,6 +49,9 @@ export async function fetchConsumoByImovelId(
   }
 
   const linkLeituras = await linkGetUltimasLeituras(config, imovelId);
+  // A Link API retorna uma mensagem de texto (não um array) quando não há leituras —
+  // trata qualquer resposta que não seja array como "sem leituras", em vez de estourar erro.
+  if (!Array.isArray(linkLeituras)) return [];
   return linkLeituras.map(linkLeituraToConsumo);
 }
 

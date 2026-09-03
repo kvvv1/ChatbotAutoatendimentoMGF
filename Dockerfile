@@ -33,7 +33,10 @@ RUN npm ci --omit=dev
 # Copia build e assets estáticos
 COPY --from=builder /app/dist ./dist
 COPY painel-atendimento/ ./painel-atendimento/
-COPY assets/ ./assets/
+COPY assets/video/ ./assets/video/
+
+# assets/audio NÃO vai na imagem — é montado como volume no docker-compose de cada
+# cliente (ex: ./volumes/chatbot/audios:/app/assets/audio:ro), com welcome.wav e menu.wav
 
 EXPOSE 3000
 

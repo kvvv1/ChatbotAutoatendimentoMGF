@@ -1,5 +1,7 @@
 # Variáveis de ambiente (NUNCA subir ao GitHub)
 .env
+.env.*
+!.env.example
 
 # Dependências
 node_modules/
@@ -15,3 +17,6 @@ npm-debug.log*
 # Arquivos temporários
 *.zip
 *.tmp
+
+# Estado interno do Docker/buildx (local, não é código do projeto)
+.docker/

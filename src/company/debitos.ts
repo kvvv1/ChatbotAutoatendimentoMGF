@@ -16,9 +16,20 @@ export type Debito = {
 };
 
 /**
- * Formata data ISO para MM/YYYY
+ * Formata DataRef para MM/YYYY.
+ * A Link API manda no formato "AAAAMM" colado (ex: "202607"), que o construtor
+ * Date() interpreta errado (trata a string inteira como ano, mês vira 01) —
+ * por isso o parse é feito manualmente a partir dos dígitos, sem usar Date().
  */
 function formatDataRefToMesAno(dataRef: string): string {
+  const digits = String(dataRef || '').replace(/\D/g, '');
+  if (digits.length === 6) {
+    const ano = digits.slice(0, 4);
+    const mes = digits.slice(4, 6);
+    return `${mes}/${ano}`;
+  }
+
+  // Fallback pra caso alguma instância venha com data ISO nesse campo
   try {
     const date = new Date(dataRef);
     if (isNaN(date.getTime())) return '';
@@ -47,6 +58,16 @@ function formatDataVencimento(dataVencimento: string): string {
 }
 
 /**
+ * Interpreta o campo DebitoAutomatico da Link API, que varia de formato entre instâncias
+ * (número 0/1, string "0"/"1", "S"/"N", ou vazio em instâncias desktop que não populam o campo)
+ */
+function parseDebitoAutomatico(value: number | string | boolean | undefined | null): boolean {
+  if (value === 1 || value === true) return true;
+  const normalized = String(value ?? '').trim().toUpperCase();
+  return normalized === '1' || normalized === 'S' || normalized === 'SIM' || normalized === 'TRUE';
+}
+
+/**
  * Converte débito da Link API para o formato Debito usado pelo bot
  */
 function linkDebitoToDebito(item: LinkDebito): Debito {
@@ -55,7 +76,7 @@ function linkDebitoToDebito(item: LinkDebito): Debito {
     mesAnoReferencia: formatDataRefToMesAno(item.DataRef),
     dataVencimento: formatDataVencimento(item.DataVencimento),
     valor: item.ValorBoleto,
-    emDebitoAutomatico: item.DebitoAutomatico === 1,
+    emDebitoAutomatico: parseDebitoAutomatico(item.DebitoAutomatico),
     linhaDigitavel: item.LinhaDigitavel,
     codigoBarras: item.CodigoBarras,
     payloadPix: item.PayloadPix,
@@ -75,6 +96,9 @@ export async function fetchDebitosByImovelId(
   }
 
   const linkDebitos = await linkGetDebitos(config, imovelId);
+  // A Link API retorna uma mensagem de texto (não um array) quando não há débitos pendentes —
+  // trata qualquer resposta que não seja array como "sem débitos", em vez de estourar erro.
+  if (!Array.isArray(linkDebitos)) return [];
   return linkDebitos.map(linkDebitoToDebito);
 }
 

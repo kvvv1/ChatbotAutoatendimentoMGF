@@ -185,6 +185,22 @@ const MIGRATIONS: Array<{ name: string; statements: string[] }> = [
         KEY otp_codes_expires_idx (expires_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
     ]
+  },
+  {
+    name: '0007_human_attendants',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS human_attendants (
+        id CHAR(36) NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        email VARCHAR(190) NOT NULL,
+        password_hash TEXT NOT NULL,
+        active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME(6) DEFAULT NOW(6),
+        updated_at DATETIME(6) DEFAULT NOW(6),
+        PRIMARY KEY (id),
+        UNIQUE KEY human_attendants_email_ux (email)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    ]
   }
 ];
 

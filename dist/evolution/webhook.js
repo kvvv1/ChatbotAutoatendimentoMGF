@@ -159,18 +159,40 @@ export async function registerEvolutionRoutes(app, config) {
                             messageType.includes('sticker') ? '[Sticker recebido]' :
                                 messageType.includes('location') ? '[Localização recebida]' :
                                     '[Mensagem recebida]';
+            // Tenta extrair URL real da mídia para exibição no painel
+            function extractMediaContent() {
+                if (messageType.includes('image')) {
+                    const url = message?.imageMessage?.url;
+                    if (typeof url === 'string' && url.startsWith('http')) {
+                        const caption = message?.imageMessage?.caption || '';
+                        return JSON.stringify({ type: 'image', url, caption });
+                    }
+                }
+                if (messageType.includes('audio')) {
+                    const url = message?.audioMessage?.url;
+                    if (typeof url === 'string' && url.startsWith('http')) {
+                        return JSON.stringify({ type: 'audio', url });
+                    }
+                }
+                return null;
+            }
             if (!phone) {
                 request.log.warn({ remoteJid, event, messageType }, 'Mensagem sem telefone válido. Ignorando.');
                 return;
             }
             await logAudit(config, { whatsappPhone: phone, action: 'message_received', payload: { payload } });
-            const displayContent = selectedDisplayText?.trim() || textRaw?.trim() || text || mediaPlaceholder;
+            const mediaContent = extractMediaContent();
+            const displayContent = mediaContent || selectedDisplayText?.trim() || textRaw?.trim() || text || mediaPlaceholder;
             try {
                 await logMessage(config, { phone, direction: 'in', content: displayContent });
                 publishHumanEvent({ type: 'message', phone, at: new Date().toISOString() });
             }
             catch (e) {
                 request.log.warn({ err: e }, 'Falha ao logar mensagem de entrada');
+            }
+            // Mídia recebida: sem conteúdo textual para o bot processar, mas já logada
+            if (mediaContent) {
+                request.log.info({ phone, messageType }, 'Mídia recebida e registrada no painel.');
             }
             try {
                 if (await hasActiveHumanTicket(config, phone)) {

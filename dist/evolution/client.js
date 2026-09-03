@@ -6,9 +6,9 @@ export class EvolutionClient {
     instance;
     apiKey;
     constructor(config) {
-        this.baseUrl = config.evolutionBaseUrl.replace(/\/+$/, '');
-        this.instance = config.evolutionInstance;
-        this.apiKey = config.evolutionApiKey;
+        this.baseUrl = (config.evolutionBaseUrl ?? '').replace(/\/+$/, '');
+        this.instance = config.evolutionInstance ?? '';
+        this.apiKey = config.evolutionApiKey ?? '';
     }
     headers() {
         return { 'Content-Type': 'application/json', apikey: this.apiKey };

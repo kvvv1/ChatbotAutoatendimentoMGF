@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "admin": "tsx src/admin/server.ts",
+    "admin:dev": "tsx watch src/admin/server.ts",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
     "build:panel-config": "node scripts/generate-panel-config.mjs",

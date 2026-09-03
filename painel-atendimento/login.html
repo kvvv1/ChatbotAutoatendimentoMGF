@@ -1,0 +1,119 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login — Painel de Atendimento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/painel-atendimento/styles.css" />
+  <script src="/painel-atendimento/config.js"></script>
+  <style>
+    .login-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 360px;
+      background: var(--panel-bg, #fff);
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    .login-card h1 {
+      font-size: 18px;
+      margin: 0 0 24px;
+      text-align: center;
+    }
+    .login-field { margin-bottom: 16px; }
+    .login-field label { display: block; margin-bottom: 6px; font-size: 13px; }
+    .login-field input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .login-error {
+      color: #c0392b;
+      font-size: 13px;
+      margin-bottom: 12px;
+      min-height: 18px;
+    }
+    .login-submit {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .login-submit:disabled { opacity: 0.6; cursor: default; }
+  </style>
+</head>
+<body>
+  <div class="login-shell">
+    <form class="login-card" id="login-form">
+      <h1>Painel de Atendimento</h1>
+      <div class="login-error" id="login-error"></div>
+      <div class="login-field">
+        <label for="login-email">E-mail</label>
+        <input type="email" id="login-email" autocomplete="username" required />
+      </div>
+      <div class="login-field">
+        <label for="login-password">Senha</label>
+        <input type="password" id="login-password" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="login-submit" id="login-submit">Entrar</button>
+    </form>
+  </div>
+
+  <script>
+    var form = document.getElementById('login-form');
+    var errorEl = document.getElementById('login-error');
+    var submitBtn = document.getElementById('login-submit');
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errorEl.textContent = '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Entrando...';
+
+      var email = document.getElementById('login-email').value.trim();
+      var password = document.getElementById('login-password').value;
+
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: password })
+      })
+        .then(function (res) {
+          return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+        })
+        .then(function (result) {
+          if (!result.ok) {
+            errorEl.textContent = result.data.error === 'invalid_credentials'
+              ? 'E-mail ou senha incorretos.'
+              : 'Não foi possível entrar. Tente novamente.';
+            return;
+          }
+          localStorage.setItem('human_panel_auth', JSON.stringify(result.data));
+          var params = new URLSearchParams(window.location.search);
+          window.location.href = '/painel-atendimento/' + (params.toString() ? '?' + params.toString() : '');
+        })
+        .catch(function () {
+          errorEl.textContent = 'Erro de conexão. Tente novamente.';
+        })
+        .finally(function () {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Entrar';
+        });
+    });
+  </script>
+</body>
+</html>

@@ -24,11 +24,37 @@ import { fetchLigacoesByCpf } from '../company/ligacoes.js';
 import { fetchDadosCadastraisByImovelId, fetchDadosCadastraisByLigacao } from '../company/cadastro.js';
 import { publishHumanEvent, subscribeHumanEvents } from './events.js';
 import { getDb } from '../supabase/client.js';
+import { verifyAttendantCredentials } from '../supabase/attendants.js';
+import { signAttendantToken } from './auth.js';
 
 const statusSchema = z.enum(['pendente', 'em_atendimento', 'finalizado', 'cancelado', 'abertos']);
 
 export async function registerHumanRoutes(app: FastifyInstance, config: AppConfig): Promise<void> {
   const zapi = new ZapiClient(config);
+
+  // Login do atendente — só disponível quando ATTENDANT_AUTH_SECRET/API_SECRET está configurado
+  app.post('/api/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!config.attendantAuthSecret) {
+      return reply.code(501).send({ error: 'attendant_auth_not_configured' });
+    }
+
+    const bodySchema = z.object({ email: z.string().email(), password: z.string().min(1) });
+    const parsed = bodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'invalid_body' });
+    }
+
+    const attendant = await verifyAttendantCredentials(config, parsed.data.email, parsed.data.password);
+    if (!attendant) {
+      return reply.code(401).send({ error: 'invalid_credentials' });
+    }
+
+    const token = signAttendantToken(
+      { sub: attendant.id, nome: attendant.name, email: attendant.email },
+      config.attendantAuthSecret
+    );
+    return { token, attendant: { id: attendant.id, nome: attendant.name, email: attendant.email } };
+  });
 
   function extractIdEletronicoFromText(value: string): string | null {
     const m = String(value || '').match(/\b\d+@[A-Za-z0-9]+\b/);
@@ -326,7 +352,7 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
   // Enviar mensagem ao usuário a partir do painel humano
   app.post('/api/human-tickets/:id/send-message', async (request: FastifyRequest, reply: FastifyReply) => {
     const paramsSchema = z.object({ id: z.string().uuid() });
-    const bodySchema = z.object({ message: z.string().min(1) });
+    const bodySchema = z.object({ message: z.string().min(1), attendant: z.string().trim().min(1).optional() });
 
     const paramsParse = paramsSchema.safeParse(request.params);
     if (!paramsParse.success) {
@@ -357,6 +383,15 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
     // Opcionalmente já marca como "em_atendimento" se ainda estiver pendente
     if (ticket.status === 'pendente') {
       await updateHumanTicketStatus(config, ticket.id, 'em_atendimento');
+    }
+
+    // Atribui o ticket a quem respondeu primeiro, sem sobrescrever atribuição existente.
+    // Prefere a identidade verificada pelo token de login; só usa o nome enviado no corpo
+    // (não verificável) como fallback pra instâncias que ainda não migraram pro login.
+    const verifiedAttendantName = (request as any).attendant?.nome as string | undefined;
+    const attendantName = verifiedAttendantName || bodyParse.data.attendant;
+    if (!ticket.assigned_attendant && attendantName) {
+      await updateHumanTicketAssignee(config, ticket.id, attendantName);
     }
 
     publishHumanEvent({ type: 'message', phone: ticket.phone, at: new Date().toISOString() });
@@ -418,9 +453,80 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
     return { note: created };
   });
 
-  // ── Respostas Rápidas ─────────────────────────────────────────────────────
+  // ── Feature flags ─────────────────────────────────────────────────────────
+  app.get('/api/features', async () => ({
+    enableContacts: config.enableContacts ?? false,
+  }));
+
+  // ── Agenda de Contatos (apenas quando ENABLE_CONTACTS=true) ───────────────
   const { randomUUID } = await import('node:crypto');
   const db = getDb(config);
+
+  if (config.enableContacts) {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(30) NOT NULL,
+        description VARCHAR(500),
+        created_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3)
+      )
+    `);
+
+    app.get('/api/contacts', async () => {
+      const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(
+        'SELECT id, name, phone, description, created_at FROM contacts ORDER BY name ASC'
+      );
+      return { contacts: rows };
+    });
+
+    app.post('/api/contacts', async (request: FastifyRequest, reply: FastifyReply) => {
+      const body = request.body as { name?: string; phone?: string; description?: string } | null;
+      const name = body?.name?.trim();
+      const phone = body?.phone?.replace(/\D/g, '');
+      const description = body?.description?.trim() ?? null;
+      if (!name || !phone) return reply.code(400).send({ error: 'name_e_phone_obrigatorios' });
+      const id = randomUUID();
+      await db.query(
+        'INSERT INTO contacts (id, name, phone, description) VALUES (?, ?, ?, ?)',
+        [id, name, phone, description]
+      );
+      const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(
+        'SELECT id, name, phone, description, created_at FROM contacts WHERE id = ?', [id]
+      );
+      return reply.code(201).send({ contact: (rows as any[])[0] });
+    });
+
+    app.delete('/api/contacts/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params as { id: string };
+      await db.query('DELETE FROM contacts WHERE id = ?', [id]);
+      return { ok: true };
+    });
+
+    app.post('/api/contacts/send', async (request: FastifyRequest, reply: FastifyReply) => {
+      const body = request.body as { phone?: string; message?: string } | null;
+      const phone = body?.phone?.replace(/\D/g, '');
+      const message = body?.message?.trim();
+      if (!phone || !message) return reply.code(400).send({ error: 'phone_e_message_obrigatorios' });
+      try {
+        await zapi.sendText({ phone, message });
+        await logMessage(config, { phone, direction: 'out', content: message });
+      } catch (err) {
+        request.log.error({ err, phone }, 'Erro ao enviar mensagem de contato');
+        return reply.code(500).send({ error: 'send_failed' });
+      }
+      return { ok: true };
+    });
+
+    app.get('/api/contacts/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+      const { phone } = request.query as { phone?: string };
+      if (!phone) return reply.code(400).send({ error: 'phone_obrigatorio' });
+      const messages = await getMessagesByPhone(config, phone.replace(/\D/g, ''), { limit: 100 });
+      return { messages };
+    });
+  }
+
+  // ── Respostas Rápidas ─────────────────────────────────────────────────────
 
   app.get('/api/quick-replies', async (_request, reply: FastifyReply) => {
     const [rows] = await db.query<import('mysql2/promise').RowDataPacket[]>(

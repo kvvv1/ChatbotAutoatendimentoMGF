@@ -23,6 +23,22 @@ export class LinkApiError extends Error {
         this.name = 'LinkApiError';
     }
 }
+function getFetchCauseMessage(error) {
+    try {
+        if (!error || typeof error !== 'object')
+            return '';
+        const cause = error.cause;
+        if (!cause || typeof cause !== 'object')
+            return '';
+        const causeObj = cause;
+        const code = causeObj.code ? ` (${causeObj.code})` : '';
+        const message = causeObj.message ? ` ${causeObj.message}` : '';
+        return `${code}${message}`.trim();
+    }
+    catch {
+        return '';
+    }
+}
 /**
  * Faz uma requisição POST para a API Link
  */
@@ -37,19 +53,34 @@ async function linkPost(config, endpoint, body) {
     const url = `${base}${endpoint}`;
     const headers = {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'Token': config.linkApiToken
     };
-    const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body)
-    });
+    let res;
+    try {
+        res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body)
+        });
+    }
+    catch (err) {
+        const causeDetails = getFetchCauseMessage(err);
+        throw new LinkApiError(`Falha de rede na API Link (${url}): ${err instanceof Error ? err.message : String(err)}${causeDetails ? ` | causa: ${causeDetails}` : ''}`);
+    }
     if (!res.ok) {
         const bodyText = await res.text().catch(() => '');
+        console.error(`[linkApi] Erro: status ${res.status} ${res.statusText} | url: ${url} | body:`, bodyText);
         throw new LinkApiError(`Erro na API Link: ${res.status} ${res.statusText}`, res.status, bodyText);
     }
-    const json = await res.json().catch(() => null);
-    return json;
+    const rawText = await res.text();
+    try {
+        return JSON.parse(rawText);
+    }
+    catch {
+        console.warn(`[linkApi] Resposta de ${endpoint} não é JSON válido, tratando como vazio. Corpo bruto:`, rawText);
+        return null;
+    }
 }
 /**
  * Faz uma requisição GET para a API Link
@@ -65,18 +96,33 @@ async function linkGet(config, endpoint) {
     const url = `${base}${endpoint}`;
     const headers = {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'Token': config.linkApiToken
     };
-    const res = await fetch(url, {
-        method: 'GET',
-        headers
-    });
+    let res;
+    try {
+        res = await fetch(url, {
+            method: 'GET',
+            headers
+        });
+    }
+    catch (err) {
+        const causeDetails = getFetchCauseMessage(err);
+        throw new LinkApiError(`Falha de rede na API Link (${url}): ${err instanceof Error ? err.message : String(err)}${causeDetails ? ` | causa: ${causeDetails}` : ''}`);
+    }
     if (!res.ok) {
         const bodyText = await res.text().catch(() => '');
+        console.error(`[linkApi] Erro: status ${res.status} ${res.statusText} | url: ${url} | body:`, bodyText);
         throw new LinkApiError(`Erro na API Link: ${res.status} ${res.statusText}`, res.status, bodyText);
     }
-    const json = await res.json().catch(() => null);
-    return json;
+    const rawText = await res.text();
+    try {
+        return JSON.parse(rawText);
+    }
+    catch {
+        console.warn(`[linkApi] Resposta de ${endpoint} não é JSON válido, tratando como vazio. Corpo bruto:`, rawText);
+        return null;
+    }
 }
 // ============================================================================
 // FUNÇÕES DE NEGÓCIO
@@ -107,9 +153,10 @@ export async function linkGetDebitos(config, imovelId) {
  * POST /Dados-Cadastrais
  */
 export async function linkGetDadosCadastrais(config, imovelId) {
-    return linkPost(config, '/Dados-Cadastrais', {
-        ImovelID: imovelId
-    });
+    console.log('[linkApi] Buscando dados cadastrais para ImovelID:', imovelId);
+    const result = await linkPost(config, '/Dados-Cadastrais', { ImovelID: imovelId });
+    console.log('[linkApi] Dados cadastrais recebidos:', JSON.stringify(result, null, 2));
+    return result;
 }
 /**
  * Busca últimas leituras do imóvel

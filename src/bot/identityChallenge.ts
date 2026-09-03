@@ -48,11 +48,18 @@ function digitDecoys(correct: string): [string, string] {
   return [candidates[0] ?? '0000', candidates[1] ?? '1111'];
 }
 
-/** Extrai bairro de "LOGRADOURO, N - BAIRRO - CIDADE/UF" */
+/**
+ * Extrai bairro de "LOGRADOURO, N - BAIRRO" ou "LOGRADOURO, N - BAIRRO - CIDADE/UF" ou "LOGRADOURO, N - BAIRRO - CIDADE - UF".
+ *
+ * Quando o cadastro não tem bairro preenchido, o GestCom retorna "LOGRADOURO, N - CIDADE - UF" (também 3 partes),
+ * o que sem essa checagem seria confundido com o formato válido de 3 partes e devolveria a cidade como se fosse o bairro.
+ * A distinção: no formato válido de 3 partes o último segmento é "CIDADE/UF" (com barra); sem bairro, é só a UF isolada.
+ */
 function extractBairro(endereco: string): string | null {
-  const parts = endereco.split(' - ');
+  const parts = endereco.split(' - ').map(p => p.trim());
+  if (parts.length === 3 && !parts[2].includes('/')) return null;
   if (parts.length >= 2) {
-    const bairro = parts[parts.length - 2].trim();
+    const bairro = parts[1];
     if (bairro && !bairro.includes('/') && bairro.length > 1) return bairro;
   }
   return null;
