@@ -41,7 +41,7 @@ export type LinkDebito = {
   CodigoBarras: string;
   LinhaDigitavel: string;
   PayloadPix: string;
-  DebitoAutomatico: number; // 0 = não, 1 = sim
+  DebitoAutomatico: number | string; // 0/1, "0"/"1", "S"/"N" ou vazio dependendo da instância (desktop vs web)
 };
 
 /** Categoria do imóvel */
@@ -165,6 +165,7 @@ async function linkPost<T>(
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '');
+    console.error(`[linkApi] Erro: status ${res.status} ${res.statusText} | url: ${url} | body:`, bodyText);
     throw new LinkApiError(
       `Erro na API Link: ${res.status} ${res.statusText}`,
       res.status,
@@ -172,8 +173,13 @@ async function linkPost<T>(
     );
   }
 
-  const json = await res.json().catch(() => null);
-  return json as T;
+  const rawText = await res.text();
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    console.warn(`[linkApi] Resposta de ${endpoint} não é JSON válido, tratando como vazio. Corpo bruto:`, rawText);
+    return null as T;
+  }
 }
 
 /**
@@ -212,6 +218,7 @@ async function linkGet<T>(
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '');
+    console.error(`[linkApi] Erro: status ${res.status} ${res.statusText} | url: ${url} | body:`, bodyText);
     throw new LinkApiError(
       `Erro na API Link: ${res.status} ${res.statusText}`,
       res.status,
@@ -219,8 +226,13 @@ async function linkGet<T>(
     );
   }
 
-  const json = await res.json().catch(() => null);
-  return json as T;
+  const rawText = await res.text();
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    console.warn(`[linkApi] Resposta de ${endpoint} não é JSON válido, tratando como vazio. Corpo bruto:`, rawText);
+    return null as T;
+  }
 }
 
 // ============================================================================

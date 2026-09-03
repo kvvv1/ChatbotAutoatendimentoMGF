@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe — Painel Administrativo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f0ede8;
+    --surface: #faf9f7;
+    --border: #d4cfc8;
+    --border-strong: #a89f94;
+    --text: #1a1714;
+    --text-muted: #7a7068;
+    --accent: #2c2926;
+    --tag-green: #2d6a4f;
+    --tag-green-bg: #d8f3dc;
+    --tag-yellow: #7d5a00;
+    --tag-yellow-bg: #fff3cd;
+    --tag-red: #8b1a1a;
+    --tag-red-bg: #ffd6d6;
+    --tag-gray: #4a4540;
+    --tag-gray-bg: #e8e4e0;
+    --sidebar-w: 220px;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--accent);
+    color: #e8e4de;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+  }
+
+  .sidebar-logo {
+    padding: 20px 18px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .sidebar-logo .logo-tag {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 4px;
+  }
+  .sidebar-logo .logo-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    padding: 10px 0;
+    overflow-y: auto;
+  }
+
+  .nav-section {
+    padding: 16px 14px 4px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 18px;
+    cursor: pointer;
+    font-size: 13.5px;
+    color: rgba(255,255,255,0.65);
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .nav-item.active {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border-left-color: #c9a96e;
+    font-weight: 500;
+  }
+  .nav-item .icon { font-size: 15px; opacity: 0.8; width: 18px; text-align: center; }
+
+  .sidebar-footer {
+    padding: 14px 18px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.35);
+  }
+  .sidebar-footer span { display: block; }
+  .sidebar-footer .version { color: rgba(255,255,255,0.2); margin-top: 2px; }
+
+  /* ── MAIN ── */
+  .main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .topbar-left { display: flex; flex-direction: column; gap: 2px; }
+  .topbar-breadcrumb { font-size: 11px; color: var(--text-muted); letter-spacing: 0.3px; }
+  .topbar-title { font-size: 17px; font-weight: 600; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 6px; font-size: 13px;
+    cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); font-weight: 500; transition: all 0.12s; user-select: none;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn-primary {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .btn-primary:hover { opacity: 0.88; background: var(--accent); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-ghost { background: transparent; border-color: transparent; }
+  .btn-ghost:hover { background: var(--bg); border-color: var(--border); }
+
+  .content { padding: 28px; flex: 1; }
+
+  /* ── SCREEN TOGGLE ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--text-muted); letter-spacing: 0.4px; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+  /* ── TAG / BADGE ── */
+  .tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 500;
+  }
+  .tag-green { background: var(--tag-green-bg); color: var(--tag-green); }
+  .tag-yellow { background: var(--tag-yellow-bg); color: var(--tag-yellow); }
+  .tag-red { background: var(--tag-red-bg); color: var(--tag-red); }
+  .tag-gray { background: var(--tag-gray-bg); color: var(--tag-gray); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ── TABLE ── */
+  .table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .table th {
+    text-align: left; padding: 10px 14px;
+    background: var(--bg); color: var(--text-muted);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .table td {
+    padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle;
+  }
+  .table tr:last-child td { border-bottom: none; }
+  .table tr:hover td { background: var(--bg); }
+
+  /* ── FORM ── */
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; letter-spacing: 0.3px; }
+  .form-input {
+    width: 100%; padding: 8px 11px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13.5px; background: var(--surface);
+    color: var(--text); outline: none;
+  }
+  .form-input:focus { border-color: var(--border-strong); }
+  .form-input[disabled] { background: var(--bg); color: var(--text-muted); }
+
+  /* ── STAT CARD ── */
+  .stat { text-align: center; padding: 16px; }
+  .stat-number { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 12px; color: var(--text-muted); }
+
+  /* ── SEPARATOR ── */
+  .sep { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* ── ANNOTATION ── */
+  .annotation {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fffbe6; border: 1px dashed #d4b800;
+    color: #7a6200; border-radius: 6px; padding: 5px 10px; font-size: 12px;
+  }
+
+  /* ── HEALTH ROW ── */
+  .health-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .health-row:last-child { border-bottom: none; }
+  .health-name { font-size: 13.5px; font-weight: 500; }
+  .health-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+
+  /* ── QR PLACEHOLDER ── */
+  .qr-box {
+    width: 180px; height: 180px; border: 2px dashed var(--border-strong);
+    border-radius: 10px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    color: var(--text-muted); font-size: 13px;
+    background: var(--bg); margin: 0 auto;
+  }
+  .qr-box .qr-icon { font-size: 36px; }
+
+  /* ── TEMPLATE THUMB ── */
+  .template-thumb {
+    aspect-ratio: 1; background: var(--bg);
+    border: 2px solid var(--border); border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; cursor: pointer; transition: all 0.15s; padding: 16px;
+  }
+  .template-thumb:hover { border-color: var(--border-strong); background: var(--surface); }
+  .template-thumb.selected { border-color: var(--accent); border-width: 2px; }
+  .template-thumb .thumb-icon { font-size: 28px; }
+  .template-thumb .thumb-label { font-size: 12px; color: var(--text-muted); text-align: center; }
+
+  /* ── LOG ROW ── */
+  .log-row {
+    display: grid; grid-template-columns: 140px 90px 1fr 110px;
+    gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--border);
+    font-size: 12.5px; align-items: center;
+  }
+  .log-row:hover { background: var(--bg); }
+  .log-row.header {
+    background: var(--bg); font-weight: 600; font-size: 11px;
+    color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase;
+    border-radius: 6px 6px 0 0;
+  }
+  .log-mono { font-family: monospace; font-size: 11.5px; color: var(--text-muted); }
+
+  /* ── PROGRESS ── */
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; border-radius: 3px; }
+
+  /* ── ENV SECTION ── */
+  .env-group { margin-bottom: 18px; }
+  .env-group-title {
+    font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--text-muted); padding: 0 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+  }
+  .env-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0; font-size: 13px;
+  }
+  .env-key { font-family: monospace; font-size: 12px; color: var(--text-muted); }
+  .env-val { font-family: monospace; font-size: 12px; }
+
+  /* ── ENTITY SELECTOR ── */
+  .entity-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--surface); font-size: 12.5px; cursor: pointer;
+    transition: all 0.12s;
+  }
+  .entity-pill:hover { border-color: var(--border-strong); }
+  .entity-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .flex { display: flex; }
+  .flex-col { flex-direction: column; }
+  .gap-8 { gap: 8px; }
+  .gap-12 { gap: 12px; }
+  .gap-16 { gap: 16px; }
+  .gap-20 { gap: 20px; }
+  .items-center { align-items: center; }
+  .justify-between { justify-content: space-between; }
+  .mb-4 { margin-bottom: 4px; }
+  .mb-8 { margin-bottom: 8px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-20 { margin-bottom: 20px; }
+  .mt-4 { margin-top: 4px; }
+  .mt-8 { margin-top: 8px; }
+  .text-muted { color: var(--text-muted); }
+  .text-sm { font-size: 12.5px; }
+  .text-xs { font-size: 11.5px; }
+  .font-mono { font-family: monospace; }
+  .w-full { width: 100%; }
+  .text-center { text-align: center; }
+
+  /* ── ANNOTATION LAYER ── */
+  .note {
+    background: #fffbea; border-left: 3px solid #e6c200;
+    padding: 10px 14px; border-radius: 0 6px 6px 0;
+    font-size: 12.5px; color: #5a4a00; line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .note strong { color: #3a3000; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-tag">Admin</div>
+    <div class="logo-title">Painel Central</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section">Visão Geral</div>
+    <div class="nav-item active" onclick="goTo('dashboard', this)">
+      <span class="icon">◉</span> Dashboard
+    </div>
+
+    <div class="nav-section">Implantação</div>
+    <div class="nav-item" onclick="goTo('entidades', this)">
+      <span class="icon">⊞</span> Entidades
+    </div>
+    <div class="nav-item" onclick="goTo('onboarding', this)">
+      <span class="icon">⬡</span> Onboarding / QR Code
+    </div>
+    <div class="nav-item" onclick="goTo('env', this)">
+      <span class="icon">⚙</span> Variáveis de Ambiente
+    </div>
+
+    <div class="nav-section">Marketing</div>
+    <div class="nav-item" onclick="goTo('marketing', this)">
+      <span class="icon">◈</span> Gerador de Material
+    </div>
+
+    <div class="nav-section">Monitoramento</div>
+    <div class="nav-item" onclick="goTo('auditoria', this)">
+      <span class="icon">≡</span> Auditoria / Logs
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <span>Tomas · Admin</span>
+    <span class="version">v1.0 — wireframe</span>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════════════ -->
+<main class="main">
+
+  <!-- ── TOPBAR (dinâmica) ── -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-breadcrumb" id="topbar-breadcrumb">Painel Admin</div>
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+    </div>
+    <div class="topbar-right" id="topbar-actions">
+      <!-- preenchido por JS -->
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ════════════════════════════════════
+         SCREEN: DASHBOARD
+    ════════════════════════════════════ -->
+    <div class="screen active" id="screen-dashboard">
+
+      <div class="note">
+        <strong>Dashboard principal</strong> — visão rápida de todas as entidades ativas. Status do WhatsApp vem de <code style="background:#f5f0dc;padding:1px 5px;border-radius:3px">GET /instances/{id}/token/{token}/status</code> (Z-API) por entidade. Demais checks (Gestcom, SMTP, DB) são pings no servidor de cada município.
+      </div>
+
+      <!-- Stats -->
+      <div class="grid-4 mb-20">
+        <div class="card stat">
+          <div class="stat-number">4</div>
+          <div class="stat-label">Entidades ativas</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-number" style="color:var(--tag-green)">3</div>
+          <div class="stat-label">WhatsApp conectado</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-number" style="color:var(--tag-yellow)">1</div>
+          <div class="stat-label">Aguardando QR Code</div>
+        </div>
+        <div class="card stat">
+          <div class="stat-number" style="color:var(--tag-red)">2</div>
+          <div class="stat-label">APIs com erro</div>
+        </div>
+      </div>
+
+      <!-- Entity cards -->
+      <div class="card-title" style="margin-bottom:12px">Status por Entidade</div>
+      <div class="grid-2" style="gap:14px">
+
+        <!-- Formiga -->
+        <div class="card">
+          <div class="flex items-center justify-between mb-8">
+            <div>
+              <div style="font-weight:600; font-size:15px">SAAE Formiga</div>
+              <div class="text-xs text-muted">.env.formiga · porta 3001</div>
+            </div>
+            <span class="tag tag-green"><span class="dot"></span> Conectado</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px">
+            <div class="health-row" style="padding:6px 0; border-bottom:none; border-right:1px solid var(--border); padding-right:12px; margin-right:12px">
+              <span class="text-muted">WhatsApp</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none">
+              <span class="text-muted">Gestcom API</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none; border-right:1px solid var(--border); padding-right:12px; margin-right:12px; margin-top:4px">
+              <span class="text-muted">SMTP</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none; margin-top:4px">
+              <span class="text-muted">DB</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+          </div>
+          <div class="sep" style="margin:12px 0"></div>
+          <div class="flex gap-8">
+            <button class="btn btn-sm" onclick="goTo('env', document.querySelector('[onclick*=env]'))">Ver ENV</button>
+            <button class="btn btn-sm" onclick="goTo('auditoria', document.querySelector('[onclick*=auditoria]'))">Logs</button>
+          </div>
+        </div>
+
+        <!-- Oliveira -->
+        <div class="card">
+          <div class="flex items-center justify-between mb-8">
+            <div>
+              <div style="font-weight:600; font-size:15px">SAAE Oliveira</div>
+              <div class="text-xs text-muted">.env.oliveira · porta 3002</div>
+            </div>
+            <span class="tag tag-green"><span class="dot"></span> Conectado</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px">
+            <div class="health-row" style="padding:6px 0; border-bottom:none; border-right:1px solid var(--border); padding-right:12px; margin-right:12px">
+              <span class="text-muted">WhatsApp</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none">
+              <span class="text-muted">Gestcom API</span><span class="tag tag-red" style="font-size:10px">Erro</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none; border-right:1px solid var(--border); padding-right:12px; margin-right:12px; margin-top:4px">
+              <span class="text-muted">SMTP</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none; margin-top:4px">
+              <span class="text-muted">DB</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+          </div>
+          <div class="sep" style="margin:12px 0"></div>
+          <div class="flex gap-8">
+            <button class="btn btn-sm" onclick="goTo('env', document.querySelector('[onclick*=env]'))">Ver ENV</button>
+            <button class="btn btn-sm" onclick="goTo('auditoria', document.querySelector('[onclick*=auditoria]'))">Logs</button>
+          </div>
+        </div>
+
+        <!-- Itabira -->
+        <div class="card">
+          <div class="flex items-center justify-between mb-8">
+            <div>
+              <div style="font-weight:600; font-size:15px">SAAE Itabira</div>
+              <div class="text-xs text-muted">.env.itabira · porta 3003</div>
+            </div>
+            <span class="tag tag-yellow"><span class="dot"></span> Aguardando QR</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px">
+            <div class="health-row" style="padding:6px 0; border-bottom:none; border-right:1px solid var(--border); padding-right:12px; margin-right:12px">
+              <span class="text-muted">WhatsApp</span><span class="tag tag-yellow" style="font-size:10px">Desconect.</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none">
+              <span class="text-muted">Gestcom API</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none; border-right:1px solid var(--border); padding-right:12px; margin-right:12px; margin-top:4px">
+              <span class="text-muted">SMTP</span><span class="tag tag-gray" style="font-size:10px">Não conf.</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none; margin-top:4px">
+              <span class="text-muted">DB</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+          </div>
+          <div class="sep" style="margin:12px 0"></div>
+          <div class="flex gap-8">
+            <button class="btn btn-sm btn-primary" onclick="goTo('onboarding', document.querySelector('[onclick*=onboarding]'))">Conectar WhatsApp</button>
+          </div>
+        </div>
+
+        <!-- Santana -->
+        <div class="card">
+          <div class="flex items-center justify-between mb-8">
+            <div>
+              <div style="font-weight:600; font-size:15px">SAAE Santana do Manhuaçu</div>
+              <div class="text-xs text-muted">.env.santana-do-manhuacu · porta 3004</div>
+            </div>
+            <span class="tag tag-green"><span class="dot"></span> Conectado</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px">
+            <div class="health-row" style="padding:6px 0; border-bottom:none; border-right:1px solid var(--border); padding-right:12px; margin-right:12px">
+              <span class="text-muted">WhatsApp</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none">
+              <span class="text-muted">Gestcom API</span><span class="tag tag-red" style="font-size:10px">Erro</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none; border-right:1px solid var(--border); padding-right:12px; margin-right:12px; margin-top:4px">
+              <span class="text-muted">SMTP</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+            <div class="health-row" style="padding:6px 0; border-bottom:none; margin-top:4px">
+              <span class="text-muted">DB</span><span class="tag tag-green" style="font-size:10px">OK</span>
+            </div>
+          </div>
+          <div class="sep" style="margin:12px 0"></div>
+          <div class="flex gap-8">
+            <button class="btn btn-sm" onclick="goTo('env', document.querySelector('[onclick*=env]'))">Ver ENV</button>
+            <button class="btn btn-sm" onclick="goTo('auditoria', document.querySelector('[onclick*=auditoria]'))">Logs</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SCREEN: ENTIDADES
+    ════════════════════════════════════ -->
+    <div class="screen" id="screen-entidades">
+
+      <div class="note">
+        <strong>Gestão de Entidades</strong> — cadastro centralizado de cada município. Aqui se registra uma nova entidade antes do onboarding.
+      </div>
+
+      <div class="card mb-16">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Entidade</th>
+              <th>Slug / ENV</th>
+              <th>Telefone WA</th>
+              <th>Porta</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>SAAE Formiga</strong></td>
+              <td class="font-mono text-xs text-muted">.env.formiga</td>
+              <td class="font-mono text-sm">5537999990001</td>
+              <td class="font-mono text-sm">3001</td>
+              <td><span class="tag tag-green">Ativo</span></td>
+              <td><div class="flex gap-8">
+                <button class="btn btn-sm btn-ghost">Editar</button>
+                <button class="btn btn-sm btn-ghost" onclick="goTo('onboarding', document.querySelector('[onclick*=onboarding]'))">QR Code</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td><strong>SAAE Oliveira</strong></td>
+              <td class="font-mono text-xs text-muted">.env.oliveira</td>
+              <td class="font-mono text-sm">5535999990002</td>
+              <td class="font-mono text-sm">3002</td>
+              <td><span class="tag tag-green">Ativo</span></td>
+              <td><div class="flex gap-8">
+                <button class="btn btn-sm btn-ghost">Editar</button>
+                <button class="btn btn-sm btn-ghost" onclick="goTo('onboarding', document.querySelector('[onclick*=onboarding]'))">QR Code</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td><strong>SAAE Itabira</strong></td>
+              <td class="font-mono text-xs text-muted">.env.itabira</td>
+              <td class="font-mono text-sm">5531999990003</td>
+              <td class="font-mono text-sm">3003</td>
+              <td><span class="tag tag-yellow">Em implantação</span></td>
+              <td><div class="flex gap-8">
+                <button class="btn btn-sm btn-ghost">Editar</button>
+                <button class="btn btn-sm btn-primary" onclick="goTo('onboarding', document.querySelector('[onclick*=onboarding]'))">Conectar WA</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td><strong>SAAE Santana do Manhuaçu</strong></td>
+              <td class="font-mono text-xs text-muted">.env.santana-do-manhuacu</td>
+              <td class="font-mono text-sm">5533999990004</td>
+              <td class="font-mono text-sm">3004</td>
+              <td><span class="tag tag-green">Ativo</span></td>
+              <td><div class="flex gap-8">
+                <button class="btn btn-sm btn-ghost">Editar</button>
+                <button class="btn btn-sm btn-ghost" onclick="goTo('onboarding', document.querySelector('[onclick*=onboarding]'))">QR Code</button>
+              </div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Form nova entidade -->
+      <div class="card">
+        <div class="card-title">Nova Entidade</div>
+        <div class="grid-2" style="gap:16px">
+          <div class="form-group">
+            <label class="form-label">Nome curto (ex: SAAE Formiga)</label>
+            <input class="form-input" type="text" placeholder="SAAE Nova Cidade">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nome completo</label>
+            <input class="form-input" type="text" placeholder="Serviço Autônomo de Água e Esgoto de Nova Cidade">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Slug do arquivo ENV</label>
+            <input class="form-input" type="text" placeholder="nova-cidade">
+            <div class="text-xs text-muted mt-4">Gerará o arquivo <span class="font-mono">.env.nova-cidade</span></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Número WhatsApp Business</label>
+            <input class="form-input" type="text" placeholder="5537999990005">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Porta do servidor</label>
+            <input class="form-input" type="text" placeholder="3005">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Evolution API Instance</label>
+            <input class="form-input" type="text" placeholder="saae-nova-cidade">
+          </div>
+        </div>
+        <div class="flex gap-8 mt-8">
+          <button class="btn btn-primary">Criar Entidade</button>
+          <button class="btn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SCREEN: ONBOARDING / QR CODE
+    ════════════════════════════════════ -->
+    <div class="screen" id="screen-onboarding">
+
+      <div class="note">
+        <strong>Onboarding WhatsApp (Z-API)</strong> — Tomás seleciona a entidade, clica em Conectar e o QR Code aparece para escanear no celular da empresa. O painel faz polling em <code style="background:#f5f0dc;padding:1px 5px;border-radius:3px">GET /instances/{id}/token/{token}/qr-code/image</code> a cada 3s até <code style="background:#f5f0dc;padding:1px 5px;border-radius:3px">GET /status</code> retornar <strong>connected: true</strong>.
+      </div>
+
+      <!-- Seletor de entidade -->
+      <div class="card mb-16">
+        <div class="card-title">Selecionar Entidade</div>
+        <div class="flex gap-8" style="flex-wrap:wrap">
+          <div class="entity-pill"><span>📍</span> SAAE Formiga</div>
+          <div class="entity-pill"><span>📍</span> SAAE Oliveira</div>
+          <div class="entity-pill active"><span>📍</span> SAAE Itabira</div>
+          <div class="entity-pill"><span>📍</span> SAAE Santana do Manhuaçu</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="gap:16px; align-items:start">
+
+        <!-- QR Code -->
+        <div class="card text-center">
+          <div class="card-title">QR Code WhatsApp</div>
+          <div class="qr-box mb-16">
+            <div class="qr-icon">⬜</div>
+            <div>Aguardando geração...</div>
+          </div>
+          <div class="text-sm text-muted mb-16">
+            Escaneie com o celular da entidade em<br>
+            <strong>WhatsApp → Aparelhos conectados → Conectar aparelho</strong>
+          </div>
+          <div class="flex gap-8" style="justify-content:center">
+            <button class="btn btn-primary">⬡ Gerar QR Code</button>
+            <button class="btn">↻ Atualizar</button>
+          </div>
+          <div class="sep"></div>
+          <div style="font-size:12px; color:var(--text-muted); line-height:1.6">
+            O QR Code expira em <strong>60 segundos</strong>.<br>
+            A página atualiza automaticamente a cada 3s.
+          </div>
+        </div>
+
+        <!-- Status e checklist -->
+        <div style="display:flex; flex-direction:column; gap:14px">
+
+          <div class="card">
+            <div class="card-title">Status da Instância — Z-API</div>
+            <div class="health-row">
+              <div>
+                <div class="health-name">Z-API Base URL</div>
+                <div class="health-sub font-mono" style="font-size:10px">GET /instances/{id}/token/{token}/status</div>
+              </div>
+              <span class="tag tag-green"><span class="dot"></span> Acessível</span>
+            </div>
+            <div class="health-row">
+              <div>
+                <div class="health-name">Conexão WhatsApp</div>
+                <div class="health-sub font-mono" style="font-size:10px">connected: false</div>
+              </div>
+              <span class="tag tag-yellow"><span class="dot"></span> Desconectado</span>
+            </div>
+            <div class="health-row">
+              <div>
+                <div class="health-name">Número esperado</div>
+                <div class="health-sub font-mono">5531999990003</div>
+              </div>
+              <span class="tag tag-gray">—</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Checklist Pré-Onboarding</div>
+            <div style="display:flex; flex-direction:column; gap:8px; font-size:13px">
+              <div class="flex items-center gap-8">
+                <span style="color:var(--tag-green)">✓</span>
+                <span>ENV configurado (.env.itabira)</span>
+              </div>
+              <div class="flex items-center gap-8">
+                <span style="color:var(--tag-green)">✓</span>
+                <span>Servidor rodando na porta 3003</span>
+              </div>
+              <div class="flex items-center gap-8">
+                <span style="color:var(--tag-green)">✓</span>
+                <span>Evolution API acessível</span>
+              </div>
+              <div class="flex items-center gap-8">
+                <span style="color:var(--tag-yellow)">○</span>
+                <span class="text-muted">WhatsApp conectado</span>
+              </div>
+              <div class="flex items-center gap-8">
+                <span style="color:var(--tag-gray)">○</span>
+                <span class="text-muted">Teste de mensagem enviado</span>
+              </div>
+            </div>
+            <div class="sep"></div>
+            <button class="btn btn-sm w-full">Enviar mensagem de teste</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Histórico de Conexão</div>
+            <div style="font-size:12px; display:flex; flex-direction:column; gap:6px">
+              <div class="flex justify-between text-muted">
+                <span>Hoje 09:14</span><span class="tag tag-red" style="font-size:10px">Desconectou</span>
+              </div>
+              <div class="flex justify-between text-muted">
+                <span>Ontem 14:32</span><span class="tag tag-green" style="font-size:10px">Conectou</span>
+              </div>
+              <div class="flex justify-between text-muted">
+                <span>23/06 11:05</span><span class="tag tag-green" style="font-size:10px">Primeira conexão</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SCREEN: ENV
+    ════════════════════════════════════ -->
+    <div class="screen" id="screen-env">
+
+      <div class="note">
+        <strong>Variáveis de Ambiente</strong> — validação de cada .env.* com semáforo por campo. Tomás vê o que está faltando ou errado sem precisar abrir o servidor.
+      </div>
+
+      <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
+        <div class="entity-pill active">SAAE Formiga</div>
+        <div class="entity-pill">SAAE Oliveira</div>
+        <div class="entity-pill">SAAE Itabira</div>
+        <div class="entity-pill">SAAE Santana do Manhuaçu</div>
+      </div>
+
+      <div class="grid-2" style="gap:16px; align-items:start">
+
+        <div class="card">
+          <div class="card-title">Resumo de Validação — SAAE Formiga</div>
+          <div style="display:flex; gap:12px; margin-bottom:16px">
+            <div style="text-align:center">
+              <div style="font-size:22px; font-weight:700; color:var(--tag-green)">18</div>
+              <div class="text-xs text-muted">OK</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:22px; font-weight:700; color:var(--tag-yellow)">1</div>
+              <div class="text-xs text-muted">Aviso</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:22px; font-weight:700; color:var(--tag-red)">0</div>
+              <div class="text-xs text-muted">Erro</div>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:95%; background:var(--tag-green)"></div>
+          </div>
+          <div class="text-xs text-muted mt-4">19 de 20 variáveis configuradas</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Ações</div>
+          <div style="background:var(--bg);border-radius:6px;padding:10px;font-size:11px;font-family:monospace;color:var(--text-muted);line-height:1.8;margin-bottom:12px">
+            <strong style="color:var(--text);font-size:10px;letter-spacing:.5px">ENDPOINTS Z-API (por entidade)</strong><br>
+            GET …/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/status<br>
+            GET …/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/qr-code/image<br>
+            POST …/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/restart<br>
+            DELETE …/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/disconnect
+          </div>
+          <div class="flex flex-col gap-8">
+            <button class="btn">↓ Baixar .env.formiga</button>
+            <button class="btn">✏ Editar no painel</button>
+            <button class="btn">↻ Revalidar agora</button>
+            <button class="btn" style="color:var(--tag-red); border-color:var(--tag-red-bg)">⚠ Ver diff com .env.example</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="card">
+        <div class="card-title">Variáveis — .env.formiga</div>
+
+        <div class="env-group">
+          <div class="env-group-title">Servidor</div>
+          <div class="env-item">
+            <span class="env-key">PORT</span>
+            <span class="env-val">3001</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+          <div class="env-item">
+            <span class="env-key">ENTIDADE_NOME</span>
+            <span class="env-val">Formiga</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+          <div class="env-item">
+            <span class="env-key">ENTIDADE_NOME_COMPLETO</span>
+            <span class="env-val">SAAE Formiga</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+        </div>
+
+        <div class="env-group">
+          <div class="env-group-title">WhatsApp / Evolution API</div>
+          <div class="env-item">
+            <span class="env-key">EVOLUTION_BASE_URL</span>
+            <span class="env-val font-mono text-sm">https://evolution.saaeformiga.com.br</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+          <div class="env-item">
+            <span class="env-key">EVOLUTION_INSTANCE</span>
+            <span class="env-val">saae-formiga</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+          <div class="env-item">
+            <span class="env-key">EVOLUTION_API_KEY</span>
+            <span class="env-val">••••••••••</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+        </div>
+
+        <div class="env-group">
+          <div class="env-group-title">Gestcom API</div>
+          <div class="env-item">
+            <span class="env-key">LINK_API_BASE_URL</span>
+            <span class="env-val">https://api.gestcom.com.br/formiga</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+          <div class="env-item">
+            <span class="env-key">LINK_API_TOKEN</span>
+            <span class="env-val">••••••••••</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+        </div>
+
+        <div class="env-group">
+          <div class="env-group-title">SMTP</div>
+          <div class="env-item">
+            <span class="env-key">SMTP_HOST</span>
+            <span class="env-val">smtp.formiga.saae.gov.br</span>
+            <span class="tag tag-green" style="font-size:10px">OK</span>
+          </div>
+          <div class="env-item">
+            <span class="env-key">SMTP_USER</span>
+            <span class="env-val">bot@saaeformiga.com.br</span>
+            <span class="tag tag-yellow" style="font-size:10px">Sem teste</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SCREEN: MARKETING
+    ════════════════════════════════════ -->
+    <div class="screen" id="screen-marketing">
+
+      <div class="note">
+        <strong>Gerador de Material</strong> — Gisele sobe os templates base. O painel preenche automaticamente nome, telefone e QR Code de cada entidade. Tomás baixa os arquivos prontos.
+      </div>
+
+      <div class="grid-2" style="gap:16px; align-items:start">
+
+        <!-- Coluna esquerda: templates -->
+        <div>
+          <div class="card mb-16">
+            <div class="card-title">Templates Disponíveis</div>
+            <div class="grid-2" style="gap:10px">
+              <div class="template-thumb selected">
+                <div class="thumb-icon">🗞️</div>
+                <div class="thumb-label">Post Instagram<br><span class="text-xs" style="color:#999">1080×1080</span></div>
+              </div>
+              <div class="template-thumb">
+                <div class="thumb-icon">📄</div>
+                <div class="thumb-label">Flyer A4<br><span class="text-xs" style="color:#999">210×297mm</span></div>
+              </div>
+              <div class="template-thumb">
+                <div class="thumb-icon">📱</div>
+                <div class="thumb-label">Stories<br><span class="text-xs" style="color:#999">1080×1920</span></div>
+              </div>
+              <div class="template-thumb" style="border-style:dashed; justify-content:center">
+                <div class="thumb-icon" style="font-size:22px">+</div>
+                <div class="thumb-label">Subir template</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Variáveis do Template</div>
+            <div style="font-size:12.5px; display:flex; flex-direction:column; gap:8px">
+              <div class="flex items-center justify-between">
+                <span class="font-mono" style="font-size:11.5px; color:var(--text-muted)">{{NOME}}</span>
+                <span class="tag tag-green" style="font-size:10px">Preenchido</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="font-mono" style="font-size:11.5px; color:var(--text-muted)">{{TELEFONE}}</span>
+                <span class="tag tag-green" style="font-size:10px">Preenchido</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="font-mono" style="font-size:11.5px; color:var(--text-muted)">{{QR_CODE}}</span>
+                <span class="tag tag-green" style="font-size:10px">Gerado</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="font-mono" style="font-size:11.5px; color:var(--text-muted)">{{LINK_WA}}</span>
+                <span class="tag tag-green" style="font-size:10px">Preenchido</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coluna direita: seleção de entidade + geração -->
+        <div>
+          <div class="card mb-16">
+            <div class="card-title">Gerar para quais entidades?</div>
+            <div style="display:flex; flex-direction:column; gap:8px; font-size:13.5px">
+              <label class="flex items-center gap-8" style="cursor:pointer">
+                <input type="checkbox" checked> SAAE Formiga
+                <span class="tag tag-green" style="font-size:10px; margin-left:auto">Pronto</span>
+              </label>
+              <label class="flex items-center gap-8" style="cursor:pointer">
+                <input type="checkbox" checked> SAAE Oliveira
+                <span class="tag tag-green" style="font-size:10px; margin-left:auto">Pronto</span>
+              </label>
+              <label class="flex items-center gap-8" style="cursor:pointer">
+                <input type="checkbox" checked> SAAE Itabira
+                <span class="tag tag-yellow" style="font-size:10px; margin-left:auto">QR pendente</span>
+              </label>
+              <label class="flex items-center gap-8" style="cursor:pointer">
+                <input type="checkbox" checked> SAAE Santana do Manhuaçu
+                <span class="tag tag-green" style="font-size:10px; margin-left:auto">Pronto</span>
+              </label>
+            </div>
+            <div class="sep"></div>
+            <button class="btn btn-primary w-full">⬇ Gerar e baixar todos (ZIP)</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Preview — SAAE Formiga</div>
+            <div style="
+              background: var(--bg);
+              border: 1px solid var(--border);
+              border-radius: 8px;
+              aspect-ratio: 1;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              gap: 12px;
+              padding: 20px;
+              text-align: center;
+            ">
+              <div style="font-size:13px; color:var(--text-muted)">Preview do post</div>
+              <div style="border: 2px dashed var(--border-strong); width:70px; height:70px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:24px">⬜</div>
+              <div style="font-weight:700; font-size:15px">SAAE Formiga</div>
+              <div style="font-size:12px; color:var(--text-muted)">📲 (37) 9 9999-0001</div>
+              <div style="font-size:10px; color:var(--text-muted); font-family:monospace">wa.me/5537999990001</div>
+            </div>
+            <div class="flex gap-8 mt-8">
+              <button class="btn btn-sm w-full">⬇ Baixar PNG</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════
+         SCREEN: AUDITORIA
+    ════════════════════════════════════ -->
+    <div class="screen" id="screen-auditoria">
+
+      <div class="note">
+        <strong>Auditoria e Logs</strong> — histórico completo de eventos do sistema por entidade. Útil para suporte, compliance e debugging remoto.
+      </div>
+
+      <!-- Filtros -->
+      <div class="card mb-16">
+        <div class="flex gap-12 items-center" style="flex-wrap:wrap">
+          <div>
+            <div class="form-label" style="margin-bottom:4px">Entidade</div>
+            <select class="form-input" style="width:180px">
+              <option>Todas</option>
+              <option>SAAE Formiga</option>
+              <option>SAAE Oliveira</option>
+              <option>SAAE Itabira</option>
+              <option>SAAE Santana do Manhuaçu</option>
+            </select>
+          </div>
+          <div>
+            <div class="form-label" style="margin-bottom:4px">Tipo de evento</div>
+            <select class="form-input" style="width:170px">
+              <option>Todos</option>
+              <option>WhatsApp</option>
+              <option>OTP</option>
+              <option>Atendimento humano</option>
+              <option>Erro de API</option>
+              <option>Sessão</option>
+            </select>
+          </div>
+          <div>
+            <div class="form-label" style="margin-bottom:4px">De</div>
+            <input class="form-input" type="date" style="width:150px" value="2026-06-21">
+          </div>
+          <div>
+            <div class="form-label" style="margin-bottom:4px">Até</div>
+            <input class="form-input" type="date" style="width:150px" value="2026-06-28">
+          </div>
+          <div style="align-self:flex-end">
+            <button class="btn btn-primary">Filtrar</button>
+          </div>
+          <div style="align-self:flex-end; margin-left:auto">
+            <button class="btn">⬇ Exportar CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Log table -->
+      <div class="card">
+        <div class="log-row header">
+          <span>Data / Hora</span>
+          <span>Entidade</span>
+          <span>Evento</span>
+          <span>Resultado</span>
+        </div>
+        <div class="log-row">
+          <span class="log-mono">2026-06-28 11:42:03</span>
+          <span class="tag tag-gray" style="font-size:10px">Formiga</span>
+          <span>OTP enviado para <span class="font-mono">37999990001</span></span>
+          <span class="tag tag-green" style="font-size:10px">Sucesso</span>
+        </div>
+        <div class="log-row">
+          <span class="log-mono">2026-06-28 11:38:17</span>
+          <span class="tag tag-gray" style="font-size:10px">Oliveira</span>
+          <span>Erro chamada Gestcom — <span class="font-mono">404 /clientes</span></span>
+          <span class="tag tag-red" style="font-size:10px">Erro</span>
+        </div>
+        <div class="log-row">
+          <span class="log-mono">2026-06-28 11:35:00</span>
+          <span class="tag tag-gray" style="font-size:10px">Formiga</span>
+          <span>Ticket humano aberto — atendente Mariana</span>
+          <span class="tag tag-yellow" style="font-size:10px">Em aberto</span>
+        </div>
+        <div class="log-row">
+          <span class="log-mono">2026-06-28 10:51:22</span>
+          <span class="tag tag-gray" style="font-size:10px">Itabira</span>
+          <span>WhatsApp desconectou</span>
+          <span class="tag tag-red" style="font-size:10px">Alerta</span>
+        </div>
+        <div class="log-row">
+          <span class="log-mono">2026-06-28 10:20:08</span>
+          <span class="tag tag-gray" style="font-size:10px">Santana</span>
+          <span>Sessão expirada por inatividade — <span class="font-mono">55339...</span></span>
+          <span class="tag tag-gray" style="font-size:10px">Info</span>
+        </div>
+        <div class="log-row">
+          <span class="log-mono">2026-06-28 09:14:33</span>
+          <span class="tag tag-gray" style="font-size:10px">Itabira</span>
+          <span>OTP validado — autenticação bem-sucedida</span>
+          <span class="tag tag-green" style="font-size:10px">Sucesso</span>
+        </div>
+        <div class="log-row">
+          <span class="log-mono">2026-06-27 17:02:11</span>
+          <span class="tag tag-gray" style="font-size:10px">Oliveira</span>
+          <span>Ticket humano fechado — duração 12min</span>
+          <span class="tag tag-green" style="font-size:10px">Resolvido</span>
+        </div>
+        <div class="log-row" style="justify-content:center; padding:14px; color:var(--text-muted); font-size:12px">
+          Exibindo 7 de 284 eventos · <a href="#" style="color:inherit; margin-left:4px">Carregar mais</a>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const screens = {
+    dashboard: { title: 'Dashboard', crumb: 'Painel Admin', actions: '' },
+    entidades: {
+      title: 'Entidades',
+      crumb: 'Implantação',
+      actions: '<button class="btn btn-primary" onclick="document.querySelector(\'#screen-entidades .card:last-child\').scrollIntoView({behavior:\'smooth\'})">+ Nova Entidade</button>'
+    },
+    onboarding: {
+      title: 'Onboarding / QR Code',
+      crumb: 'Implantação',
+      actions: '<button class="btn">↓ Exportar checklist</button>'
+    },
+    env: {
+      title: 'Variáveis de Ambiente',
+      crumb: 'Implantação',
+      actions: '<button class="btn">↻ Revalidar todas</button><button class="btn" style="margin-left:8px">⬇ Baixar .env.example</button>'
+    },
+    marketing: {
+      title: 'Gerador de Material',
+      crumb: 'Marketing',
+      actions: '<button class="btn">+ Subir template</button>'
+    },
+    auditoria: {
+      title: 'Auditoria / Logs',
+      crumb: 'Monitoramento',
+      actions: '<button class="btn">⬇ Exportar CSV</button>'
+    },
+  };
+
+  function goTo(id, navEl) {
+    // hide all screens
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    // show target
+    document.getElementById('screen-' + id).classList.add('active');
+    // update topbar
+    const cfg = screens[id];
+    document.getElementById('topbar-title').textContent = cfg.title;
+    document.getElementById('topbar-breadcrumb').textContent = cfg.crumb;
+    document.getElementById('topbar-actions').innerHTML = cfg.actions;
+    // update nav
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (navEl) navEl.classList.add('active');
+    // scroll top
+    window.scrollTo(0, 0);
+  }
+</script>
+</body>
+</html>

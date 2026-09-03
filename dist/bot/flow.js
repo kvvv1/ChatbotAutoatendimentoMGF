@@ -6,9 +6,11 @@ import { fetchDebitosByLigacao } from '../company/debitos.js';
 import { fetchConsumoByLigacao } from '../company/consumo.js';
 import { fetchDadosCadastraisByLigacao } from '../company/cadastro.js';
 import { fetchClienteByCpf, loginByIdEletronico } from '../company/cliente.js';
-import { isLinkApiConfigured, linkImpressaoConta } from '../company/linkApi.js';
+import { isLinkApiConfigured, linkImpressaoConta, linkGetDadosCadastrais } from '../company/linkApi.js';
+import { buildChallenges } from './identityChallenge.js';
 import { fetchDadosAutarquia, formatarTelefone } from '../company/autarquia.js';
 import { ensureOpenHumanTicket } from '../supabase/humanTickets.js';
+import { isWithinBusinessHours, businessHoursMessage } from './businessHours.js';
 function onlyDigits(value) {
     try {
         if (typeof value !== 'string')
@@ -87,22 +89,6 @@ function normalizeUserText(value) {
     catch {
         return (value || '').toLowerCase().trim();
     }
-}
-function isHumanAttendantRequest(value) {
-    const normalized = normalizeUserText(value || '');
-    if (!normalized)
-        return false;
-    if (normalized === '0')
-        return true;
-    if (normalized.includes('falar com atendente'))
-        return true;
-    if (normalized.includes('com atendente'))
-        return true;
-    if (normalized.includes('atendimento humano'))
-        return true;
-    if (normalized === 'atendente' || normalized.includes('atendente'))
-        return true;
-    return false;
 }
 async function sendLigacoesSelection(config, sessionStore, phone, replies, now, cpf, state, prefixMessage) {
     try {
@@ -227,8 +213,8 @@ function hoursDiff(a, b) {
 function isValidIdEletronico(id) {
     if (!id || typeof id !== 'string')
         return false;
-    // Aceita formatos como "70111@A", "8991@X", etc.
-    return /^\d+@[A-Za-z]\s*$/.test(id.trim()) || /^\d+@[A-Za-z]$/.test(id.trim());
+    // Aceita formatos como "6012@01", "70111@A", "3013648@07", etc.
+    return /^\d+@[A-Za-z0-9]+$/.test(id.trim());
 }
 function isAuthenticated(state) {
     try {
@@ -306,41 +292,6 @@ export async function processMessage(config, phone, text, sessionStore) {
             };
         }
         const state = session.state || { name: 'idle' };
-        // Comandos globais (processados antes da verificação de estado)
-        // 0 - falar com atendente (cria/garante ticket humano no Supabase)
-        if (isHumanAttendantRequest(text)) {
-            try {
-                let protocoloMsg = '';
-                try {
-                    const ticket = await ensureOpenHumanTicket(config, phone);
-                    if (ticket) {
-                        const shortId = ticket.id.slice(0, 8);
-                        protocoloMsg = `\n\n🔢 Protocolo do atendimento humano: *${shortId}*`;
-                    }
-                }
-                catch {
-                    // Falha ao registrar ticket não impede a mensagem ao usuário
-                }
-                // Tenta buscar telefone da autarquia para contato alternativo
-                let telefoneMsg = '';
-                try {
-                    const autarquia = await fetchDadosAutarquia(config);
-                    if (autarquia.telefone) {
-                        const telFormatado = formatarTelefone(autarquia.telefone);
-                        telefoneMsg = `\n\n📞 Você também pode ligar para: *${telFormatado}*`;
-                    }
-                }
-                catch {
-                    // Ignora erro - usa apenas a mensagem padrão
-                }
-                replies.push(messages.humanContact + protocoloMsg + telefoneMsg);
-                await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
-            }
-            catch {
-                // Mesmo se falhar ao salvar sessão, retorna a resposta já montada
-            }
-            return replies;
-        }
         // ENCERRAR ATENDIMENTO - reseta completamente a sessão e volta ao início
         if (normalizedText === 'encerrar atendimento') {
             try {
@@ -353,7 +304,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                 // Ignora erro ao tentar limpar sessão; segue com reset lógico
             }
             replies.push('✅ Atendimento encerrado. Vamos começar novamente.');
-            replies.push(messages.welcome);
+            replies.push(messages.welcome(config.entidadeNome));
             if (config.welcomeAudioUrl) {
                 replies.push({
                     type: 'audio',
@@ -361,34 +312,12 @@ export async function processMessage(config, phone, text, sessionStore) {
                     waveform: true
                 });
             }
-            // Modo demonstração: usa ID do environment se configurado
-            const demoId = config.demoIdEletronico;
-            if (demoId) {
-                replies.push(messages.idEletronicoInserido(demoId));
-                replies.push({
-                    type: 'buttons',
-                    text: 'Confirma que este é seu ID Eletrônico?',
-                    buttons: [
-                        { id: 'confirm_id_yes', text: '✅ Sim, confirmo' },
-                        { id: 'confirm_id_no', text: '❌ Não, corrigir' }
-                    ],
-                    footer: 'Toque no botão'
-                });
-                try {
-                    await sessionStore.save({ phone, state: { name: 'awaiting_confirm_id', idEletronico: demoId }, updatedAt: now });
-                }
-                catch {
-                    // Erro silencioso
-                }
+            replies.push(messages.askIdEletronico);
+            try {
+                await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
             }
-            else {
-                replies.push(messages.askIdEletronico);
-                try {
-                    await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
-                }
-                catch {
-                    // Erro silencioso
-                }
+            catch {
+                // Erro silencioso
             }
             return replies;
         }
@@ -455,43 +384,7 @@ export async function processMessage(config, phone, text, sessionStore) {
         }
         // Se está no estado inicial (idle)
         if (state.name === 'idle') {
-            // Modo demonstração: usa ID do environment se configurado
-            const demoId = config.demoIdEletronico;
-            const trimmedText = text.trim();
-            const idToUse = demoId || (isValidIdEletronico(trimmedText) ? trimmedText : null);
-            if (idToUse) {
-                replies.push(messages.welcome);
-                if (config.welcomeAudioUrl) {
-                    replies.push({
-                        type: 'audio',
-                        audioUrl: config.welcomeAudioUrl,
-                        waveform: true
-                    });
-                }
-                replies.push(messages.idEletronicoInserido(idToUse));
-                replies.push({
-                    type: 'buttons',
-                    text: 'Confirma que este é seu ID Eletrônico?',
-                    buttons: [
-                        { id: 'confirm_id_yes', text: '✅ Sim, confirmo' },
-                        { id: 'confirm_id_no', text: '❌ Não, corrigir' }
-                    ],
-                    footer: 'Toque no botão'
-                });
-                try {
-                    await sessionStore.save({
-                        phone,
-                        state: { name: 'awaiting_confirm_id', idEletronico: idToUse },
-                        updatedAt: now
-                    });
-                }
-                catch {
-                    // Erro silencioso - sessão em memória não deve falhar
-                }
-                return replies;
-            }
-            // Se não tem demo ID e não é ID válido, pede ID Eletrônico
-            replies.push(messages.welcome);
+            replies.push(messages.welcome(config.entidadeNome));
             if (config.welcomeAudioUrl) {
                 replies.push({
                     type: 'audio',
@@ -526,7 +419,8 @@ export async function processMessage(config, phone, text, sessionStore) {
                     'awaiting_login_otp',
                     // 'awaiting_confirm_cpf', // COMENTADO: Não é mais usado
                     'awaiting_confirm_id',
-                    'awaiting_confirm_email'
+                    'awaiting_confirm_email',
+                    'awaiting_identity_verification'
                 ];
                 if (state.name && !loginStates.includes(state.name)) {
                     try {
@@ -605,79 +499,140 @@ export async function processMessage(config, phone, text, sessionStore) {
                     try {
                         const loginResult = await loginByIdEletronico(config, idEletronico);
                         const ligacoes = imoveisToLigacoes(loginResult.imoveis);
-                        // Saudação com nome do cliente
-                        replies.push(messages.clienteEncontrado(loginResult.nomeCliente));
                         if (ligacoes.length === 0) {
                             replies.push('Não encontramos imóveis vinculados a este ID Eletrônico.');
                             replies.push(messages.askIdEletronico);
                             await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                             return replies;
                         }
-                        if (ligacoes.length === 1) {
-                            // Único imóvel - vai direto pro menu
-                            const lig = ligacoes[0];
-                            // Busca dados cadastrais
-                            let dados = null;
+                        const imovelParaDesafio = ligacoes[0];
+                        // Dados base sempre disponíveis a partir do login
+                        const dadosBase = {
+                            Nome: loginResult.nomeCliente,
+                            Endereco: imovelParaDesafio.description ?? '',
+                            MapaCadastral: '',
+                            Categorias: [],
+                            DataLigacao: '',
+                            DataInstalacao: '',
+                            Hidrometro: '',
+                            Servico: 0,
+                            DescricaoServico: '',
+                            Situacao: 0,
+                            DescricaoSituacao: '',
+                            IDEletronico: idEletronico,
+                            EnderecoCorrespondencia: '',
+                            DCO: 0
+                        };
+                        // Tenta enriquecer com /Dados-Cadastrais (CPF, telefone, email, bairro)
+                        let dadosVerificacao = dadosBase;
+                        try {
+                            if (imovelParaDesafio.imovelId && isLinkApiConfigured(config)) {
+                                const enriched = await linkGetDadosCadastrais(config, imovelParaDesafio.imovelId);
+                                if (enriched) {
+                                    dadosVerificacao = { ...dadosBase, ...enriched };
+                                }
+                            }
+                        }
+                        catch {
+                            // Usa dados base do login — suficiente para Nome e Endereço
+                        }
+                        const storedLigacoes = ligacoes.map(l => ({
+                            id: l.id,
+                            imovelId: l.imovelId,
+                            idEletronico: l.idEletronico,
+                            label: l.label,
+                            description: l.description
+                        }));
+                        // Se tiver CPF nos dados, busca imóveis extras pelo CPF e mescla
+                        let allStoredLigacoes = storedLigacoes;
+                        const cpfFromDados = dadosVerificacao.CPF ? String(dadosVerificacao.CPF).replace(/\D/g, '') : null;
+                        if (cpfFromDados && cpfFromDados.length === 11) {
                             try {
-                                dados = await fetchDadosCadastraisByLigacao(config, {
-                                    ligacaoId: lig.id,
-                                    imovelId: lig.imovelId
-                                });
+                                const cpfLoginResult = await loginByIdEletronico(config, cpfFromDados);
+                                const cpfLigacoes = imoveisToLigacoes(cpfLoginResult.imoveis);
+                                const existingIds = new Set(storedLigacoes.map(l => l.imovelId));
+                                const extras = cpfLigacoes
+                                    .filter(l => !existingIds.has(l.imovelId))
+                                    .map(l => ({ id: l.id, imovelId: l.imovelId, idEletronico: l.idEletronico, label: l.label, description: l.description }));
+                                if (extras.length > 0)
+                                    allStoredLigacoes = [...storedLigacoes, ...extras];
                             }
                             catch {
-                                // Erro silencioso
+                                // Silencioso — usa apenas os imóveis do login original
                             }
-                            replies.push(buildDadosCadastraisMessage(lig, dados));
-                            // Toca áudio do menu se configurado
-                            if (config.menuAudioUrl) {
-                                replies.push({
-                                    type: 'audio',
-                                    audioUrl: config.menuAudioUrl,
-                                    waveform: true
+                        }
+                        // Monta desafio de identidade — sempre executa, nunca pula
+                        const challengeSet = buildChallenges(dadosVerificacao);
+                        // Verifica se há email disponível para OTP
+                        const emailCadastrado = dadosVerificacao.Email;
+                        const temEmail = typeof emailCadastrado === 'string' && emailCadastrado.includes('@');
+                        if (!temEmail) {
+                            console.warn(`[OTP] Email ausente ou inválido para ID ${idEletronico} (valor: ${emailCadastrado ?? 'null'}) — seguindo para desafio de identidade`);
+                        }
+                        if (temEmail) {
+                            try {
+                                await createAndSendOtp(config, { phone, identifier: idEletronico, email: emailCadastrado });
+                                replies.push('Para proteger seu atendimento, enviamos um código de verificação para o seu e-mail cadastrado. 🔒');
+                                replies.push('Digite o código de 6 dígitos recebido:');
+                                await sessionStore.save({
+                                    phone,
+                                    state: {
+                                        name: 'awaiting_login_otp',
+                                        idEletronico,
+                                        nomeCliente: loginResult.nomeCliente,
+                                        imovelId: imovelParaDesafio.imovelId,
+                                        ligacaoId: imovelParaDesafio.id,
+                                        ligacoes: allStoredLigacoes,
+                                        email: emailCadastrado
+                                    },
+                                    updatedAt: now
                                 });
+                                return replies;
                             }
-                            replies.push(menuInteractive());
-                            // menuFallbackText removido - só menu interativo
+                            catch {
+                                // Falha ao enviar OTP — cai para desafio de botões
+                                replies.push('Não foi possível enviar o código por e-mail. Vamos verificar de outra forma.');
+                            }
+                        }
+                        // Desafio de identidade — sempre presente (nome e endereço garantem isso)
+                        if (challengeSet) {
+                            replies.push('Para confirmar sua identidade, precisamos de algumas informações:');
+                            replies.push({
+                                type: 'buttons',
+                                text: challengeSet.primary.question,
+                                buttons: challengeSet.primary.options.map(o => ({ id: o.id, text: o.text })),
+                                footer: 'Selecione a opção correta'
+                            });
                             await sessionStore.save({
                                 phone,
                                 state: {
-                                    name: 'main_menu',
+                                    name: 'awaiting_identity_verification',
                                     idEletronico,
                                     nomeCliente: loginResult.nomeCliente,
-                                    imovelId: lig.imovelId,
-                                    ligacaoId: lig.id,
-                                    menuAudioPlayed: true
+                                    imovelId: imovelParaDesafio.imovelId,
+                                    ligacaoId: imovelParaDesafio.id,
+                                    ligacoes: allStoredLigacoes,
+                                    challenge: challengeSet.primary,
+                                    secondaryChallenge: challengeSet.secondary,
+                                    step: 'primary',
+                                    attemptsLeft: 2
                                 },
                                 updatedAt: now
                             });
+                            return replies;
                         }
-                        else {
-                            // Múltiplos imóveis - mostra lista para seleção
+                        // Segurança: sem dados suficientes para qualquer verificação — bloqueia acesso
+                        replies.push('Não foi possível verificar sua identidade. Entre em contato com a entidade para atualizar seus dados cadastrais.');
+                        if (config.entidadePhoneNumber) {
                             replies.push({
-                                type: 'list',
-                                text: messages.selecioneImovel,
-                                buttonText: 'Meus imóveis',
-                                sections: [
-                                    {
-                                        title: 'Imóveis vinculados',
-                                        rows: ligacoes.map(l => ({
-                                            id: l.id,
-                                            title: l.label,
-                                            description: l.description
-                                        }))
-                                    }
-                                ]
-                            });
-                            await sessionStore.save({
-                                phone,
-                                state: {
-                                    name: 'select_ligacao',
-                                    idEletronico,
-                                    nomeCliente: loginResult.nomeCliente
-                                },
-                                updatedAt: now
+                                type: 'buttonActions',
+                                message: 'Toque no botão abaixo para ligar diretamente para a entidade.',
+                                title: 'Ligar para a entidade',
+                                footer: 'Atendimento telefônico',
+                                buttonActions: [{ id: 'call_entidade', type: 'CALL', phone: config.entidadePhoneNumber, label: 'Fale conosco' }]
                             });
                         }
+                        await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
                     }
                     catch (err) {
                         // Log do erro para debug
@@ -907,6 +862,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                     debitos = await fetchDebitosByLigacao(config, { cpf, ligacaoId, imovelId });
                                 }
                                 catch (err) {
+                                    console.error('[send_fatura] Erro ao buscar débitos para ImovelID', imovelId, ':', err);
                                     replies.push('Não foi possível consultar as faturas desta ligação no momento. Tente novamente mais tarde.');
                                     showMenuAfter = true;
                                     break;
@@ -1007,6 +963,56 @@ export async function processMessage(config, phone, text, sessionStore) {
                                 showMenuAfter = true;
                             }
                             break;
+                        case '0': {
+                            // 0️⃣ Falar com atendente — só disponível via menu (usuário já autenticado neste estado)
+                            if (!isWithinBusinessHours(config)) {
+                                replies.push(businessHoursMessage(config));
+                                showMenuAfter = true;
+                                break;
+                            }
+                            if (config.humanHandoffCallEnabled && config.humanHandoffCallPhone) {
+                                replies.push({
+                                    type: 'buttonActions',
+                                    message: config.humanHandoffCallMessage
+                                        || '📞 Para falar com um atendente, toque no botão abaixo pra ligar direto pra gente. Nossa equipe está pronta pra te atender!',
+                                    buttonActions: [
+                                        { type: 'CALL', phone: config.humanHandoffCallPhone, label: 'Ligar agora' }
+                                    ]
+                                });
+                                showMenuAfter = true;
+                                break;
+                            }
+                            try {
+                                let protocoloMsg = '';
+                                try {
+                                    const ticket = await ensureOpenHumanTicket(config, phone, state?.nomeCliente ?? null);
+                                    if (ticket) {
+                                        const shortId = ticket.id.slice(0, 8);
+                                        protocoloMsg = `\n\n🔢 Protocolo do atendimento humano: *${shortId}*`;
+                                    }
+                                }
+                                catch {
+                                    // Falha ao registrar ticket não impede a mensagem ao usuário
+                                }
+                                let telefoneMsg = '';
+                                try {
+                                    const autarquia = await fetchDadosAutarquia(config);
+                                    if (autarquia.telefone) {
+                                        const telFormatado = formatarTelefone(autarquia.telefone);
+                                        telefoneMsg = `\n\n📞 Você também pode ligar para: *${telFormatado}*`;
+                                    }
+                                }
+                                catch {
+                                    // Ignora erro
+                                }
+                                replies.push(messages.humanContact + protocoloMsg + telefoneMsg);
+                                await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
+                            }
+                            catch {
+                                replies.push(messages.humanContact);
+                            }
+                            break;
+                        }
                         default:
                             replies.push(menuInteractive());
                     }
@@ -1189,7 +1195,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                     }
                                     else if (cliente.email && isValidEmail(cliente.email)) {
                                         try {
-                                            await createAndSendOtp(config, { phone, cpf, email: cliente.email });
+                                            await createAndSendOtp(config, { phone, identifier: cpf, email: cliente.email });
                                             replies.push('Enviamos um código de verificação para o seu e-mail cadastrado.');
                                             replies.push(messages.otpSent);
                                             try {
@@ -1420,7 +1426,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                         }
                         // Envia OTP real por e-mail e persiste no Supabase
                         try {
-                            await createAndSendOtp(config, { phone, cpf, email });
+                            await createAndSendOtp(config, { phone, identifier: cpf, email });
                             replies.push(messages.otpSent);
                             try {
                                 await sessionStore.save({
@@ -1468,111 +1474,230 @@ export async function processMessage(config, phone, text, sessionStore) {
             }
             case 'awaiting_login_otp': {
                 try {
-                    // Validar OTP via Supabase
                     if (!text || typeof text !== 'string' || !/^\d{4,8}$/.test(text.trim())) {
                         replies.push('Código inválido. Digite o código de verificação recebido por e-mail (4 a 8 dígitos).');
                         break;
                     }
                     const cpf = state?.cpf;
+                    const idEletronico = state?.idEletronico;
                     const email = state?.email;
-                    if (!cpf || typeof cpf !== 'string' || cpf.length !== 11) {
-                        replies.push('Erro: CPF não encontrado. Por favor, informe seu CPF novamente.');
+                    const nomeCliente = state?.nomeCliente;
+                    const storedLigacoes = state?.ligacoes;
+                    const isNewFlow = !!idEletronico && !cpf;
+                    const identifier = isNewFlow ? idEletronico : cpf;
+                    if (!identifier) {
+                        replies.push('Erro: identificador não encontrado. Por favor, recomeçar o atendimento.');
                         replies.push(messages.askIdEletronico);
-                        try {
-                            await sessionStore.save({ phone, state: { name: 'awaiting_login_cpf' }, updatedAt: now });
-                        }
-                        catch (err) {
-                            // Mesmo se falhar ao salvar, retorna a resposta
-                        }
+                        await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                         break;
                     }
                     if (!email || typeof email !== 'string' || !isValidEmail(email)) {
-                        replies.push('Erro: E-mail não encontrado. Por favor, informe seu e-mail novamente.');
-                        replies.push(messages.askEmail);
-                        try {
-                            await sessionStore.save({ phone, state: { name: 'awaiting_login_email', cpf }, updatedAt: now });
-                        }
-                        catch (err) {
-                            // Mesmo se falhar ao salvar, retorna a resposta
-                        }
+                        replies.push('Erro: E-mail não encontrado. Por favor, recomeçar o atendimento.');
+                        replies.push(messages.askIdEletronico);
+                        await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                         break;
                     }
                     try {
-                        const ok = await verifyOtp(config, { cpf, email, code: text.trim() });
+                        const ok = await verifyOtp(config, { identifier, email, code: text.trim() });
                         if (!ok) {
                             replies.push('Código incorreto ou expirado. Tente novamente ou digite "menu" para recomeçar.');
                             break;
                         }
-                        // Login OK: em vez de ir direto para o menu, já direciona para seleção de ligação
                         replies.push(messages.otpAccepted);
-                        try {
-                            const ligacoes = await fetchLigacoesByCpf(config, cpf);
-                            if (ligacoes && ligacoes.length > 0) {
+                        if (isNewFlow) {
+                            if (nomeCliente)
+                                replies.push(messages.clienteEncontrado(nomeCliente));
+                            const goToMenuWithLigacoes = async (ligacoes) => {
                                 if (ligacoes.length === 1) {
                                     const lig = ligacoes[0];
-                                    const detalhes = lig.description ? `\n${lig.description}` : '';
-                                    replies.push(`Ligação encontrada:\n\n${lig.label}${detalhes}`);
-                                    if (config.menuAudioUrl) {
-                                        replies.push({
-                                            type: 'audio',
-                                            audioUrl: config.menuAudioUrl,
-                                            waveform: true
-                                        });
+                                    let dados = null;
+                                    try {
+                                        dados = await fetchDadosCadastraisByLigacao(config, { ligacaoId: lig.id, imovelId: lig.imovelId });
                                     }
-                                    replies.push(menuInteractive('Agora escolha uma opção do menu para essa ligação.'));
-                                    await sessionStore.save({
-                                        phone,
-                                        state: { name: 'main_menu', cpf, email, ligacaoId: lig.id, menuAudioPlayed: true },
-                                        updatedAt: now
-                                    });
+                                    catch { }
+                                    replies.push(buildDadosCadastraisMessage(lig, dados));
+                                    if (config.menuAudioUrl)
+                                        replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
+                                    replies.push(menuInteractive('Agora escolha uma opção do menu para esse imóvel.'));
+                                    await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, imovelId: lig.imovelId, ligacaoId: lig.id, menuAudioPlayed: true }, updatedAt: now });
                                 }
                                 else {
-                                    replies.push({
-                                        type: 'list',
-                                        text: 'Selecione a ligação desejada:',
-                                        buttonText: 'Minhas ligações',
-                                        sections: [
-                                            {
-                                                title: 'Ligações vinculadas ao CPF',
-                                                rows: ligacoes.map(l => ({ id: l.id, title: l.label, description: l.description }))
-                                            }
-                                        ]
-                                    });
-                                    await sessionStore.save({
-                                        phone,
-                                        state: { name: 'select_ligacao', cpf, email },
-                                        updatedAt: now
-                                    });
+                                    replies.push({ type: 'list', text: messages.selecioneImovel, buttonText: 'Meus imóveis', sections: [{ title: 'Imóveis vinculados', rows: ligacoes.map(l => ({ id: l.id, title: l.label, description: l.description })) }] });
+                                    await sessionStore.save({ phone, state: { name: 'select_ligacao', idEletronico, nomeCliente }, updatedAt: now });
                                 }
+                            };
+                            if (storedLigacoes && storedLigacoes.length > 0) {
+                                await goToMenuWithLigacoes(storedLigacoes);
                             }
                             else {
-                                replies.push('Não encontramos nenhuma ligação vinculada a este CPF.');
-                                await sessionStore.save({
-                                    phone,
-                                    state: { name: 'main_menu', cpf, email },
-                                    updatedAt: now
-                                });
+                                try {
+                                    const loginResult = await loginByIdEletronico(config, idEletronico);
+                                    const freshLigacoes = imoveisToLigacoes(loginResult.imoveis);
+                                    if (freshLigacoes.length > 0) {
+                                        await goToMenuWithLigacoes(freshLigacoes.map(l => ({ id: l.id, imovelId: l.imovelId, label: l.label, description: l.description })));
+                                    }
+                                    else {
+                                        if (config.menuAudioUrl)
+                                            replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
+                                        replies.push(menuInteractive());
+                                        await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, menuAudioPlayed: true }, updatedAt: now });
+                                    }
+                                }
+                                catch {
+                                    if (config.menuAudioUrl)
+                                        replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
+                                    replies.push(menuInteractive());
+                                    await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, menuAudioPlayed: true }, updatedAt: now });
+                                }
                             }
                         }
-                        catch (err) {
-                            // Se der erro ao buscar ligações, cai para o menu padrão
-                            replies.push(menuInteractive(messages.otpAccepted));
+                        else {
+                            // Fluxo legado por CPF
                             try {
-                                await sessionStore.save({
-                                    phone,
-                                    state: { name: 'main_menu', cpf, email },
-                                    updatedAt: now
-                                });
+                                const fetchedLigacoes = await fetchLigacoesByCpf(config, cpf);
+                                if (fetchedLigacoes && fetchedLigacoes.length > 0) {
+                                    if (fetchedLigacoes.length === 1) {
+                                        const lig = fetchedLigacoes[0];
+                                        const detalhes = lig.description ? `\n${lig.description}` : '';
+                                        replies.push(`Ligação encontrada:\n\n${lig.label}${detalhes}`);
+                                        if (config.menuAudioUrl)
+                                            replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
+                                        replies.push(menuInteractive('Agora escolha uma opção do menu para essa ligação.'));
+                                        await sessionStore.save({ phone, state: { name: 'main_menu', cpf, email, ligacaoId: lig.id, menuAudioPlayed: true }, updatedAt: now });
+                                    }
+                                    else {
+                                        replies.push({ type: 'list', text: 'Selecione a ligação desejada:', buttonText: 'Minhas ligações', sections: [{ title: 'Ligações vinculadas ao CPF', rows: fetchedLigacoes.map(l => ({ id: l.id, title: l.label, description: l.description })) }] });
+                                        await sessionStore.save({ phone, state: { name: 'select_ligacao', cpf, email }, updatedAt: now });
+                                    }
+                                }
+                                else {
+                                    replies.push('Não encontramos nenhuma ligação vinculada a este CPF.');
+                                    await sessionStore.save({ phone, state: { name: 'main_menu', cpf, email }, updatedAt: now });
+                                }
                             }
-                            catch { }
+                            catch {
+                                replies.push(menuInteractive(messages.otpAccepted));
+                                try {
+                                    await sessionStore.save({ phone, state: { name: 'main_menu', cpf, email }, updatedAt: now });
+                                }
+                                catch { }
+                            }
                         }
                     }
-                    catch (err) {
+                    catch {
                         replies.push('Erro ao verificar código. Por favor, tente novamente ou digite "menu" para recomeçar.');
                     }
                 }
-                catch (err) {
+                catch {
                     replies.push('Erro ao processar código de verificação. Por favor, tente novamente.');
+                }
+                break;
+            }
+            case 'awaiting_identity_verification': {
+                try {
+                    const idEletronico = state?.idEletronico;
+                    const nomeCliente = state?.nomeCliente;
+                    const storedLigacoes = state?.ligacoes;
+                    const challenge = state?.challenge;
+                    const secondaryChallenge = state?.secondaryChallenge;
+                    const step = state?.step;
+                    const attemptsLeft = state?.attemptsLeft ?? 2;
+                    const selectedId = text.trim();
+                    const isCorrect = selectedId === challenge.correctId;
+                    if (!isCorrect) {
+                        if (attemptsLeft <= 1) {
+                            replies.push('Não foi possível verificar sua identidade. Por segurança, o atendimento foi encerrado.');
+                            await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
+                            break;
+                        }
+                        replies.push('Resposta incorreta. Tente novamente:');
+                        replies.push({
+                            type: 'buttons',
+                            text: challenge.question,
+                            buttons: challenge.options.map(o => ({ id: o.id, text: o.text })),
+                            footer: 'Selecione a opção correta'
+                        });
+                        await sessionStore.save({
+                            phone,
+                            state: { ...state, attemptsLeft: attemptsLeft - 1 },
+                            updatedAt: now
+                        });
+                        break;
+                    }
+                    if (step === 'primary' && secondaryChallenge) {
+                        replies.push('Correto! Mais uma confirmação:');
+                        replies.push({
+                            type: 'buttons',
+                            text: secondaryChallenge.question,
+                            buttons: secondaryChallenge.options.map(o => ({ id: o.id, text: o.text })),
+                            footer: 'Selecione a opção correta'
+                        });
+                        await sessionStore.save({
+                            phone,
+                            state: {
+                                name: 'awaiting_identity_verification',
+                                idEletronico,
+                                nomeCliente,
+                                imovelId: state?.imovelId,
+                                ligacaoId: state?.ligacaoId,
+                                ligacoes: storedLigacoes,
+                                challenge: secondaryChallenge,
+                                step: 'secondary',
+                                attemptsLeft: 2
+                            },
+                            updatedAt: now
+                        });
+                        break;
+                    }
+                    // Identidade verificada com sucesso
+                    replies.push(messages.clienteEncontrado(nomeCliente));
+                    const goToMenuWithLigacoes = async (ligacoes) => {
+                        if (ligacoes.length === 1) {
+                            const lig = ligacoes[0];
+                            let dados = null;
+                            try {
+                                dados = await fetchDadosCadastraisByLigacao(config, { ligacaoId: lig.id, imovelId: lig.imovelId });
+                            }
+                            catch { }
+                            replies.push(buildDadosCadastraisMessage(lig, dados));
+                            if (config.menuAudioUrl)
+                                replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
+                            replies.push(menuInteractive('Agora escolha uma opção do menu para esse imóvel.'));
+                            await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, imovelId: lig.imovelId, ligacaoId: lig.id, menuAudioPlayed: true }, updatedAt: now });
+                        }
+                        else {
+                            replies.push({ type: 'list', text: messages.selecioneImovel, buttonText: 'Meus imóveis', sections: [{ title: 'Imóveis vinculados', rows: ligacoes.map(l => ({ id: l.id, title: l.label, description: l.description })) }] });
+                            await sessionStore.save({ phone, state: { name: 'select_ligacao', idEletronico, nomeCliente }, updatedAt: now });
+                        }
+                    };
+                    if (storedLigacoes && storedLigacoes.length > 0) {
+                        await goToMenuWithLigacoes(storedLigacoes);
+                    }
+                    else {
+                        try {
+                            const loginResult = await loginByIdEletronico(config, idEletronico);
+                            const freshLigacoes = imoveisToLigacoes(loginResult.imoveis);
+                            if (freshLigacoes.length > 0) {
+                                await goToMenuWithLigacoes(freshLigacoes.map(l => ({ id: l.id, imovelId: l.imovelId, label: l.label, description: l.description })));
+                            }
+                            else {
+                                if (config.menuAudioUrl)
+                                    replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
+                                replies.push(menuInteractive());
+                                await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, menuAudioPlayed: true }, updatedAt: now });
+                            }
+                        }
+                        catch {
+                            if (config.menuAudioUrl)
+                                replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
+                            replies.push(menuInteractive());
+                            await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, menuAudioPlayed: true }, updatedAt: now });
+                        }
+                    }
+                }
+                catch {
+                    replies.push('Erro ao processar verificação de identidade. Por favor, tente novamente.');
+                    await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                 }
                 break;
             }
@@ -1925,7 +2050,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                 }
                 catch (err) {
                     // Fallback absoluto - sempre retorna uma resposta
-                    replies.push(messages.welcome);
+                    replies.push(messages.welcome(config.entidadeNome));
                     replies.push(messages.askIdEletronico);
                 }
             }

@@ -27,6 +27,10 @@ export async function fetchConsumoByImovelId(config, imovelId) {
         throw new Error('Link API não configurada (LINK_API_BASE_URL e LINK_API_TOKEN ausentes)');
     }
     const linkLeituras = await linkGetUltimasLeituras(config, imovelId);
+    // A Link API retorna uma mensagem de texto (não um array) quando não há leituras —
+    // trata qualquer resposta que não seja array como "sem leituras", em vez de estourar erro.
+    if (!Array.isArray(linkLeituras))
+        return [];
     return linkLeituras.map(linkLeituraToConsumo);
 }
 function buildConsumoUrl(config, cpf, ligacaoId) {

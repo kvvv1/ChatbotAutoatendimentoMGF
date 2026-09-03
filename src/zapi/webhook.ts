@@ -466,6 +466,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         try {
           const replies = await processMessage(config, phone, latestMessage, sessionStore);
           for (const out of replies) {
+            try {
             if (typeof out === 'string') {
               await zapi.sendText({ phone, message: out });
               try { await logMessage(config, { phone, direction: 'out', content: out }); } catch {}
@@ -579,6 +580,9 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
                 longitude: locOut.longitude
               });
               try { await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) }); } catch {}
+            }
+            } catch (err) {
+              request.log.error({ err, phone, out }, 'Erro ao enviar um item da resposta; seguindo para o próximo');
             }
           }
         } catch (err) {

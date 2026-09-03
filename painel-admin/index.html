@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel Administrativo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f0ede8; --surface: #faf9f7; --border: #d4cfc8;
+    --border-strong: #a89f94; --text: #1a1714; --text-muted: #7a7068;
+    --accent: #2c2926; --sidebar-w: 220px;
+    --green: #2d6a4f; --green-bg: #d8f3dc;
+    --yellow: #7d5a00; --yellow-bg: #fff3cd;
+    --red: #8b1a1a; --red-bg: #ffd6d6;
+    --gray: #4a4540; --gray-bg: #e8e4e0;
+  }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+  /* SIDEBAR */
+  .sidebar { width: var(--sidebar-w); background: var(--accent); color: #e8e4de; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+  .sidebar-logo { padding: 20px 18px 14px; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .logo-tag { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.45); margin-bottom: 4px; }
+  .logo-title { font-size: 15px; font-weight: 600; color: #fff; }
+  .sidebar-nav { flex: 1; padding: 10px 0; overflow-y: auto; }
+  .nav-section { padding: 16px 14px 4px; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,.3); }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; cursor: pointer; font-size: 13.5px; color: rgba(255,255,255,.65); border-left: 3px solid transparent; transition: all .15s; user-select: none; }
+  .nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .nav-item.active { background: rgba(255,255,255,.12); color: #fff; border-left-color: #c9a96e; font-weight: 500; }
+  .nav-item .icon { font-size: 15px; width: 18px; text-align: center; }
+  .sidebar-footer { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.1); font-size: 11.5px; color: rgba(255,255,255,.35); }
+
+  /* MAIN */
+  .main { margin-left: var(--sidebar-w); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  .topbar-left { display: flex; flex-direction: column; gap: 2px; }
+  .topbar-breadcrumb { font-size: 11px; color: var(--text-muted); }
+  .topbar-title { font-size: 17px; font-weight: 600; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .content { padding: 28px; flex: 1; }
+
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card-title { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 14px; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+
+  /* TAGS */
+  .tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 500; }
+  .tag-green { background: var(--green-bg); color: var(--green); }
+  .tag-yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .tag-red { background: var(--red-bg); color: var(--red); }
+  .tag-gray { background: var(--gray-bg); color: var(--gray); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+  /* BOTÕES */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 500; transition: all .12s; user-select: none; }
+  .btn:hover { background: var(--bg); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { opacity: .88; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  /* FORM */
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+  .form-input { width: 100%; padding: 8px 11px; border: 1px solid var(--border); border-radius: 6px; font-size: 13.5px; background: var(--surface); color: var(--text); outline: none; }
+  .form-input:focus { border-color: var(--border-strong); }
+
+  /* TABLE */
+  .table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .table th { text-align: left; padding: 10px 14px; background: var(--bg); color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .table td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .table tr:last-child td { border-bottom: none; }
+  .table tr:hover td { background: var(--bg); }
+
+  /* MISC */
+  .sep { height: 1px; background: var(--border); margin: 16px 0; }
+  .flex { display: flex; } .flex-col { flex-direction: column; }
+  .gap-8 { gap: 8px; } .gap-12 { gap: 12px; } .gap-16 { gap: 16px; }
+  .items-center { align-items: center; } .justify-between { justify-content: space-between; }
+  .mb-8 { margin-bottom: 8px; } .mb-12 { margin-bottom: 12px; } .mb-16 { margin-bottom: 16px; } .mb-20 { margin-bottom: 20px; }
+  .mt-8 { margin-top: 8px; } .mt-12 { margin-top: 12px; }
+  .text-muted { color: var(--text-muted); } .text-sm { font-size: 12.5px; } .text-xs { font-size: 11.5px; }
+  .font-mono { font-family: monospace; } .w-full { width: 100%; } .text-center { text-align: center; }
+  .screen { display: none; } .screen.active { display: block; }
+
+  /* LOADING */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-block { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px; color: var(--text-muted); font-size: 13px; }
+  .loading-block .spinner { width: 28px; height: 28px; border-width: 3px; }
+
+  /* STAT CARD */
+  .stat { text-align: center; padding: 16px; }
+  .stat-number { font-size: 30px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 12px; color: var(--text-muted); }
+
+  /* HEALTH */
+  .health-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .health-row:last-child { border-bottom: none; }
+  .health-name { font-size: 13.5px; font-weight: 500; }
+  .health-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; font-family: monospace; }
+
+  /* QR */
+  .qr-box { width: 200px; height: 200px; border: 2px dashed var(--border-strong); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--text-muted); font-size: 12px; background: var(--bg); margin: 0 auto; }
+  .qr-box img { width: 180px; height: 180px; object-fit: contain; }
+
+  /* ENTITY PILLS */
+  .entity-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; cursor: pointer; transition: all .12s; }
+  .entity-pill:hover { border-color: var(--border-strong); }
+  .entity-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ENV */
+  .env-group { margin-bottom: 18px; }
+  .env-group-title { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+  .env-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; gap: 8px; }
+  .env-key { font-family: monospace; font-size: 12px; color: var(--text-muted); min-width: 220px; }
+  .env-val { font-family: monospace; font-size: 12px; flex: 1; word-break: break-all; }
+
+  /* AUDIT LOG */
+  .log-row { display: grid; grid-template-columns: 150px 100px 1fr 100px; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; align-items: center; }
+  .log-row:hover { background: var(--bg); }
+  .log-row.header { background: var(--bg); font-weight: 600; font-size: 11px; color: var(--text-muted); letter-spacing: .5px; text-transform: uppercase; }
+  .log-mono { font-family: monospace; font-size: 11.5px; color: var(--text-muted); }
+
+  /* PROGRESS BAR */
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+
+  /* ERROR */
+  .error-block { background: var(--red-bg); color: var(--red); border-radius: 8px; padding: 14px 16px; font-size: 13px; }
+
+  /* MARKETING */
+  .template-thumb { aspect-ratio: 1; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: all .15s; padding: 16px; text-align: center; }
+  .template-thumb:hover { border-color: var(--border-strong); }
+  .template-thumb.selected { border-color: var(--accent); }
+  .thumb-icon { font-size: 28px; }
+  .thumb-label { font-size: 12px; color: var(--text-muted); }
+</style>
+<script src="/config.js"></script>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-tag">Admin</div>
+    <div class="logo-title">Painel Central</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Visão Geral</div>
+    <div class="nav-item active" data-screen="dashboard"><span class="icon">◉</span> Dashboard</div>
+    <div class="nav-section">Implantação</div>
+    <div class="nav-item" data-screen="entidades"><span class="icon">⊞</span> Entidades</div>
+    <div class="nav-item" data-screen="onboarding"><span class="icon">⬡</span> Onboarding / QR Code</div>
+    <div class="nav-item" data-screen="env"><span class="icon">⚙</span> Variáveis de Ambiente</div>
+    <div class="nav-section">Marketing</div>
+    <div class="nav-item" data-screen="marketing"><span class="icon">◈</span> Gerador de Material</div>
+    <div class="nav-section">Monitoramento</div>
+    <div class="nav-item" data-screen="auditoria"><span class="icon">≡</span> Auditoria / Logs</div>
+  </nav>
+  <div class="sidebar-footer">
+    <span>Painel Admin</span>
+    <span style="color:rgba(255,255,255,.2);font-size:10px;margin-top:2px;display:block" id="last-refresh"></span>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-breadcrumb" id="topbar-crumb">Painel Admin</div>
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+    </div>
+    <div class="topbar-right" id="topbar-actions"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══════════════════════════════ DASHBOARD ══════════════════════════════ -->
+    <div class="screen active" id="screen-dashboard">
+      <div class="grid-4 mb-20" id="dash-stats">
+        <div class="card stat"><div class="spinner" style="margin:0 auto 8px"></div><div class="stat-label">Carregando…</div></div>
+      </div>
+      <div class="card-title mb-12">Status por Entidade</div>
+      <div class="grid-2" id="dash-cards">
+        <div class="card loading-block"><div class="spinner"></div><span>Verificando entidades…</span></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════ ENTIDADES ══════════════════════════════ -->
+    <div class="screen" id="screen-entidades">
+      <div class="card mb-16">
+        <div id="entidades-table-wrap">
+          <div class="loading-block"><div class="spinner"></div><span>Carregando entidades…</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════ ONBOARDING ══════════════════════════════ -->
+    <div class="screen" id="screen-onboarding">
+      <div class="card mb-16">
+        <div class="card-title">Selecionar Entidade</div>
+        <div class="flex gap-8" id="onb-pills" style="flex-wrap:wrap">
+          <div class="loading-block" style="padding:10px"><div class="spinner"></div></div>
+        </div>
+      </div>
+      <div class="grid-2" style="gap:16px;align-items:start">
+        <div class="card text-center" id="onb-qr-card">
+          <div class="card-title">QR Code WhatsApp</div>
+          <div class="qr-box mb-16" id="onb-qr-box">
+            <span style="font-size:28px">⬜</span>
+            <span>Selecione uma entidade</span>
+          </div>
+          <div class="text-sm text-muted mb-16">
+            Escaneie com o celular da entidade em<br>
+            <strong>WhatsApp → Aparelhos conectados → Conectar aparelho</strong>
+          </div>
+          <div class="flex gap-8" style="justify-content:center">
+            <button class="btn btn-primary" id="onb-btn-connect" disabled>⬡ Gerar QR Code</button>
+            <button class="btn" id="onb-btn-refresh" disabled>↻ Atualizar</button>
+          </div>
+          <div class="sep"></div>
+          <div style="font-size:12px;color:var(--text-muted)">O QR Code é atualizado automaticamente a cada 5s enquanto desconectado.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card" id="onb-status-card">
+            <div class="card-title">Status Z-API</div>
+            <div class="text-muted text-sm">Selecione uma entidade</div>
+          </div>
+          <div class="card" id="onb-checklist">
+            <div class="card-title">Checklist</div>
+            <div class="text-muted text-sm">Selecione uma entidade</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════ ENV ══════════════════════════════ -->
+    <div class="screen" id="screen-env">
+      <div class="flex gap-8 mb-16" id="env-pills" style="flex-wrap:wrap">
+        <div class="loading-block" style="padding:10px"><div class="spinner"></div></div>
+      </div>
+      <div class="grid-2 mb-16" style="gap:16px;align-items:start">
+        <div class="card" id="env-summary"><div class="loading-block"><div class="spinner"></div></div></div>
+        <div class="card">
+          <div class="card-title">Ações</div>
+          <div class="flex flex-col gap-8">
+            <button class="btn" id="env-btn-revalidate">↻ Revalidar</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="env-fields"><div class="loading-block"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ══════════════════════════════ MARKETING ══════════════════════════════ -->
+    <div class="screen" id="screen-marketing">
+      <div class="grid-2" style="gap:16px;align-items:start">
+        <div>
+          <div class="card mb-16">
+            <div class="card-title">Templates</div>
+            <div class="grid-2" style="gap:10px">
+              <div class="template-thumb selected" data-tpl="instagram">
+                <div class="thumb-icon">🗞️</div>
+                <div class="thumb-label">Post Instagram<br><span style="color:#999;font-size:10px">1080×1080</span></div>
+              </div>
+              <div class="template-thumb" data-tpl="flyer">
+                <div class="thumb-icon">📄</div>
+                <div class="thumb-label">Flyer A4</div>
+              </div>
+              <div class="template-thumb" data-tpl="stories">
+                <div class="thumb-icon">📱</div>
+                <div class="thumb-label">Stories<br><span style="color:#999;font-size:10px">1080×1920</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Variáveis Disponíveis</div>
+            <div style="font-size:12px;line-height:2;font-family:monospace;color:var(--text-muted)">
+              {{NOME}} — nome abreviado da entidade<br>
+              {{NOME_COMPLETO}} — nome completo<br>
+              {{TELEFONE}} — número formatado<br>
+              {{NUMERO_WA}} — número sem formatação<br>
+              {{QR_CODE}} — imagem do QR Code wa.me
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card mb-16">
+            <div class="card-title">Gerar para</div>
+            <div id="mkt-entity-list" style="display:flex;flex-direction:column;gap:8px;font-size:13.5px;margin-bottom:16px">
+              <div class="loading-block" style="padding:10px"><div class="spinner"></div></div>
+            </div>
+            <button class="btn btn-primary w-full" id="mkt-btn-generate">⬇ Gerar e Baixar (ZIP)</button>
+          </div>
+          <div class="card">
+            <div class="card-title">Preview — Canvas</div>
+            <canvas id="mkt-canvas" width="400" height="400" style="width:100%;border:1px solid var(--border);border-radius:8px;background:var(--bg)"></canvas>
+            <button class="btn btn-sm w-full mt-8" id="mkt-btn-download-one">⬇ Baixar PNG</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════ AUDITORIA ══════════════════════════════ -->
+    <div class="screen" id="screen-auditoria">
+      <div class="card mb-16">
+        <div class="flex gap-12 items-center" style="flex-wrap:wrap">
+          <div>
+            <div class="form-label" style="margin-bottom:4px">Entidade</div>
+            <select class="form-input" id="audit-slug" style="width:200px"><option value="">Selecione…</option></select>
+          </div>
+          <div>
+            <div class="form-label" style="margin-bottom:4px">De</div>
+            <input class="form-input" type="date" id="audit-from" style="width:150px">
+          </div>
+          <div>
+            <div class="form-label" style="margin-bottom:4px">Até</div>
+            <input class="form-input" type="date" id="audit-to" style="width:150px">
+          </div>
+          <div style="align-self:flex-end">
+            <button class="btn btn-primary" id="audit-btn-search">Buscar</button>
+          </div>
+          <div style="align-self:flex-end;margin-left:auto">
+            <button class="btn" id="audit-btn-csv">⬇ CSV</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="audit-results">
+        <div class="text-muted text-sm text-center" style="padding:24px">Selecione uma entidade e clique em Buscar</div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<script>
+// ══════════════════════════════════════════════════════
+// NAVEGAÇÃO
+// ══════════════════════════════════════════════════════
+const SCREENS = {
+  dashboard:  { title: 'Dashboard',              crumb: 'Painel Admin' },
+  entidades:  { title: 'Entidades',              crumb: 'Implantação' },
+  onboarding: { title: 'Onboarding / QR Code',  crumb: 'Implantação' },
+  env:        { title: 'Variáveis de Ambiente',  crumb: 'Implantação' },
+  marketing:  { title: 'Gerador de Material',    crumb: 'Marketing' },
+  auditoria:  { title: 'Auditoria / Logs',       crumb: 'Monitoramento' },
+};
+
+let currentScreen = 'dashboard';
+
+document.querySelectorAll('.nav-item[data-screen]').forEach(el => {
+  el.addEventListener('click', () => goTo(el.dataset.screen));
+});
+
+function goTo(id) {
+  currentScreen = id;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.screen === id));
+  const cfg = SCREENS[id] || {};
+  document.getElementById('topbar-title').textContent = cfg.title || id;
+  document.getElementById('topbar-crumb').textContent = cfg.crumb || 'Admin';
+  window.scrollTo(0, 0);
+  onScreenEnter(id);
+}
+
+function onScreenEnter(id) {
+  if (id === 'dashboard') loadDashboard();
+  if (id === 'entidades') loadEntidades();
+  if (id === 'onboarding') loadOnboardingPills();
+  if (id === 'env') loadEnvPills();
+  if (id === 'marketing') loadMarketingEntities();
+  if (id === 'auditoria') loadAuditSelects();
+}
+
+// ══════════════════════════════════════════════════════
+// UTILITÁRIOS
+// ══════════════════════════════════════════════════════
+async function api(path) {
+  const headers = window.APP_CONFIG?.apiSecret ? { Authorization: 'Bearer ' + window.APP_CONFIG.apiSecret } : {};
+  const res = await fetch(path, { headers });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function tag(cls, text, dot = false) {
+  return `<span class="tag tag-${cls}">${dot ? '<span class="dot"></span>' : ''}${text}</span>`;
+}
+
+function statusTag(check) {
+  if (!check) return tag('gray', '—');
+  if (check.ok) return tag('green', check.latencyMs ? `${check.latencyMs}ms` : 'OK', true);
+  if (!check.detail || check.detail === 'Não configurado') return tag('gray', 'N/A');
+  if (check.detail.includes('interno Docker')) return tag('gray', 'Host interno');
+  return tag('red', 'Erro', true);
+}
+
+function waStatusTag(wa) {
+  if (wa.ok) return tag('green', wa.latencyMs ? `${wa.latencyMs}ms` : 'OK', true);
+  if (wa.connected === false) return tag('yellow', 'Desconectado', true);
+  if (wa.detail?.includes('configurado')) return tag('gray', 'N/A');
+  return tag('red', 'Sem resposta', true);
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' });
+}
+
+// ══════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════
+let dashInterval = null;
+
+async function loadDashboard() {
+  if (dashInterval) clearInterval(dashInterval);
+  renderDashLoading();
+  await fetchAndRenderDash();
+  dashInterval = setInterval(() => { if (currentScreen === 'dashboard') fetchAndRenderDash(); }, 30000);
+}
+
+function renderDashLoading() {
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="card stat"><div class="spinner" style="margin:0 auto 8px"></div><div class="stat-label">Carregando…</div></div>
+  `;
+  document.getElementById('dash-cards').innerHTML = `
+    <div class="card loading-block"><div class="spinner"></div><span>Verificando Z-API e APIs…</span></div>
+  `;
+}
+
+async function fetchAndRenderDash() {
+  try {
+    const data = await api('/admin/api/status');
+    renderDashStats(data);
+    renderDashCards(data);
+    document.getElementById('last-refresh').textContent = 'Atualizado ' + new Date().toLocaleTimeString('pt-BR');
+  } catch (e) {
+    document.getElementById('dash-cards').innerHTML = `<div class="error-block">Erro ao carregar status: ${e.message}</div>`;
+  }
+}
+
+function renderDashStats(data) {
+  const total = data.length;
+  const waOk = data.filter(d => d.checks.whatsapp.ok).length;
+  const waDisc = data.filter(d => !d.checks.whatsapp.ok && d.checks.whatsapp.connected === false).length;
+  const waErr = total - waOk - waDisc;
+  // Erros reais de API (exclui host interno Docker e não configurados)
+  const apiErr = data.filter(d => {
+    const gc = d.checks.gestcom;
+    return !gc.ok && gc.detail !== 'Não configurado' && !gc.detail?.includes('interno Docker');
+  }).length;
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="card stat"><div class="stat-number">${total}</div><div class="stat-label">Entidades ativas</div></div>
+    <div class="card stat"><div class="stat-number" style="color:var(--green)">${waOk}</div><div class="stat-label">WhatsApp conectado</div></div>
+    <div class="card stat"><div class="stat-number" style="color:var(--yellow)">${waDisc}</div><div class="stat-label">WA desconectado</div></div>
+    <div class="card stat"><div class="stat-number" style="color:var(--red)">${apiErr}</div><div class="stat-label">APIs com erro</div></div>
+  `;
+}
+
+function renderDashCards(data) {
+  if (!data.length) {
+    document.getElementById('dash-cards').innerHTML = '<div class="card text-center text-muted" style="padding:32px">Nenhuma entidade encontrada</div>';
+    return;
+  }
+  document.getElementById('dash-cards').innerHTML = data.map(d => {
+    const wa = d.checks.whatsapp;
+    const gc = d.checks.gestcom;
+    const sm = d.checks.smtp;
+    const waTagCls = wa.ok ? 'green' : (wa.connected === false ? 'yellow' : 'red');
+    const waTagTxt = wa.ok ? 'Conectado' : (wa.connected === false ? 'Desconectado' : 'Sem resposta');
+    return `
+    <div class="card">
+      <div class="flex items-center justify-between mb-12">
+        <div>
+          <div style="font-weight:600;font-size:15px">${d.nomeAbreviado}</div>
+          <div class="text-xs text-muted font-mono">${d.envFile} · porta ${d.port}</div>
+        </div>
+        ${tag(waTagCls, waTagTxt, true)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 0;font-size:12.5px">
+        <div class="flex justify-between items-center" style="padding:5px 8px 5px 0;border-right:1px solid var(--border);margin-right:8px">
+          <span class="text-muted">WhatsApp Z-API</span>${waStatusTag(wa)}
+        </div>
+        <div class="flex justify-between items-center" style="padding:5px 0">
+          <span class="text-muted">Gestcom API</span>${statusTag(gc)}
+        </div>
+        <div class="flex justify-between items-center" style="padding:5px 8px 5px 0;border-right:1px solid var(--border);margin-right:8px;margin-top:2px">
+          <span class="text-muted">SMTP</span>${statusTag(sm)}
+        </div>
+        <div class="flex justify-between items-center" style="padding:5px 0;margin-top:2px">
+          <span class="text-muted font-mono" style="font-size:11px">${d.phoneNumber || '—'}</span>
+          <span class="text-xs text-muted">${wa.latencyMs ? wa.latencyMs + 'ms Z-API' : ''}</span>
+        </div>
+      </div>
+      <div class="sep" style="margin:12px 0"></div>
+      <div class="flex gap-8">
+        <button class="btn btn-sm" onclick="goTo('env');selectEnv('${d.slug}')">Ver ENV</button>
+        <button class="btn btn-sm" onclick="goTo('auditoria');selectAudit('${d.slug}')">Logs</button>
+        ${wa.connected === false ? `<button class="btn btn-sm btn-primary" onclick="goTo('onboarding');selectOnboarding('${d.slug}')">QR Code</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// ENTIDADES
+// ══════════════════════════════════════════════════════
+async function loadEntidades() {
+  document.getElementById('entidades-table-wrap').innerHTML = '<div class="loading-block"><div class="spinner"></div><span>Carregando…</span></div>';
+  try {
+    const data = await api('/admin/api/instances');
+    document.getElementById('entidades-table-wrap').innerHTML = `
+      <table class="table">
+        <thead><tr>
+          <th>Entidade</th><th>Arquivo ENV</th><th>Telefone</th><th>Porta</th><th></th>
+        </tr></thead>
+        <tbody>${data.map(i => `
+          <tr>
+            <td><strong>${i.nomeAbreviado}</strong><br><span class="text-xs text-muted">${i.nomeCompleto}</span></td>
+            <td class="font-mono text-xs text-muted">${i.envFile}</td>
+            <td class="font-mono text-sm">${i.phoneNumber || '—'}</td>
+            <td class="font-mono text-sm">${i.port}</td>
+            <td>
+              <div class="flex gap-8">
+                <button class="btn btn-sm" onclick="goTo('env');selectEnv('${i.slug}')">ENV</button>
+                <button class="btn btn-sm btn-primary" onclick="goTo('onboarding');selectOnboarding('${i.slug}')">QR Code</button>
+                <button class="btn btn-sm" onclick="goTo('auditoria');selectAudit('${i.slug}')">Logs</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    document.getElementById('entidades-table-wrap').innerHTML = `<div class="error-block">${e.message}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// ONBOARDING / QR CODE
+// ══════════════════════════════════════════════════════
+let onbSlug = null;
+let onbInterval = null;
+
+async function loadOnboardingPills() {
+  document.getElementById('onb-pills').innerHTML = '<div class="loading-block" style="padding:10px"><div class="spinner"></div></div>';
+  try {
+    const data = await api('/admin/api/instances');
+    document.getElementById('onb-pills').innerHTML = data.map(i =>
+      `<div class="entity-pill ${onbSlug === i.slug ? 'active' : ''}" onclick="selectOnboarding('${i.slug}')">📍 ${i.nomeAbreviado}</div>`
+    ).join('');
+    if (!onbSlug && data.length) selectOnboarding(data[0].slug);
+  } catch (e) {
+    document.getElementById('onb-pills').innerHTML = `<div class="error-block">${e.message}</div>`;
+  }
+}
+
+function selectOnboarding(slug) {
+  onbSlug = slug;
+  document.querySelectorAll('#onb-pills .entity-pill').forEach(p => {
+    p.classList.toggle('active', p.textContent.includes(slug) || p.onclick?.toString().includes(`'${slug}'`));
+  });
+  document.querySelectorAll('#onb-pills .entity-pill').forEach(p => {
+    if (p.getAttribute('onclick') && p.getAttribute('onclick').includes(`'${slug}'`)) p.classList.add('active');
+    else p.classList.remove('active');
+  });
+  if (onbInterval) clearInterval(onbInterval);
+  loadOnboardingStatus(slug);
+}
+
+async function loadOnboardingStatus(slug) {
+  document.getElementById('onb-btn-connect').disabled = false;
+  document.getElementById('onb-btn-refresh').disabled = false;
+  document.getElementById('onb-qr-box').innerHTML = '<span style="font-size:28px">⬜</span><span>Clique em Gerar QR Code</span>';
+
+  try {
+    const status = await api(`/admin/api/status/${slug}`);
+    renderOnboardingStatus(status);
+    renderOnboardingChecklist(status);
+  } catch (e) {
+    document.getElementById('onb-status-card').innerHTML = `<div class="card-title">Status Z-API</div><div class="error-block">${e.message}</div>`;
+  }
+}
+
+function renderOnboardingStatus(s) {
+  const wa = s.checks.whatsapp;
+  document.getElementById('onb-status-card').innerHTML = `
+    <div class="card-title">Status Z-API — ${s.nomeAbreviado}</div>
+    <div class="health-row">
+      <div><div class="health-name">Conexão WhatsApp</div><div class="health-sub">${wa.detail}</div></div>
+      ${tag(wa.ok ? 'green' : 'yellow', wa.ok ? 'Conectado' : 'Desconectado', true)}
+    </div>
+    <div class="health-row">
+      <div><div class="health-name">Smartphone</div></div>
+      ${tag(wa.smartphoneConnected ? 'green' : 'gray', wa.smartphoneConnected ? 'Sim' : 'Não')}
+    </div>
+    <div class="health-row">
+      <div><div class="health-name">Latência Z-API</div></div>
+      <span class="text-sm text-muted">${wa.latencyMs ? wa.latencyMs + 'ms' : '—'}</span>
+    </div>`;
+}
+
+function renderOnboardingChecklist(s) {
+  const wa = s.checks.whatsapp;
+  const gc = s.checks.gestcom;
+  const sm = s.checks.smtp;
+  const item = (ok, label) =>
+    `<div class="flex items-center gap-8" style="padding:4px 0;font-size:13px">
+      <span style="color:var(--${ok ? 'green' : 'yellow'})">${ok ? '✓' : '○'}</span>
+      <span ${ok ? '' : 'class="text-muted"'}>${label}</span>
+    </div>`;
+  document.getElementById('onb-checklist').innerHTML = `
+    <div class="card-title">Checklist</div>
+    ${item(gc.ok || gc.detail === 'Não configurado', 'Gestcom API acessível')}
+    ${item(sm.ok || sm.detail === 'Não configurado', 'SMTP porta aberta')}
+    ${item(wa.ok, 'WhatsApp conectado')}
+    <div class="sep"></div>
+    <button class="btn btn-sm w-full" onclick="testMessage()">Enviar mensagem de teste</button>`;
+}
+
+document.getElementById('onb-btn-connect').addEventListener('click', async () => {
+  if (!onbSlug) return;
+  if (onbInterval) clearInterval(onbInterval);
+  fetchQrCode(onbSlug);
+  onbInterval = setInterval(() => fetchQrCodeOrStop(onbSlug), 5000);
+});
+
+document.getElementById('onb-btn-refresh').addEventListener('click', () => {
+  if (onbSlug) fetchQrCode(onbSlug);
+});
+
+async function fetchQrCode(slug) {
+  const box = document.getElementById('onb-qr-box');
+  box.innerHTML = '<div class="spinner"></div><span>Buscando QR Code…</span>';
+  try {
+    const res = await fetch(`/admin/api/qrcode/${slug}`, {
+      headers: window.APP_CONFIG?.apiSecret ? { Authorization: 'Bearer ' + window.APP_CONFIG.apiSecret } : {}
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      box.innerHTML = `<span style="color:var(--red);font-size:12px">${err.error}</span>`;
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    box.innerHTML = `<img src="${url}" alt="QR Code">`;
+  } catch (e) {
+    box.innerHTML = `<span style="color:var(--red);font-size:12px">${e.message}</span>`;
+  }
+}
+
+async function fetchQrCodeOrStop(slug) {
+  try {
+    const status = await api(`/admin/api/status/${slug}`);
+    if (status.checks.whatsapp.ok) {
+      clearInterval(onbInterval);
+      onbInterval = null;
+      document.getElementById('onb-qr-box').innerHTML = '<span style="font-size:36px">✅</span><span style="color:var(--green);font-weight:600">Conectado!</span>';
+      renderOnboardingStatus(status);
+      renderOnboardingChecklist(status);
+      return;
+    }
+  } catch {}
+  fetchQrCode(slug);
+}
+
+async function testMessage() {
+  if (!onbSlug) return;
+  alert('Endpoint de teste não configurado ainda. Adicione um número de destino no código.');
+}
+
+// ══════════════════════════════════════════════════════
+// ENV
+// ══════════════════════════════════════════════════════
+let envSlug = null;
+
+async function loadEnvPills() {
+  document.getElementById('env-pills').innerHTML = '<div class="loading-block" style="padding:10px"><div class="spinner"></div></div>';
+  try {
+    const data = await api('/admin/api/instances');
+    document.getElementById('env-pills').innerHTML = data.map(i =>
+      `<div class="entity-pill ${envSlug === i.slug ? 'active' : ''}" onclick="selectEnv('${i.slug}')">${i.nomeAbreviado}</div>`
+    ).join('');
+    if (!envSlug && data.length) selectEnv(data[0].slug);
+    else if (envSlug) selectEnv(envSlug);
+  } catch (e) {
+    document.getElementById('env-pills').innerHTML = `<div class="error-block">${e.message}</div>`;
+  }
+}
+
+async function selectEnv(slug) {
+  envSlug = slug;
+  document.querySelectorAll('#env-pills .entity-pill').forEach(p => {
+    p.classList.toggle('active', p.getAttribute('onclick')?.includes(`'${slug}'`));
+  });
+  document.getElementById('env-summary').innerHTML = '<div class="loading-block"><div class="spinner"></div></div>';
+  document.getElementById('env-fields').innerHTML = '<div class="loading-block"><div class="spinner"></div></div>';
+  await loadEnvData(slug);
+}
+
+async function loadEnvData(slug) {
+  try {
+    const r = await api(`/admin/api/env/${slug}`);
+    renderEnvSummary(r);
+    renderEnvFields(r);
+  } catch (e) {
+    document.getElementById('env-summary').innerHTML = `<div class="error-block">${e.message}</div>`;
+    document.getElementById('env-fields').innerHTML = '';
+  }
+}
+
+function renderEnvSummary(r) {
+  const pct = Math.round((r.okCount / r.totalFields) * 100);
+  const barColor = r.missingCount > 0 ? 'var(--red)' : (r.emptyCount > 0 ? 'var(--yellow)' : 'var(--green)');
+  document.getElementById('env-summary').innerHTML = `
+    <div class="card-title">Validação — ${r.envFile}</div>
+    <div class="flex gap-16 mb-12">
+      <div class="text-center"><div style="font-size:22px;font-weight:700;color:var(--green)">${r.okCount}</div><div class="text-xs text-muted">OK</div></div>
+      <div class="text-center"><div style="font-size:22px;font-weight:700;color:var(--red)">${r.missingCount}</div><div class="text-xs text-muted">Ausentes</div></div>
+      <div class="text-center"><div style="font-size:22px;font-weight:700;color:var(--yellow)">${r.emptyCount}</div><div class="text-xs text-muted">Vazios</div></div>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" style="width:${pct}%;background:${barColor}"></div>
+    </div>
+    <div class="text-xs text-muted mt-8">${r.okCount} de ${r.totalFields} variáveis preenchidas</div>`;
+}
+
+function renderEnvFields(r) {
+  const groups = {};
+  r.fields.forEach(f => { (groups[f.group] = groups[f.group] || []).push(f); });
+  const fieldStatusTag = (f) => {
+    if (f.status === 'ok') return tag('green', 'OK');
+    if (f.status === 'missing') return f.required ? tag('red', 'Ausente') : tag('gray', 'Não definido');
+    return tag('yellow', 'Vazio');
+  };
+  document.getElementById('env-fields').innerHTML = `
+    <div class="card-title">Campos — ${r.envFile}</div>
+    ${Object.entries(groups).map(([group, fields]) => `
+      <div class="env-group">
+        <div class="env-group-title">${group}</div>
+        ${fields.map(f => `
+          <div class="env-item">
+            <span class="env-key">${f.key}${f.required ? ' <span style="color:var(--red)">*</span>' : ''}</span>
+            <span class="env-val text-muted">${f.value ?? ''}</span>
+            ${fieldStatusTag(f)}
+          </div>`).join('')}
+      </div>`).join('')}`;
+}
+
+document.getElementById('env-btn-revalidate').addEventListener('click', () => {
+  if (envSlug) loadEnvData(envSlug);
+});
+
+// ══════════════════════════════════════════════════════
+// MARKETING
+// ══════════════════════════════════════════════════════
+let mktInstances = [];
+let mktTemplate = 'instagram';
+
+async function loadMarketingEntities() {
+  document.getElementById('mkt-entity-list').innerHTML = '<div class="loading-block" style="padding:10px"><div class="spinner"></div></div>';
+  try {
+    mktInstances = await api('/admin/api/instances');
+    document.getElementById('mkt-entity-list').innerHTML = mktInstances.map(i => `
+      <label class="flex items-center gap-8" style="cursor:pointer">
+        <input type="checkbox" class="mkt-check" value="${i.slug}" checked>
+        ${i.nomeAbreviado}
+        <span class="font-mono text-xs text-muted" style="margin-left:auto">${i.phoneNumber || '—'}</span>
+      </label>`).join('');
+    if (mktInstances.length) renderMktPreview(mktInstances[0]);
+  } catch (e) {
+    document.getElementById('mkt-entity-list').innerHTML = `<div class="error-block">${e.message}</div>`;
+  }
+}
+
+document.querySelectorAll('.template-thumb').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.template-thumb').forEach(t => t.classList.remove('selected'));
+    el.classList.add('selected');
+    mktTemplate = el.dataset.tpl;
+    if (mktInstances.length) renderMktPreview(mktInstances[0]);
+  });
+});
+
+function renderMktPreview(instance) {
+  const canvas = document.getElementById('mkt-canvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.fillStyle = '#f0ede8';
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#d4cfc8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(4, 4, w - 8, h - 8);
+  ctx.fillStyle = '#1a1714';
+  ctx.font = 'bold 22px Segoe UI, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(instance.nomeAbreviado, w / 2, 80);
+  ctx.font = '14px Segoe UI, sans-serif';
+  ctx.fillStyle = '#7a7068';
+  ctx.fillText(instance.nomeCompleto, w / 2, 108);
+  ctx.fillStyle = '#1a1714';
+  ctx.font = '14px monospace';
+  ctx.fillText('📲 ' + (instance.phoneNumber || '—'), w / 2, 150);
+  // QR Code area placeholder
+  ctx.strokeStyle = '#a89f94';
+  ctx.strokeRect(w / 2 - 60, 170, 120, 120);
+  ctx.font = '11px sans-serif';
+  ctx.fillStyle = '#a89f94';
+  ctx.fillText('QR Code wa.me/' + (instance.phoneNumber || '…'), w / 2, 240);
+  ctx.font = '11px monospace';
+  ctx.fillText('wa.me/' + (instance.phoneNumber || '…'), w / 2, 340);
+}
+
+document.getElementById('mkt-btn-download-one').addEventListener('click', () => {
+  const canvas = document.getElementById('mkt-canvas');
+  const a = document.createElement('a');
+  a.download = `material-${mktInstances[0]?.slug || 'preview'}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+});
+
+document.getElementById('mkt-btn-generate').addEventListener('click', async () => {
+  const slugs = [...document.querySelectorAll('.mkt-check:checked')].map(c => c.value);
+  const instances = mktInstances.filter(i => slugs.includes(i.slug));
+  if (!instances.length) { alert('Selecione pelo menos uma entidade.'); return; }
+  // Download each as PNG individually (ZIP requer biblioteca externa)
+  for (const inst of instances) {
+    renderMktPreview(inst);
+    await new Promise(r => setTimeout(r, 80));
+    const a = document.createElement('a');
+    a.download = `material-${inst.slug}.png`;
+    a.href = document.getElementById('mkt-canvas').toDataURL('image/png');
+    a.click();
+    await new Promise(r => setTimeout(r, 200));
+  }
+});
+
+// ══════════════════════════════════════════════════════
+// AUDITORIA
+// ══════════════════════════════════════════════════════
+let auditData = [];
+
+async function loadAuditSelects() {
+  try {
+    const data = await api('/admin/api/instances');
+    const sel = document.getElementById('audit-slug');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Selecione…</option>' + data.map(i =>
+      `<option value="${i.slug}" ${i.slug === current ? 'selected' : ''}>${i.nomeAbreviado}</option>`
+    ).join('');
+    // Default dates: last 7 days
+    const today = new Date();
+    const from = new Date(today); from.setDate(from.getDate() - 6);
+    if (!document.getElementById('audit-from').value) {
+      document.getElementById('audit-from').value = from.toISOString().slice(0, 10);
+      document.getElementById('audit-to').value = today.toISOString().slice(0, 10);
+    }
+  } catch {}
+}
+
+document.getElementById('audit-btn-search').addEventListener('click', fetchAudit);
+
+async function fetchAudit() {
+  const slug = document.getElementById('audit-slug').value;
+  const from = document.getElementById('audit-from').value;
+  const to = document.getElementById('audit-to').value;
+  if (!slug) { alert('Selecione uma entidade.'); return; }
+
+  document.getElementById('audit-results').innerHTML = '<div class="loading-block"><div class="spinner"></div><span>Consultando banco de dados…</span></div>';
+  try {
+    const params = new URLSearchParams({ slug, from, to, limit: '100' });
+    const r = await api(`/admin/api/audit?${params}`);
+    auditData = r.rows;
+    renderAuditTable(r);
+  } catch (e) {
+    document.getElementById('audit-results').innerHTML = `<div class="error-block">${e.message}</div>`;
+  }
+}
+
+function actionTag(action) {
+  if (action?.includes('error') || action?.includes('fail')) return tag('red', action);
+  if (action?.includes('otp') || action?.includes('auth')) return tag('yellow', action);
+  if (action?.includes('connect') || action?.includes('success')) return tag('green', action);
+  return tag('gray', action || '—');
+}
+
+function renderAuditTable(r) {
+  if (!r.rows.length) {
+    document.getElementById('audit-results').innerHTML = '<div class="text-muted text-sm text-center" style="padding:24px">Nenhum registro encontrado no período.</div>';
+    return;
+  }
+  document.getElementById('audit-results').innerHTML = `
+    <div class="log-row header"><span>Data/Hora</span><span>Telefone</span><span>Ação</span><span>CPF</span></div>
+    ${r.rows.map(row => `
+      <div class="log-row">
+        <span class="log-mono">${fmtDate(row.created_at)}</span>
+        <span class="font-mono text-xs">${row.whatsapp_phone || '—'}</span>
+        <span>${actionTag(row.action)}</span>
+        <span class="log-mono">${row.cpf ? row.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '—'}</span>
+      </div>`).join('')}
+    <div style="padding:10px 14px;font-size:12px;color:var(--text-muted)">
+      Exibindo ${r.rows.length} de ${r.total} registros
+    </div>`;
+}
+
+document.getElementById('audit-btn-csv').addEventListener('click', () => {
+  if (!auditData.length) { alert('Faça uma busca antes de exportar.'); return; }
+  const header = 'data_hora,telefone,acao,cpf,ligacao_id';
+  const rows = auditData.map(r =>
+    [fmtDate(r.created_at), r.whatsapp_phone, r.action, r.cpf || '', r.ligacao_id || ''].join(',')
+  );
+  const csv = [header, ...rows].join('\n');
+  const a = document.createElement('a');
+  a.download = `auditoria-${document.getElementById('audit-slug').value}-${Date.now()}.csv`;
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.click();
+});
+
+// Funções auxiliares para navegação via atalho em cards
+function selectAudit(slug) {
+  setTimeout(() => {
+    const sel = document.getElementById('audit-slug');
+    if (sel) { sel.value = slug; fetchAudit(); }
+  }, 100);
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+loadDashboard();
+</script>
+</body>
+</html>

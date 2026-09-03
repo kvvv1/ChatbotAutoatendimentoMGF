@@ -10,30 +10,47 @@
   <div class="app-shell">
     <aside class="sidebar">
       <header class="sidebar-header">
-        <h1>Conversas</h1>
+        <div class="sidebar-tabs" id="sidebar-tabs">
+          <button class="sidebar-tab active" data-tab="conversations">Conversas</button>
+          <button class="sidebar-tab hidden" data-tab="contacts" id="contacts-tab-btn">Agenda</button>
+        </div>
+        <button id="logout-button" class="hidden" style="margin-left:8px;font-size:12px;background:none;border:none;color:inherit;opacity:0.7;cursor:pointer;" title="Sair">Sair</button>
       </header>
 
-      <div class="sidebar-controls">
-        <label for="filter-status">Filtrar por status</label>
-        <select id="filter-status">
-          <option value="abertos">Abertos (pendentes + em atendimento)</option>
-          <option value="pendente">Pendentes</option>
-          <option value="em_atendimento">Em atendimento</option>
-          <option value="finalizado">Finalizados</option>
-          <option value="cancelado">Cancelados</option>
-          <option value="">Todos</option>
-        </select>
-        <label for="search-conversation">Buscar conversa</label>
-        <input
-          id="search-conversation"
-          type="search"
-          placeholder="Nome ou numero do cliente"
-          autocomplete="off"
-        />
+      <!-- Painel: Conversas -->
+      <div id="panel-conversations">
+        <div class="sidebar-controls">
+          <label for="filter-status">Filtrar por status</label>
+          <select id="filter-status">
+            <option value="abertos">Abertos (pendentes + em atendimento)</option>
+            <option value="pendente">Pendentes</option>
+            <option value="em_atendimento">Em atendimento</option>
+            <option value="finalizado">Finalizados</option>
+            <option value="cancelado">Cancelados</option>
+            <option value="">Todos</option>
+          </select>
+          <label for="search-conversation">Buscar conversa</label>
+          <input
+            id="search-conversation"
+            type="search"
+            placeholder="Nome ou numero do cliente"
+            autocomplete="off"
+          />
+        </div>
+        <div id="tickets-list" class="tickets-list">
+          <div class="chat-empty">Carregando conversas...</div>
+        </div>
       </div>
 
-      <div id="tickets-list" class="tickets-list">
-        <div class="chat-empty">Carregando conversas...</div>
+      <!-- Painel: Agenda (oculto por padrão) -->
+      <div id="panel-contacts" class="hidden">
+        <div class="contacts-toolbar">
+          <input id="contacts-search" type="search" placeholder="Buscar contato..." autocomplete="off" />
+          <button id="contacts-add-btn" class="btn-contacts-add" title="Novo contato">+</button>
+        </div>
+        <div id="contacts-list" class="contacts-list">
+          <div class="chat-empty">Nenhum contato cadastrado.</div>
+        </div>
       </div>
     </aside>
 
@@ -152,8 +169,31 @@
     </div>
   </div>
 
+  <!-- Modal: novo contato -->
+  <div id="contact-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-box modal-box-sm">
+      <div class="modal-header">
+        <h2>Novo Contato</h2>
+        <button id="contact-modal-close" class="modal-close-btn" title="Fechar">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">Nome *</label>
+        <input id="contact-name-input" type="text" class="form-input" placeholder="Ex: SAAE Formiga" maxlength="255" />
+        <label class="form-label">WhatsApp (somente números) *</label>
+        <input id="contact-phone-input" type="tel" class="form-input" placeholder="Ex: 5537999999999" maxlength="20" />
+        <label class="form-label">Descrição</label>
+        <input id="contact-desc-input" type="text" class="form-input" placeholder="Opcional" maxlength="500" />
+        <div class="modal-actions">
+          <button id="contact-save-btn" class="btn-accent">Salvar</button>
+          <button id="contact-cancel-btn" class="btn-secondary">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="/painel-atendimento/config.js"></script>
   <script src="/painel-atendimento/app.js" defer></script>
+  <script src="/painel-atendimento/contacts.js" defer></script>
 </body>
 </html>

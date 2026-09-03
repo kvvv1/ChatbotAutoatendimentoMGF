@@ -63,6 +63,28 @@ export type AppConfig = {
   atendimentoMapsAddress?: string;
   welcomeAudioUrl?: string;
   menuAudioUrl?: string;
+  enableContacts?: boolean;
+  // Horário comercial do atendimento humano (padrão: seg-sex, 08:00-18:00)
+  businessHoursStart: string;
+  businessHoursEnd: string;
+  businessDayStart: number;
+  businessDayEnd: number;
+  // "Falar com atendente" via ligação em vez de ticket (só ativa se configurado — por entidade)
+  humanHandoffCallEnabled: boolean;
+  humanHandoffCallPhone?: string;
+  humanHandoffCallMessage?: string;
+  // Chave compartilhada exigida nas rotas /api/* do painel (ver src/security/apiAuth.ts)
+  apiSecret?: string;
+  // Segredo pra assinar o token de login dos atendentes (ver src/human/auth.ts)
+  attendantAuthSecret?: string;
+  // WhatsApp Cloud API oficial da Meta (opcional — usada quando WHATSAPP_PROVIDER=meta)
+  whatsappProvider: 'zapi' | 'meta';
+  metaAccessToken?: string;
+  metaPhoneNumberId?: string;
+  metaWabaId?: string;
+  metaAppSecret?: string;
+  metaVerifyToken?: string;
+  metaApiVersion?: string;
   // Modo demonstração/simulação
   demoIdEletronico?: string;
   // Evolution API (opcional, para suporte multi-canal)
@@ -131,7 +153,24 @@ export function loadConfig(): AppConfig {
     MENU_AUDIO_URL,
     DEMO_ID_ELETRONICO,
     ENTIDADE_NOME,
-    ENTIDADE_NOME_COMPLETO
+    ENTIDADE_NOME_COMPLETO,
+    ENABLE_CONTACTS,
+    BUSINESS_HOURS_START,
+    BUSINESS_HOURS_END,
+    BUSINESS_DAY_START,
+    BUSINESS_DAY_END,
+    HUMAN_HANDOFF_CALL_ENABLED,
+    HUMAN_HANDOFF_CALL_PHONE,
+    HUMAN_HANDOFF_CALL_MESSAGE,
+    API_SECRET,
+    ATTENDANT_AUTH_SECRET,
+    WHATSAPP_PROVIDER,
+    META_ACCESS_TOKEN,
+    META_PHONE_NUMBER_ID,
+    META_WABA_ID,
+    META_APP_SECRET,
+    META_VERIFY_TOKEN,
+    META_API_VERSION,
   } = process.env;
 
   if (!DB_SERVER) throw new Error('DB_SERVER não configurado');
@@ -202,6 +241,23 @@ export function loadConfig(): AppConfig {
     demoIdEletronico: DEMO_ID_ELETRONICO,
     entidadeNome: ENTIDADE_NOME || 'SAAE',
     entidadeNomeCompleto: ENTIDADE_NOME_COMPLETO || ENTIDADE_NOME || 'SAAE',
+    enableContacts: ENABLE_CONTACTS === 'true',
+    businessHoursStart: BUSINESS_HOURS_START || '08:00',
+    businessHoursEnd: BUSINESS_HOURS_END || '18:00',
+    businessDayStart: Number(BUSINESS_DAY_START) || 1,
+    businessDayEnd: Number(BUSINESS_DAY_END) || 5,
+    humanHandoffCallEnabled: HUMAN_HANDOFF_CALL_ENABLED === 'true',
+    humanHandoffCallPhone: HUMAN_HANDOFF_CALL_PHONE || undefined,
+    humanHandoffCallMessage: HUMAN_HANDOFF_CALL_MESSAGE || undefined,
+    apiSecret: API_SECRET || undefined,
+    attendantAuthSecret: ATTENDANT_AUTH_SECRET || API_SECRET || undefined,
+    whatsappProvider: WHATSAPP_PROVIDER === 'meta' ? 'meta' : 'zapi',
+    metaAccessToken: META_ACCESS_TOKEN || undefined,
+    metaPhoneNumberId: META_PHONE_NUMBER_ID || undefined,
+    metaWabaId: META_WABA_ID || undefined,
+    metaAppSecret: META_APP_SECRET || undefined,
+    metaVerifyToken: META_VERIFY_TOKEN || undefined,
+    metaApiVersion: META_API_VERSION || undefined,
   };
 }
 

@@ -125,13 +125,53 @@ function getOperatorContext() {
   }
 }
 
+const ATTENDANT_AUTH_STORAGE_KEY = 'human_panel_auth';
+
+function getAttendantAuth() {
+  try {
+    const raw = window.localStorage.getItem(ATTENDANT_AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.token || !parsed?.attendant) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function isAttendantTokenExpired(token) {
+  try {
+    const payloadPart = String(token || '').split('.')[0];
+    const payload = JSON.parse(atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/')));
+    return !payload.exp || payload.exp < Math.floor(Date.now() / 1000);
+  } catch {
+    return true;
+  }
+}
+
+function logoutAttendant() {
+  window.localStorage.removeItem(ATTENDANT_AUTH_STORAGE_KEY);
+  window.location.href = '/painel-atendimento/login.html';
+}
+
+// Se essa instância exige login individual, garante uma sessão válida antes de
+// carregar qualquer coisa do painel — senão redireciona pro login.
+if (window.APP_CONFIG?.attendantAuthEnabled) {
+  const auth = getAttendantAuth();
+  if (!auth || isAttendantTokenExpired(auth.token)) {
+    logoutAttendant();
+  }
+}
+
 function getOperatorHeaders() {
   const ctx = getOperatorContext();
-  if (!ctx) return {};
   const headers = {};
-  if (ctx.nome) headers['x-panel-operator-name'] = ctx.nome;
-  if (ctx.email) headers['x-panel-operator-email'] = ctx.email;
-  if (ctx.id) headers['x-panel-operator-id'] = ctx.id;
+  if (ctx?.nome) headers['x-panel-operator-name'] = ctx.nome;
+  if (ctx?.email) headers['x-panel-operator-email'] = ctx.email;
+  if (ctx?.id) headers['x-panel-operator-id'] = ctx.id;
+  if (window.APP_CONFIG?.apiSecret) headers['Authorization'] = 'Bearer ' + window.APP_CONFIG.apiSecret;
+  const auth = getAttendantAuth();
+  if (auth?.token) headers['X-Attendant-Token'] = auth.token;
   return headers;
 }
 
@@ -152,6 +192,10 @@ if (attendantFromUrl && attendantFromUrl.trim()) {
 }
 
 function getAttendantName() {
+  // Login verificado tem prioridade sobre o mecanismo antigo (?atendente=/?token= não assinados)
+  const auth = getAttendantAuth();
+  if (auth?.attendant?.nome) return auth.attendant.nome;
+
   const saved = window.localStorage.getItem(ATTENDANT_STORAGE_KEY);
   if (saved && saved.trim()) return saved.trim();
   return DEFAULT_ATTENDANT_NAME;
@@ -208,7 +252,8 @@ function initRealtimeStream() {
   }
 
   try {
-    realtimeStream = new EventSource(apiUrl('/human/stream'));
+    const streamUrl = apiUrl('/human/stream') + (window.APP_CONFIG?.apiSecret ? '?key=' + encodeURIComponent(window.APP_CONFIG.apiSecret) : '');
+    realtimeStream = new EventSource(streamUrl);
   } catch (err) {
     console.error(err);
     return;
@@ -278,6 +323,10 @@ async function fetchJson(url, options = {}) {
           ...(fetchOptions.headers || {})
         }
       });
+      if (res.status === 401 && window.APP_CONFIG?.attendantAuthEnabled) {
+        logoutAttendant();
+        throw new Error('Sessão expirada');
+      }
       if (!res.ok) {
         const body = await res.text().catch(() => '');
         throw new Error((body && body.slice(0, 180)) || ('HTTP ' + res.status));
@@ -1265,7 +1314,7 @@ async function sendMessage() {
     await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/send-message'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, attendant: getAttendantName() }),
       retries: 1
     });
     messageInputEl.value = '';
@@ -1347,6 +1396,12 @@ function handleGlobalShortcuts(ev) {
     ev.preventDefault();
     if (!closeButtonEl.disabled) closeTicketOneClick();
   }
+}
+
+const logoutButtonEl = document.getElementById('logout-button');
+if (logoutButtonEl && window.APP_CONFIG?.attendantAuthEnabled) {
+  logoutButtonEl.classList.remove('hidden');
+  logoutButtonEl.addEventListener('click', logoutAttendant);
 }
 
 statusFilterEl.addEventListener('change', async () => {

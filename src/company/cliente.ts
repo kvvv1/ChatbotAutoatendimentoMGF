@@ -46,13 +46,27 @@ export async function loginByIdEletronico(
   }
 
   const response = await linkLogin(config, idEletronico);
-  
-  console.log('[cliente] Login response:', JSON.stringify(response, null, 2));
-  
+
+  console.log('[cliente] Login response raw:', JSON.stringify(response, null, 2));
+
+  // Normaliza variações de campo da API (Imoveis / Imovel / imoveis / imovel)
+  const raw = response as any;
+  const imoveis: LinkImovel[] =
+    Array.isArray(raw.Imoveis)   ? raw.Imoveis  :
+    Array.isArray(raw.Imovel)    ? raw.Imovel   :
+    Array.isArray(raw.imoveis)   ? raw.imoveis  :
+    Array.isArray(raw.imovel)    ? raw.imovel   :
+    raw.Imoveis != null          ? [raw.Imoveis] :
+    [];
+
+  if (!imoveis.length) {
+    console.warn('[cliente] Nenhum imóvel retornado pela API. Response:', JSON.stringify(raw));
+  }
+
   return {
-    nomeCliente: response.Cliente,
-    imoveis: response.Imoveis,
-    imovelSelecionado: response.ImovelSelecionado
+    nomeCliente: raw.Cliente ?? raw.cliente ?? raw.NomeCliente ?? '',
+    imoveis,
+    imovelSelecionado: raw.ImovelSelecionado ?? raw.imovelSelecionado ?? 0,
   };
 }
 

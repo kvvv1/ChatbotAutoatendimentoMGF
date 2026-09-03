@@ -12,6 +12,7 @@ import { isLinkApiConfigured, linkImpressaoConta, linkGetDadosCadastrais, type L
 import { buildChallenges } from './identityChallenge.js';
 import { fetchDadosAutarquia, formatarTelefone } from '../company/autarquia.js';
 import { ensureOpenHumanTicket } from '../supabase/humanTickets.js';
+import { isWithinBusinessHours, businessHoursMessage } from './businessHours.js';
 
 function onlyDigits(value: string): string {
   try {
@@ -946,6 +947,7 @@ export async function processMessage(
                 try {
                   debitos = await fetchDebitosByLigacao(config, { cpf, ligacaoId, imovelId });
                 } catch (err) {
+                  console.error('[send_fatura] Erro ao buscar débitos para ImovelID', imovelId, ':', err);
                   replies.push('Não foi possível consultar as faturas desta ligação no momento. Tente novamente mais tarde.');
                   showMenuAfter = true;
                   break;
@@ -1052,6 +1054,23 @@ export async function processMessage(
               break;
             case '0': {
               // 0️⃣ Falar com atendente — só disponível via menu (usuário já autenticado neste estado)
+              if (!isWithinBusinessHours(config)) {
+                replies.push(businessHoursMessage(config));
+                showMenuAfter = true;
+                break;
+              }
+              if (config.humanHandoffCallEnabled && config.humanHandoffCallPhone) {
+                replies.push({
+                  type: 'buttonActions',
+                  message: config.humanHandoffCallMessage
+                    || '📞 Para falar com um atendente, toque no botão abaixo pra ligar direto pra gente. Nossa equipe está pronta pra te atender!',
+                  buttonActions: [
+                    { type: 'CALL', phone: config.humanHandoffCallPhone, label: 'Ligar agora' }
+                  ]
+                });
+                showMenuAfter = true;
+                break;
+              }
               try {
                 let protocoloMsg = '';
                 try {

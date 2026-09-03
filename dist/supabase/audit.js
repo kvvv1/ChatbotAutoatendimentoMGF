@@ -1,21 +1,18 @@
-import { getSupabaseAdmin } from './client.js';
-/**
- * Registra ação de auditoria no Supabase.
- * Falhas são silenciadas para não interromper o fluxo principal.
- */
+import { randomUUID } from 'node:crypto';
+import { getDb } from './client.js';
 export async function logAudit(config, params) {
     try {
-        const supabase = getSupabaseAdmin(config);
-        await supabase.rpc('log_audit', {
-            p_whatsapp_phone: params.whatsappPhone,
-            p_cpf: params.cpf ?? null,
-            p_ligacao_id: params.ligacaoId ?? null,
-            p_action: params.action,
-            p_payload: (params.payload ?? {})
-        });
-        // Ignora erros silenciosamente
+        const pool = getDb(config);
+        await pool.query('INSERT INTO audit_logs (id, whatsapp_phone, cpf, ligacao_id, action, payload) VALUES (?, ?, ?, ?, ?, ?)', [
+            randomUUID(),
+            params.whatsappPhone,
+            params.cpf ?? null,
+            params.ligacaoId ?? null,
+            params.action,
+            JSON.stringify(params.payload ?? {})
+        ]);
     }
     catch {
-        // Silenciado - Supabase não disponível
+        // Silenciado
     }
 }

@@ -2,17 +2,37 @@ import { z } from 'zod';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ZapiClient } from '../zapi/client.js';
-import { listHumanTickets, getHumanTicketById, getMessagesByPhone, updateHumanTicketStatus, updateHumanTicketAssignee, listHumanTicketNotes, addHumanTicketNote, getCustomerByPhone, listLigacoesByCustomerId, listUserMediaByPhone } from '../supabase/humanTickets.js';
+import { listHumanTickets, getHumanTicketById, getMessagesByPhone, updateHumanTicketStatus, updateHumanTicketAssignee, updateHumanTicketCustomerName, listHumanTicketNotes, addHumanTicketNote, getCustomerByPhone, listLigacoesByCustomerId, listUserMediaByPhone } from '../supabase/humanTickets.js';
 import { logMessage } from '../supabase/messages.js';
 import { fetchClienteByCpf, loginByIdEletronico } from '../company/cliente.js';
 import { fetchLigacoesByCpf } from '../company/ligacoes.js';
 import { fetchDadosCadastraisByImovelId, fetchDadosCadastraisByLigacao } from '../company/cadastro.js';
 import { publishHumanEvent, subscribeHumanEvents } from './events.js';
+import { getDb } from '../supabase/client.js';
+import { verifyAttendantCredentials } from '../supabase/attendants.js';
+import { signAttendantToken } from './auth.js';
 const statusSchema = z.enum(['pendente', 'em_atendimento', 'finalizado', 'cancelado', 'abertos']);
 export async function registerHumanRoutes(app, config) {
     const zapi = new ZapiClient(config);
+    // Login do atendente — só disponível quando ATTENDANT_AUTH_SECRET/API_SECRET está configurado
+    app.post('/api/auth/login', async (request, reply) => {
+        if (!config.attendantAuthSecret) {
+            return reply.code(501).send({ error: 'attendant_auth_not_configured' });
+        }
+        const bodySchema = z.object({ email: z.string().email(), password: z.string().min(1) });
+        const parsed = bodySchema.safeParse(request.body);
+        if (!parsed.success) {
+            return reply.code(400).send({ error: 'invalid_body' });
+        }
+        const attendant = await verifyAttendantCredentials(config, parsed.data.email, parsed.data.password);
+        if (!attendant) {
+            return reply.code(401).send({ error: 'invalid_credentials' });
+        }
+        const token = signAttendantToken({ sub: attendant.id, nome: attendant.name, email: attendant.email }, config.attendantAuthSecret);
+        return { token, attendant: { id: attendant.id, nome: attendant.name, email: attendant.email } };
+    });
     function extractIdEletronicoFromText(value) {
-        const m = String(value || '').match(/\b\d+@[A-Za-z]\b/);
+        const m = String(value || '').match(/\b\d+@[A-Za-z0-9]+\b/);
         return m ? m[0].trim() : null;
     }
     // Página HTML simples do painel
@@ -199,6 +219,25 @@ export async function registerHumanRoutes(app, config) {
                 }
             }
         }
+        // Se o ticket ainda não tem nome, tenta resolver pelo titular da ligação ou nome do cliente da API
+        if (!ticket.customer_name) {
+            let resolvedName = null;
+            if (apiProfile?.ligacoes?.length) {
+                const nomeTitular = apiProfile.ligacoes
+                    .map((l) => l.cadastro?.nomeTitular)
+                    .find((n) => typeof n === 'string' && n.trim().length > 0);
+                if (nomeTitular)
+                    resolvedName = nomeTitular.trim();
+            }
+            if (!resolvedName && apiProfile?.cliente?.nome) {
+                resolvedName = String(apiProfile.cliente.nome).trim() || null;
+            }
+            if (resolvedName) {
+                await updateHumanTicketCustomerName(config, ticket.id, resolvedName);
+                ticket.customer_name = resolvedName;
+                publishHumanEvent({ type: 'ticket_update', phone: ticket.phone, at: new Date().toISOString() });
+            }
+        }
         return {
             ticket,
             customer,
@@ -248,7 +287,7 @@ export async function registerHumanRoutes(app, config) {
     // Enviar mensagem ao usuário a partir do painel humano
     app.post('/api/human-tickets/:id/send-message', async (request, reply) => {
         const paramsSchema = z.object({ id: z.string().uuid() });
-        const bodySchema = z.object({ message: z.string().min(1) });
+        const bodySchema = z.object({ message: z.string().min(1), attendant: z.string().trim().min(1).optional() });
         const paramsParse = paramsSchema.safeParse(request.params);
         if (!paramsParse.success) {
             return reply.code(400).send({ error: 'invalid_id' });
@@ -274,6 +313,14 @@ export async function registerHumanRoutes(app, config) {
         // Opcionalmente já marca como "em_atendimento" se ainda estiver pendente
         if (ticket.status === 'pendente') {
             await updateHumanTicketStatus(config, ticket.id, 'em_atendimento');
+        }
+        // Atribui o ticket a quem respondeu primeiro, sem sobrescrever atribuição existente.
+        // Prefere a identidade verificada pelo token de login; só usa o nome enviado no corpo
+        // (não verificável) como fallback pra instâncias que ainda não migraram pro login.
+        const verifiedAttendantName = request.attendant?.nome;
+        const attendantName = verifiedAttendantName || bodyParse.data.attendant;
+        if (!ticket.assigned_attendant && attendantName) {
+            await updateHumanTicketAssignee(config, ticket.id, attendantName);
         }
         publishHumanEvent({ type: 'message', phone: ticket.phone, at: new Date().toISOString() });
         return { ok: true };
@@ -321,5 +368,101 @@ export async function registerHumanRoutes(app, config) {
         }
         publishHumanEvent({ type: 'ticket_update', phone: ticket.phone, at: new Date().toISOString() });
         return { note: created };
+    });
+    // ── Feature flags ─────────────────────────────────────────────────────────
+    app.get('/api/features', async () => ({
+        enableContacts: config.enableContacts ?? false,
+    }));
+    // ── Agenda de Contatos (apenas quando ENABLE_CONTACTS=true) ───────────────
+    const { randomUUID } = await import('node:crypto');
+    const db = getDb(config);
+    if (config.enableContacts) {
+        await db.query(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(30) NOT NULL,
+        description VARCHAR(500),
+        created_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3)
+      )
+    `);
+        app.get('/api/contacts', async () => {
+            const [rows] = await db.query('SELECT id, name, phone, description, created_at FROM contacts ORDER BY name ASC');
+            return { contacts: rows };
+        });
+        app.post('/api/contacts', async (request, reply) => {
+            const body = request.body;
+            const name = body?.name?.trim();
+            const phone = body?.phone?.replace(/\D/g, '');
+            const description = body?.description?.trim() ?? null;
+            if (!name || !phone)
+                return reply.code(400).send({ error: 'name_e_phone_obrigatorios' });
+            const id = randomUUID();
+            await db.query('INSERT INTO contacts (id, name, phone, description) VALUES (?, ?, ?, ?)', [id, name, phone, description]);
+            const [rows] = await db.query('SELECT id, name, phone, description, created_at FROM contacts WHERE id = ?', [id]);
+            return reply.code(201).send({ contact: rows[0] });
+        });
+        app.delete('/api/contacts/:id', async (request, reply) => {
+            const { id } = request.params;
+            await db.query('DELETE FROM contacts WHERE id = ?', [id]);
+            return { ok: true };
+        });
+        app.post('/api/contacts/send', async (request, reply) => {
+            const body = request.body;
+            const phone = body?.phone?.replace(/\D/g, '');
+            const message = body?.message?.trim();
+            if (!phone || !message)
+                return reply.code(400).send({ error: 'phone_e_message_obrigatorios' });
+            try {
+                await zapi.sendText({ phone, message });
+                await logMessage(config, { phone, direction: 'out', content: message });
+            }
+            catch (err) {
+                request.log.error({ err, phone }, 'Erro ao enviar mensagem de contato');
+                return reply.code(500).send({ error: 'send_failed' });
+            }
+            return { ok: true };
+        });
+        app.get('/api/contacts/messages', async (request, reply) => {
+            const { phone } = request.query;
+            if (!phone)
+                return reply.code(400).send({ error: 'phone_obrigatorio' });
+            const messages = await getMessagesByPhone(config, phone.replace(/\D/g, ''), { limit: 100 });
+            return { messages };
+        });
+    }
+    // ── Respostas Rápidas ─────────────────────────────────────────────────────
+    app.get('/api/quick-replies', async (_request, reply) => {
+        const [rows] = await db.query('SELECT id, titulo, conteudo, created_at, updated_at FROM quick_replies ORDER BY titulo ASC');
+        return { quickReplies: rows };
+    });
+    app.post('/api/quick-replies', async (request, reply) => {
+        const body = request.body;
+        const titulo = body?.titulo?.trim();
+        const conteudo = body?.conteudo?.trim();
+        if (!titulo || !conteudo)
+            return reply.code(400).send({ error: 'titulo_e_conteudo_obrigatorios' });
+        const id = randomUUID();
+        await db.query('INSERT INTO quick_replies (id, titulo, conteudo) VALUES (?, ?, ?)', [id, titulo, conteudo]);
+        const [rows] = await db.query('SELECT id, titulo, conteudo, created_at, updated_at FROM quick_replies WHERE id = ?', [id]);
+        return reply.code(201).send({ quickReply: rows[0] });
+    });
+    app.put('/api/quick-replies/:id', async (request, reply) => {
+        const { id } = request.params;
+        const body = request.body;
+        const titulo = body?.titulo?.trim();
+        const conteudo = body?.conteudo?.trim();
+        if (!titulo || !conteudo)
+            return reply.code(400).send({ error: 'titulo_e_conteudo_obrigatorios' });
+        await db.query('UPDATE quick_replies SET titulo = ?, conteudo = ?, updated_at = NOW(6) WHERE id = ?', [titulo, conteudo, id]);
+        const [rows] = await db.query('SELECT id, titulo, conteudo, created_at, updated_at FROM quick_replies WHERE id = ?', [id]);
+        if (!rows.length)
+            return reply.code(404).send({ error: 'not_found' });
+        return { quickReply: rows[0] };
+    });
+    app.delete('/api/quick-replies/:id', async (request, reply) => {
+        const { id } = request.params;
+        await db.query('DELETE FROM quick_replies WHERE id = ?', [id]);
+        return { ok: true };
     });
 }

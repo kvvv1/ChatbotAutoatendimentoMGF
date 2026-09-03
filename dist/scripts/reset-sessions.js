@@ -1,53 +1,26 @@
 #!/usr/bin/env node
-import { getSupabaseAdmin } from '../supabase/client.js';
+import { getDb } from '../supabase/client.js';
 import { loadConfig } from '../config.js';
 async function resetSessions() {
     try {
         const config = loadConfig();
-        const supabase = getSupabaseAdmin(config);
-        const phone = process.argv[2]; // Optional phone argument
+        const pool = getDb(config);
+        const phone = process.argv[2];
         if (phone) {
-            // Delete specific session
-            console.log(`🗑️  Deletando sessão do telefone: ${phone}...`);
-            const { error, count } = await supabase
-                .from('sessions')
-                .delete({ count: 'exact' })
-                .eq('phone', phone);
-            if (error) {
-                console.error('❌ Erro ao deletar sessão:', error.message);
-                process.exit(1);
-            }
-            if (count && count > 0) {
-                console.log(`✅ Sessão do telefone ${phone} deletada com sucesso!`);
-            }
-            else {
-                console.log(`ℹ️  Nenhuma sessão encontrada para o telefone ${phone}.`);
-            }
+            console.log(`Deletando sessao do telefone: ${phone}...`);
+            await pool.query('DELETE FROM sessions WHERE phone = ?', [phone]);
+            console.log(`Sessao do telefone ${phone} deletada.`);
         }
         else {
-            // Delete all sessions
-            console.log('🗑️  Deletando todas as sessões...');
-            // First, get count
-            const { count: totalCount } = await supabase
-                .from('sessions')
-                .select('*', { count: 'exact', head: true });
-            if (totalCount === 0) {
-                console.log('ℹ️  Nenhuma sessão encontrada para deletar.');
-                return;
-            }
-            const { error, count } = await supabase
-                .from('sessions')
-                .delete({ count: 'exact' })
-                .neq('phone', ''); // Delete all (condition always true)
-            if (error) {
-                console.error('❌ Erro ao deletar todas as sessões:', error.message);
-                process.exit(1);
-            }
-            console.log(`✅ ${count || 0} sessão(ões) deletada(s) com sucesso!`);
+            console.log('Deletando todas as sessoes...');
+            await pool.query('DELETE FROM sessions');
+            console.log('Todas as sessoes deletadas.');
         }
+        await pool.end();
     }
     catch (err) {
-        console.error('❌ Erro:', err?.message || err);
+        const e = err;
+        console.error('Erro:', e?.message || err);
         process.exit(1);
     }
 }
