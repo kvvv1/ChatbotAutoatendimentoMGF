@@ -5,7 +5,7 @@ import { fetchDebitosByLigacao } from '../company/debitos.js';
 // Serviços: API a ser implementada em breve
 import { fetchConsumoByLigacao } from '../company/consumo.js';
 import { fetchDadosCadastraisByLigacao } from '../company/cadastro.js';
-import { fetchClienteByCpf, loginByIdEletronico } from '../company/cliente.js';
+import { fetchClienteByCpf, loginByIdEletronico, loginByImovelId } from '../company/cliente.js';
 import { isLinkApiConfigured, linkImpressaoConta, linkGetDadosCadastrais } from '../company/linkApi.js';
 import { buildChallenges } from './identityChallenge.js';
 import { fetchDadosAutarquia, formatarTelefone } from '../company/autarquia.js';
@@ -312,7 +312,16 @@ export async function processMessage(config, phone, text, sessionStore) {
                     waveform: true
                 });
             }
-            replies.push(messages.askIdEletronico);
+            if (config.enableLoginByImovelId && config.imagemAjudaCodigoLigacao) {
+                replies.push({
+                    type: 'image',
+                    image: config.imagemAjudaCodigoLigacao,
+                    caption: messages.askIdEletronico(true)
+                });
+            }
+            else {
+                replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
+            }
             try {
                 await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
             }
@@ -346,7 +355,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                 const authed = isAuthenticated(state);
                 if (!authed) {
                     // Login é sempre por ID Eletrônico
-                    replies.push(messages.askIdEletronico);
+                    replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                     await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                 }
                 else {
@@ -378,7 +387,7 @@ export async function processMessage(config, phone, text, sessionStore) {
             }
             catch (err) {
                 // Fallback em caso de erro
-                replies.push(messages.askIdEletronico);
+                replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
             }
             return replies;
         }
@@ -392,7 +401,16 @@ export async function processMessage(config, phone, text, sessionStore) {
                     waveform: true
                 });
             }
-            replies.push(messages.askIdEletronico);
+            if (config.enableLoginByImovelId && config.imagemAjudaCodigoLigacao) {
+                replies.push({
+                    type: 'image',
+                    image: config.imagemAjudaCodigoLigacao,
+                    caption: messages.askIdEletronico(true)
+                });
+            }
+            else {
+                replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
+            }
             try {
                 await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
             }
@@ -425,7 +443,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                 if (state.name && !loginStates.includes(state.name)) {
                     try {
                         // Login é sempre por ID Eletrônico
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                     }
                     catch (err) {
@@ -444,16 +462,27 @@ export async function processMessage(config, phone, text, sessionStore) {
             case 'awaiting_login_id': {
                 try {
                     const trimmedText = text.trim();
-                    if (!isValidIdEletronico(trimmedText)) {
+                    // Entrada numérica (com ou sem o dígito verificador depois do traço, ex: "00004-2"):
+                    // se a entidade ativou login por código da ligação, trata como tal em vez de rejeitar
+                    // como ID Eletrônico inválido. O DV (parte depois do traço) NUNCA é usado no ImovelID —
+                    // confirmado via teste real: concatenar ID+DV pode bater com outro imóvel real e
+                    // vazar dados de um cliente diferente. Só a parte antes do traço é o ImovelID de verdade.
+                    const codigoLigacaoMatch = trimmedText.match(/^(\d+)-\d+$/);
+                    const isPureDigits = /^\d+$/.test(trimmedText);
+                    const isImovelId = config.enableLoginByImovelId && (isPureDigits || !!codigoLigacaoMatch);
+                    const imovelIdDigitado = codigoLigacaoMatch ? codigoLigacaoMatch[1] : trimmedText;
+                    if (!isImovelId && !isValidIdEletronico(trimmedText)) {
                         replies.push(messages.invalidIdEletronico);
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         return replies;
                     }
-                    // Mostra o ID inserido e pede confirmação
-                    replies.push(messages.idEletronicoInserido(trimmedText));
+                    // Mostra o dado inserido e pede confirmação
+                    replies.push(isImovelId
+                        ? `Código da ligação inserido: *${trimmedText}*`
+                        : messages.idEletronicoInserido(trimmedText));
                     replies.push({
                         type: 'buttons',
-                        text: 'Confirma que este é seu ID Eletrônico?',
+                        text: isImovelId ? 'Confirma que este é o código da sua ligação?' : 'Confirma que este é seu ID Eletrônico?',
                         buttons: [
                             { id: 'confirm_id_yes', text: '✅ Sim, confirmo' },
                             { id: 'confirm_id_no', text: '❌ Não, corrigir' }
@@ -462,31 +491,32 @@ export async function processMessage(config, phone, text, sessionStore) {
                     });
                     await sessionStore.save({
                         phone,
-                        state: { name: 'awaiting_confirm_id', idEletronico: trimmedText },
+                        state: { name: 'awaiting_confirm_id', idEletronico: isImovelId ? imovelIdDigitado : trimmedText, isImovelId },
                         updatedAt: now
                     });
                 }
                 catch (err) {
                     replies.push('Erro ao processar ID. Tente novamente.');
-                    replies.push(messages.askIdEletronico);
+                    replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                 }
                 return replies;
             }
             case 'awaiting_confirm_id': {
                 try {
                     const idEletronico = state?.idEletronico;
+                    const isImovelId = state?.isImovelId === true;
                     const confirmed = text === 'confirm_id_yes' || normalizedText === 'sim' || normalizedText === 'sim, correto';
                     const denied = text === 'confirm_id_no' || normalizedText === 'não' || normalizedText === 'nao' || normalizedText === 'não, corrigir' || normalizedText === 'nao, corrigir';
                     if (denied) {
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                         return replies;
                     }
                     if (!confirmed) {
-                        replies.push(messages.idEletronicoInserido(idEletronico));
+                        replies.push(isImovelId ? `Código da ligação inserido: *${idEletronico}*` : messages.idEletronicoInserido(idEletronico));
                         replies.push({
                             type: 'buttons',
-                            text: 'Confirma que este é seu ID Eletrônico?',
+                            text: isImovelId ? 'Confirma que este é o código da sua ligação?' : 'Confirma que este é seu ID Eletrônico?',
                             buttons: [
                                 { id: 'confirm_id_yes', text: '✅ Sim, confirmo' },
                                 { id: 'confirm_id_no', text: '❌ Não, corrigir' }
@@ -497,15 +527,26 @@ export async function processMessage(config, phone, text, sessionStore) {
                     }
                     // Faz login via API
                     try {
-                        const loginResult = await loginByIdEletronico(config, idEletronico);
+                        const loginResult = isImovelId
+                            ? await loginByImovelId(config, Number(idEletronico))
+                            : await loginByIdEletronico(config, idEletronico);
+                        if (!loginResult) {
+                            replies.push('Não encontramos nenhum imóvel com esse código. Verifique e tente novamente.');
+                            replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
+                            await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
+                            return replies;
+                        }
                         const ligacoes = imoveisToLigacoes(loginResult.imoveis);
                         if (ligacoes.length === 0) {
                             replies.push('Não encontramos imóveis vinculados a este ID Eletrônico.');
-                            replies.push(messages.askIdEletronico);
+                            replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                             await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                             return replies;
                         }
                         const imovelParaDesafio = ligacoes[0];
+                        // No login por ImovelID, "idEletronico" guarda o número do imóvel digitado, não
+                        // o ID Eletrônico real — usa o valor vindo da ligação (sempre correto) daqui pra frente.
+                        const resolvedIdEletronico = imovelParaDesafio.idEletronico || idEletronico;
                         // Dados base sempre disponíveis a partir do login
                         const dadosBase = {
                             Nome: loginResult.nomeCliente,
@@ -519,7 +560,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                             DescricaoServico: '',
                             Situacao: 0,
                             DescricaoSituacao: '',
-                            IDEletronico: idEletronico,
+                            IDEletronico: resolvedIdEletronico,
                             EnderecoCorrespondencia: '',
                             DCO: 0
                         };
@@ -567,18 +608,18 @@ export async function processMessage(config, phone, text, sessionStore) {
                         const emailCadastrado = dadosVerificacao.Email;
                         const temEmail = typeof emailCadastrado === 'string' && emailCadastrado.includes('@');
                         if (!temEmail) {
-                            console.warn(`[OTP] Email ausente ou inválido para ID ${idEletronico} (valor: ${emailCadastrado ?? 'null'}) — seguindo para desafio de identidade`);
+                            console.warn(`[OTP] Email ausente ou inválido para ID ${resolvedIdEletronico} (valor: ${emailCadastrado ?? 'null'}) — seguindo para desafio de identidade`);
                         }
                         if (temEmail) {
                             try {
-                                await createAndSendOtp(config, { phone, identifier: idEletronico, email: emailCadastrado });
+                                await createAndSendOtp(config, { phone, identifier: resolvedIdEletronico, email: emailCadastrado });
                                 replies.push('Para proteger seu atendimento, enviamos um código de verificação para o seu e-mail cadastrado. 🔒');
                                 replies.push('Digite o código de 6 dígitos recebido:');
                                 await sessionStore.save({
                                     phone,
                                     state: {
                                         name: 'awaiting_login_otp',
-                                        idEletronico,
+                                        idEletronico: resolvedIdEletronico,
                                         nomeCliente: loginResult.nomeCliente,
                                         imovelId: imovelParaDesafio.imovelId,
                                         ligacaoId: imovelParaDesafio.id,
@@ -607,7 +648,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                 phone,
                                 state: {
                                     name: 'awaiting_identity_verification',
-                                    idEletronico,
+                                    idEletronico: resolvedIdEletronico,
                                     nomeCliente: loginResult.nomeCliente,
                                     imovelId: imovelParaDesafio.imovelId,
                                     ligacaoId: imovelParaDesafio.id,
@@ -644,13 +685,13 @@ export async function processMessage(config, phone, text, sessionStore) {
                         else {
                             replies.push(`Erro ao validar ID Eletrônico: ${errorMessage}`);
                         }
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                     }
                 }
                 catch (err) {
                     replies.push('Erro ao processar. Tente novamente.');
-                    replies.push(messages.askIdEletronico);
+                    replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                     await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                 }
                 return replies;
@@ -1030,7 +1071,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                 try {
                     if (!isValidCpf(text)) {
                         replies.push(messages.invalidIdEletronico);
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         try {
                             await sessionStore.save({ phone, state: { name: 'awaiting_login_cpf' }, updatedAt: now });
                         }
@@ -1042,7 +1083,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                     const cpfDigits = onlyDigits(text);
                     if (!cpfDigits || cpfDigits.length !== 11) {
                         replies.push(messages.invalidIdEletronico);
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         break;
                     }
                     // Formata CPF para exibição: XXX.XXX.XXX-XX
@@ -1071,7 +1112,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                 }
                 catch (err) {
                     replies.push('Erro ao processar CPF. Por favor, tente novamente.');
-                    replies.push(messages.askIdEletronico);
+                    replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                 }
                 break;
             }
@@ -1083,7 +1124,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                     if (text === 'confirm_cpf_yes' || normalizedText === 'sim' || normalizedText === 's' || normalizedText === '1') {
                         if (!cpf || typeof cpf !== 'string' || cpf.length !== 11) {
                             replies.push('Erro: CPF não encontrado. Por favor, informe seu CPF novamente.');
-                            replies.push(messages.askIdEletronico);
+                            replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                             try {
                                 await sessionStore.save({ phone, state: { name: 'awaiting_login_cpf' }, updatedAt: now });
                             }
@@ -1311,7 +1352,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                     }
                     // Verifica confirmação negativa (botões, texto "não" ou número 2)
                     else if (text === 'confirm_cpf_no' || normalizedText === 'não' || normalizedText === 'nao' || normalizedText === 'n' || normalizedText === '2') {
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         try {
                             await sessionStore.save({ phone, state: { name: 'awaiting_login_cpf' }, updatedAt: now });
                         }
@@ -1343,7 +1384,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                 }
                 catch (err) {
                     replies.push('Erro ao processar confirmação. Por favor, informe seu CPF novamente.');
-                    replies.push(messages.askIdEletronico);
+                    replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                     try {
                         await sessionStore.save({ phone, state: { name: 'awaiting_login_cpf' }, updatedAt: now });
                     }
@@ -1363,7 +1404,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                     const cpf = state?.cpf;
                     if (!cpf || typeof cpf !== 'string' || cpf.length !== 11) {
                         replies.push('Erro: CPF não encontrado. Por favor, informe seu CPF novamente.');
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         try {
                             await sessionStore.save({ phone, state: { name: 'awaiting_login_cpf' }, updatedAt: now });
                         }
@@ -1404,7 +1445,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                         // Valida dados antes de enviar OTP
                         if (!cpf || typeof cpf !== 'string' || cpf.length !== 11) {
                             replies.push('Erro: CPF não encontrado. Por favor, informe seu CPF novamente.');
-                            replies.push(messages.askIdEletronico);
+                            replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                             try {
                                 await sessionStore.save({ phone, state: { name: 'awaiting_login_cpf' }, updatedAt: now });
                             }
@@ -1487,13 +1528,13 @@ export async function processMessage(config, phone, text, sessionStore) {
                     const identifier = isNewFlow ? idEletronico : cpf;
                     if (!identifier) {
                         replies.push('Erro: identificador não encontrado. Por favor, recomeçar o atendimento.');
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                         break;
                     }
                     if (!email || typeof email !== 'string' || !isValidEmail(email)) {
                         replies.push('Erro: E-mail não encontrado. Por favor, recomeçar o atendimento.');
-                        replies.push(messages.askIdEletronico);
+                        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                         await sessionStore.save({ phone, state: { name: 'awaiting_login_id' }, updatedAt: now });
                         break;
                     }
@@ -2051,7 +2092,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                 catch (err) {
                     // Fallback absoluto - sempre retorna uma resposta
                     replies.push(messages.welcome(config.entidadeNome));
-                    replies.push(messages.askIdEletronico);
+                    replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
                 }
             }
         }
@@ -2059,12 +2100,12 @@ export async function processMessage(config, phone, text, sessionStore) {
     catch (err) {
         // Tratamento de erro global - sempre retorna uma resposta
         replies.push('Desculpe, ocorreu um erro. Por favor, tente novamente.');
-        replies.push(messages.askIdEletronico);
+        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
     }
     // Garante que sempre retorna pelo menos uma resposta
     if (replies.length === 0) {
         replies.push('Por favor, informe seu CPF para continuar.');
-        replies.push(messages.askIdEletronico);
+        replies.push(messages.askIdEletronico(config.enableLoginByImovelId));
     }
     return replies;
 }

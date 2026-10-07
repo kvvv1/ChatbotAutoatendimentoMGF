@@ -12,7 +12,7 @@ export type IdentityChallengeState = {
 export type ConversationState =
   | { name: 'idle' }
   | { name: 'awaiting_login_id'; humanBypassAttempts?: number }
-  | { name: 'awaiting_confirm_id'; idEletronico: string }
+  | { name: 'awaiting_confirm_id'; idEletronico: string; isImovelId?: boolean }
   | { name: 'awaiting_login_cpf' }
   | { name: 'awaiting_confirm_cpf' ; cpf: string }
   | {

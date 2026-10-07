@@ -31,6 +31,15 @@ export class ZapiClient {
                 return 'audio/mp4';
             return 'audio/mpeg';
         }
+        if (kind === 'image') {
+            if (ext === '.png')
+                return 'image/png';
+            if (ext === '.webp')
+                return 'image/webp';
+            if (ext === '.gif')
+                return 'image/gif';
+            return 'image/jpeg';
+        }
         if (ext === '.mp4')
             return 'video/mp4';
         if (ext === '.mov')
@@ -226,6 +235,24 @@ export class ZapiClient {
         if (!res.ok) {
             const text = await res.text().catch(() => '');
             throw new Error(`Falha ao enviar vídeo: ${res.status} ${text}`);
+        }
+    }
+    async sendImage(params) {
+        const image = await this.resolveMediaInput(params.image, 'image');
+        const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-image`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: this.authHeaders(),
+            body: JSON.stringify({
+                phone: params.phone,
+                image,
+                caption: params.caption,
+                viewOnce: params.viewOnce ?? false
+            })
+        });
+        if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            throw new Error(`Falha ao enviar imagem: ${res.status} ${text}`);
         }
     }
     async sendAudio(params) {

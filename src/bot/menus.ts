@@ -12,7 +12,9 @@ export function mainMenu(): string {
 
 export const messages = {
   welcome: (entidadeNome: string) => `Olá!  Sou o autoatendimento do ${entidadeNome}. Para iniciar seu atendimento, vamos validar suas informações.`,
-  askIdEletronico: 'Informe seu *ID Eletrônico* (encontrado na sua conta de água).',
+  askIdEletronico: (allowImovelId?: boolean) => allowImovelId
+    ? 'Informe seu *ID Eletrônico* ou o *código da sua ligação* (encontrados na sua conta de água).\n\n⚠️ Caso opte por usar o código da ligação, digite *somente os números antes do traço* (não inclua o dígito depois do traço).'
+    : 'Informe seu *ID Eletrônico* (encontrado na sua conta de água).',
   // askCpf: 'Informe seu CPF (apenas números).', // COMENTADO: Não é mais usado, login é por ID Eletrônico
   invalidIdEletronico: 'ID Eletrônico inválido ou não encontrado. Verifique e tente novamente.',
   // invalidCpf: 'CPF inválido. Tente novamente (somente números, 11 dígitos).', // COMENTADO

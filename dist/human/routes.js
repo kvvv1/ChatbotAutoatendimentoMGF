@@ -325,6 +325,66 @@ export async function registerHumanRoutes(app, config) {
         publishHumanEvent({ type: 'message', phone: ticket.phone, at: new Date().toISOString() });
         return { ok: true };
     });
+    // Enviar arquivo (imagem, vídeo, áudio ou documento) ao usuário a partir do painel humano
+    app.post('/api/human-tickets/:id/send-file', async (request, reply) => {
+        const paramsSchema = z.object({ id: z.string().uuid() });
+        const bodySchema = z.object({
+            type: z.enum(['image', 'video', 'audio', 'document']),
+            data: z.string().min(1), // data URI base64: data:<mime>;base64,<conteudo>
+            fileName: z.string().optional(),
+            caption: z.string().optional(),
+            attendant: z.string().trim().min(1).optional()
+        });
+        const paramsParse = paramsSchema.safeParse(request.params);
+        if (!paramsParse.success) {
+            return reply.code(400).send({ error: 'invalid_id' });
+        }
+        const bodyParse = bodySchema.safeParse(request.body);
+        if (!bodyParse.success) {
+            return reply.code(400).send({ error: 'invalid_body' });
+        }
+        const ticket = await getHumanTicketById(config, paramsParse.data.id);
+        if (!ticket) {
+            return reply.code(404).send({ error: 'ticket_not_found' });
+        }
+        const phone = ticket.phone;
+        const { type, data, fileName, caption } = bodyParse.data;
+        let logContent;
+        try {
+            if (type === 'image') {
+                await zapi.sendImage({ phone, image: data, caption });
+                logContent = { type: 'image', image: data, caption, fileName };
+            }
+            else if (type === 'video') {
+                await zapi.sendVideo({ phone, video: data, caption });
+                logContent = { type: 'video', video: data, caption, fileName };
+            }
+            else if (type === 'audio') {
+                await zapi.sendAudio({ phone, audio: data });
+                logContent = { type: 'audio', audioUrl: data, caption, fileName };
+            }
+            else {
+                const extension = (fileName?.split('.').pop() || 'pdf').toLowerCase();
+                await zapi.sendDocument({ phone, document: data, fileName, extension, caption });
+                logContent = { type: 'document', document: data, caption, fileName };
+            }
+            await logMessage(config, { phone, direction: 'out', content: JSON.stringify(logContent) });
+        }
+        catch (err) {
+            request.log.error({ err, phone, type }, 'Erro ao enviar arquivo do atendente');
+            return reply.code(500).send({ error: 'send_failed' });
+        }
+        if (ticket.status === 'pendente') {
+            await updateHumanTicketStatus(config, ticket.id, 'em_atendimento');
+        }
+        const verifiedAttendantName = request.attendant?.nome;
+        const attendantName = verifiedAttendantName || bodyParse.data.attendant;
+        if (!ticket.assigned_attendant && attendantName) {
+            await updateHumanTicketAssignee(config, ticket.id, attendantName);
+        }
+        publishHumanEvent({ type: 'message', phone: ticket.phone, at: new Date().toISOString() });
+        return { ok: true };
+    });
     // Listar anotacoes internas do ticket
     app.get('/api/human-tickets/:id/notes', async (request, reply) => {
         const paramsSchema = z.object({ id: z.string().uuid() });

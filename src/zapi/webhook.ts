@@ -540,6 +540,15 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
                 viewOnce: videoOut.viewOnce
               });
               try { await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) }); } catch {}
+            } else if ((out as any).type === 'image') {
+              const imageOut = out as any;
+              if (!imageOut.image) continue;
+              await zapi.sendImage({
+                phone,
+                image: imageOut.image,
+                caption: imageOut.caption
+              });
+              try { await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) }); } catch {}
             } else if ((out as any).type === 'audio') {
               const audioOut = out as any;
               if (!audioOut.audioUrl) continue;

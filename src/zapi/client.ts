@@ -32,7 +32,7 @@ export class ZapiClient {
     return headers;
   }
 
-  private guessMimeType(filePath: string, kind: 'audio' | 'video'): string {
+  private guessMimeType(filePath: string, kind: 'audio' | 'video' | 'image'): string {
     const ext = path.extname(filePath).toLowerCase();
     if (kind === 'audio') {
       if (ext === '.mp3') return 'audio/mpeg';
@@ -42,6 +42,13 @@ export class ZapiClient {
       return 'audio/mpeg';
     }
 
+    if (kind === 'image') {
+      if (ext === '.png') return 'image/png';
+      if (ext === '.webp') return 'image/webp';
+      if (ext === '.gif') return 'image/gif';
+      return 'image/jpeg';
+    }
+
     if (ext === '.mp4') return 'video/mp4';
     if (ext === '.mov') return 'video/quicktime';
     if (ext === '.webm') return 'video/webm';
@@ -49,7 +56,7 @@ export class ZapiClient {
     return 'video/mp4';
   }
 
-  private async resolveMediaInput(input: string, kind: 'audio' | 'video'): Promise<string> {
+  private async resolveMediaInput(input: string, kind: 'audio' | 'video' | 'image'): Promise<string> {
     const value = String(input || '').trim();
     if (!value) return value;
 
@@ -279,6 +286,30 @@ export class ZapiClient {
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new Error(`Falha ao enviar vídeo: ${res.status} ${text}`);
+    }
+  }
+
+  async sendImage(params: {
+    phone: string;
+    image: string; // URL ou caminho local ou base64 com prefixo data:image/png;base64,
+    caption?: string;
+    viewOnce?: boolean;
+  }): Promise<void> {
+    const image = await this.resolveMediaInput(params.image, 'image');
+    const url = `${this.baseUrl}/instances/${this.instanceId}/token/${this.token}/send-image`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: JSON.stringify({
+        phone: params.phone,
+        image,
+        caption: params.caption,
+        viewOnce: params.viewOnce ?? false
+      })
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Falha ao enviar imagem: ${res.status} ${text}`);
     }
   }
 

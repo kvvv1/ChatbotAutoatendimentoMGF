@@ -533,6 +533,20 @@ export async function registerZapiRoutes(app, config) {
                                 }
                                 catch { }
                             }
+                            else if (out.type === 'image') {
+                                const imageOut = out;
+                                if (!imageOut.image)
+                                    continue;
+                                await zapi.sendImage({
+                                    phone,
+                                    image: imageOut.image,
+                                    caption: imageOut.caption
+                                });
+                                try {
+                                    await logMessage(config, { phone, direction: 'out', content: JSON.stringify(out) });
+                                }
+                                catch { }
+                            }
                             else if (out.type === 'audio') {
                                 const audioOut = out;
                                 if (!audioOut.audioUrl)

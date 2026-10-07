@@ -23,11 +23,21 @@ const messageInputEl = document.getElementById('message-input');
 const sendButtonEl = document.getElementById('send-button');
 const toastRegionEl = document.getElementById('toast-region');
 const qrTriggerBtn = document.getElementById('quick-replies-btn');
+const attachButtonEl = document.getElementById('attach-button');
+const fileInputEl = document.getElementById('file-input');
+const filePreviewBarEl = document.getElementById('file-preview-bar');
+const filePreviewThumbEl = document.getElementById('file-preview-thumb');
+const filePreviewNameEl = document.getElementById('file-preview-name');
+const filePreviewCaptionEl = document.getElementById('file-preview-caption');
+const filePreviewCancelEl = document.getElementById('file-preview-cancel');
+const filePreviewSendEl = document.getElementById('file-preview-send');
 
 let currentTicket = null;
 let ticketsCache = [];
 let isLoadingTickets = false;
 let isSending = false;
+let selectedFile = null;
+let isSendingFile = false;
 let isSavingNote = false;
 let isNotesPanelOpen = false;
 let currentMessages = [];
@@ -757,6 +767,8 @@ function resetConversationPanel(subtitle) {
   messageInputEl.value = '';
   sendButtonEl.disabled = true;
   if (qrTriggerBtn) qrTriggerBtn.disabled = true;
+  if (attachButtonEl) attachButtonEl.disabled = true;
+  cancelFilePreview();
 
   markActiveTicket();
   setProfileOpen(false);
@@ -787,6 +799,7 @@ function applyCurrentTicketHeader() {
   messageInputEl.disabled = false;
   sendButtonEl.disabled = false;
   if (qrTriggerBtn) qrTriggerBtn.disabled = false;
+  if (attachButtonEl) attachButtonEl.disabled = false;
 }
 
 function renderCurrentConversation(force = false) {
@@ -1292,6 +1305,126 @@ async function addInternalNote() {
   }
 }
 
+const FILE_SIZE_LIMIT_BYTES = 16 * 1024 * 1024; // 16MB — limite prático de mídia do WhatsApp
+
+function detectFileKind(file) {
+  const mime = (file.type || '').toLowerCase();
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  return 'document';
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Falha ao ler arquivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function openFilePicker() {
+  if (!currentTicket || fileInputEl.disabled) return;
+  fileInputEl.click();
+}
+
+function onFileSelected() {
+  const file = fileInputEl.files && fileInputEl.files[0];
+  if (!file) return;
+  if (file.size > FILE_SIZE_LIMIT_BYTES) {
+    showToast('Arquivo muito grande (limite de 16MB).', 'error');
+    fileInputEl.value = '';
+    return;
+  }
+  selectedFile = file;
+  renderFilePreview(file);
+}
+
+function renderFilePreview(file) {
+  const kind = detectFileKind(file);
+  filePreviewNameEl.textContent = file.name;
+  filePreviewCaptionEl.value = '';
+  filePreviewThumbEl.innerHTML = '';
+
+  if (kind === 'image') {
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    filePreviewThumbEl.appendChild(img);
+  } else if (kind === 'video') {
+    filePreviewThumbEl.textContent = '🎥';
+  } else if (kind === 'audio') {
+    filePreviewThumbEl.textContent = '🎵';
+  } else {
+    filePreviewThumbEl.textContent = '📄';
+  }
+
+  filePreviewBarEl.classList.remove('hidden');
+}
+
+function cancelFilePreview() {
+  selectedFile = null;
+  fileInputEl.value = '';
+  filePreviewBarEl.classList.add('hidden');
+  filePreviewThumbEl.innerHTML = '';
+  filePreviewNameEl.textContent = '';
+  filePreviewCaptionEl.value = '';
+}
+
+async function sendSelectedFile() {
+  if (!currentTicket || !selectedFile || isSendingFile) return;
+
+  const file = selectedFile;
+  const kind = detectFileKind(file);
+  const caption = filePreviewCaptionEl.value.trim();
+
+  isSendingFile = true;
+  filePreviewSendEl.disabled = true;
+
+  const optimisticContent = { type: kind, caption: caption || undefined, fileName: file.name };
+  const previewUrl = URL.createObjectURL(file);
+  if (kind === 'image') optimisticContent.image = previewUrl;
+  else if (kind === 'video') optimisticContent.video = previewUrl;
+  else if (kind === 'audio') optimisticContent.audioUrl = previewUrl;
+  else optimisticContent.document = previewUrl;
+
+  const optimistic = {
+    id: 'tmp-' + String(Date.now()),
+    phone: currentTicket.phone,
+    direction: 'out',
+    content: JSON.stringify(optimisticContent),
+    created_at: new Date().toISOString()
+  };
+  pendingOutgoing.push(optimistic);
+  cancelFilePreview();
+  renderCurrentConversation();
+
+  try {
+    const data = await readFileAsDataUrl(file);
+    await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/send-file'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: kind, data, fileName: file.name, caption: caption || undefined, attendant: getAttendantName() }),
+      retries: 0,
+      timeoutMs: 60000
+    });
+    pendingOutgoing = pendingOutgoing.filter((m) => m.id !== optimistic.id);
+    await Promise.all([
+      refreshCurrentTicket(),
+      loadTickets({ silent: true })
+    ]);
+    showToast('Arquivo enviado.', 'success');
+  } catch (err) {
+    console.error(err);
+    pendingOutgoing = pendingOutgoing.filter((m) => m.id !== optimistic.id);
+    renderCurrentConversation(true);
+    showToast('Nao foi possivel enviar o arquivo: ' + normalizeError(err), 'error');
+  } finally {
+    isSendingFile = false;
+    filePreviewSendEl.disabled = false;
+  }
+}
+
 async function sendMessage() {
   if (!currentTicket || isSending) return;
 
@@ -1439,6 +1572,10 @@ if (chatProfileCloseEl) {
 }
 addNoteButtonEl.addEventListener('click', addInternalNote);
 sendButtonEl.addEventListener('click', sendMessage);
+if (attachButtonEl) attachButtonEl.addEventListener('click', openFilePicker);
+if (fileInputEl) fileInputEl.addEventListener('change', onFileSelected);
+if (filePreviewCancelEl) filePreviewCancelEl.addEventListener('click', cancelFilePreview);
+if (filePreviewSendEl) filePreviewSendEl.addEventListener('click', sendSelectedFile);
 window.addEventListener('keydown', handleGlobalShortcuts);
 window.addEventListener('resize', () => {
   if (!isMobileLayout()) closeConversationOnMobile();

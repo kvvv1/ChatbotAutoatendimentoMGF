@@ -73,6 +73,9 @@ export type AppConfig = {
   humanHandoffCallEnabled: boolean;
   humanHandoffCallPhone?: string;
   humanHandoffCallMessage?: string;
+  // Login também por ImovelID (só dígitos), além do ID Eletrônico — por entidade
+  enableLoginByImovelId: boolean;
+  imagemAjudaCodigoLigacao?: string;
   // Chave compartilhada exigida nas rotas /api/* do painel (ver src/security/apiAuth.ts)
   apiSecret?: string;
   // Segredo pra assinar o token de login dos atendentes (ver src/human/auth.ts)
@@ -162,6 +165,8 @@ export function loadConfig(): AppConfig {
     HUMAN_HANDOFF_CALL_ENABLED,
     HUMAN_HANDOFF_CALL_PHONE,
     HUMAN_HANDOFF_CALL_MESSAGE,
+    HABILITAR_LOGIN_POR_IMOVEL,
+    IMAGEM_AJUDA_CODIGO_LIGACAO,
     API_SECRET,
     ATTENDANT_AUTH_SECRET,
     WHATSAPP_PROVIDER,
@@ -249,6 +254,8 @@ export function loadConfig(): AppConfig {
     humanHandoffCallEnabled: HUMAN_HANDOFF_CALL_ENABLED === 'true',
     humanHandoffCallPhone: HUMAN_HANDOFF_CALL_PHONE || undefined,
     humanHandoffCallMessage: HUMAN_HANDOFF_CALL_MESSAGE || undefined,
+    enableLoginByImovelId: HABILITAR_LOGIN_POR_IMOVEL === 'true',
+    imagemAjudaCodigoLigacao: IMAGEM_AJUDA_CODIGO_LIGACAO || undefined,
     apiSecret: API_SECRET || undefined,
     attendantAuthSecret: ATTENDANT_AUTH_SECRET || API_SECRET || undefined,
     whatsappProvider: WHATSAPP_PROVIDER === 'meta' ? 'meta' : 'zapi',

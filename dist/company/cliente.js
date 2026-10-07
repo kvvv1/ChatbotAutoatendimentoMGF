@@ -1,5 +1,5 @@
 import { fetch } from 'undici';
-import { linkLogin, isLinkApiConfigured } from './linkApi.js';
+import { linkLogin, linkGetDadosCadastrais, isLinkApiConfigured } from './linkApi.js';
 function onlyDigits(value) {
     try {
         if (typeof value !== 'string')
@@ -43,6 +43,32 @@ export async function loginByIdEletronico(config, idEletronico) {
         nomeCliente: raw.Cliente ?? raw.cliente ?? raw.NomeCliente ?? '',
         imoveis,
         imovelSelecionado: raw.ImovelSelecionado ?? raw.imovelSelecionado ?? 0,
+    };
+}
+/**
+ * Login "por ImovelID" — usa /Dados-Cadastrais diretamente (não passa por /login-default),
+ * pra entidades que ativaram ENABLE_LOGIN_BY_IMOVEL_ID e cujo cliente pode digitar o
+ * número do imóvel em vez do ID Eletrônico. Devolve o mesmo formato de loginByIdEletronico
+ * pra reaproveitar o restante do fluxo de login sem duplicar lógica.
+ */
+export async function loginByImovelId(config, imovelId) {
+    if (!isLinkApiConfigured(config)) {
+        throw new Error('Link API não configurada (LINK_API_BASE_URL e LINK_API_TOKEN ausentes)');
+    }
+    const dados = await linkGetDadosCadastrais(config, imovelId);
+    if (!dados || !dados.Nome) {
+        return null;
+    }
+    const imovel = {
+        ImovelID: imovelId,
+        DV: 0,
+        IdEletronico: dados.IDEletronico ?? '',
+        Endereco: dados.Endereco ?? ''
+    };
+    return {
+        nomeCliente: dados.Nome,
+        imoveis: [imovel],
+        imovelSelecionado: imovelId
     };
 }
 /**

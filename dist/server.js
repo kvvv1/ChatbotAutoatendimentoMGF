@@ -22,7 +22,9 @@ async function bootstrap() {
             transport: process.env.NODE_ENV === 'production' ? undefined : {
                 target: 'pino-pretty'
             }
-        }
+        },
+        // Padrão do Fastify é 1MB — pequeno demais pro envio de arquivos em base64 pelo painel
+        bodyLimit: 25 * 1024 * 1024
     });
     await app.register(fastifyCors, { origin: true });
     // Exige API_SECRET (se configurado) para acessar as rotas de dados do painel

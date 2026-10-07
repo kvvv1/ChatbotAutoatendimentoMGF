@@ -106,6 +106,16 @@
         <div class="chat-empty">Escolha uma conversa na coluna da esquerda.</div>
       </div>
 
+      <div id="file-preview-bar" class="file-preview-bar hidden">
+        <div id="file-preview-thumb" class="file-preview-thumb"></div>
+        <div id="file-preview-info" class="file-preview-info">
+          <div id="file-preview-name" class="file-preview-name"></div>
+          <input id="file-preview-caption" type="text" placeholder="Adicionar legenda (opcional)" autocomplete="off" />
+        </div>
+        <button id="file-preview-cancel" class="file-preview-btn" title="Cancelar">✕</button>
+        <button id="file-preview-send" class="file-preview-btn file-preview-send" title="Enviar arquivo">➤</button>
+      </div>
+
       <footer class="chat-input">
         <div class="qr-wrapper">
           <button id="quick-replies-btn" class="qr-trigger-btn" title="Respostas rápidas (ou digite /)" disabled>⚡</button>
@@ -118,6 +128,8 @@
             <div id="qr-empty" class="qr-empty hidden">Nenhuma resposta encontrada.</div>
           </div>
         </div>
+        <button id="attach-button" class="attach-btn" title="Anexar arquivo" disabled>📎</button>
+        <input type="file" id="file-input" accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" hidden />
         <textarea id="message-input" placeholder="Digite uma mensagem ou / para respostas rápidas" disabled></textarea>
         <button id="send-button" disabled>Enviar</button>
       </footer>
