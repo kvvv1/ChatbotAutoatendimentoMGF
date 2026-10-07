@@ -20,6 +20,7 @@ import {
 } from '../supabase/humanTickets.js';
 import { logMessage } from '../supabase/messages.js';
 import { fetchClienteByCpf, loginByIdEletronico } from '../company/cliente.js';
+import { linkGetOperadores, isLinkApiConfigured } from '../company/linkApi.js';
 import { fetchLigacoesByCpf } from '../company/ligacoes.js';
 import { fetchDadosCadastraisByImovelId, fetchDadosCadastraisByLigacao } from '../company/cadastro.js';
 import { publishHumanEvent, subscribeHumanEvents } from './events.js';
@@ -77,7 +78,7 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
   // Listagem de tickets (JSON)
   app.get('/api/human-tickets', async (request: FastifyRequest, reply: FastifyReply) => {
     const querySchema = z
-      .object({ status: statusSchema.optional() })
+      .object({ status: statusSchema.optional(), attendant: z.string().trim().min(1).optional() })
       .partial();
 
     const parse = querySchema.safeParse(request.query);
@@ -86,8 +87,25 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
     }
 
     const status = parse.data.status;
-    const tickets = await listHumanTickets(config, { status: status as HumanTicketStatus | 'abertos' | undefined });
+    const tickets = await listHumanTickets(config, {
+      status: status as HumanTicketStatus | 'abertos' | undefined,
+      attendant: parse.data.attendant
+    });
     return { data: tickets };
+  });
+
+  // Lista operadores cadastrados na API Link — usado pro filtro e transferência no painel
+  app.get('/api/human-tickets/operadores', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!isLinkApiConfigured(config)) {
+      return { data: [] };
+    }
+    try {
+      const operadores = await linkGetOperadores(config);
+      return { data: operadores };
+    } catch (err) {
+      request.log.error({ err }, 'Erro ao buscar operadores na API Link');
+      return reply.code(502).send({ error: 'operadores_unavailable' });
+    }
   });
 
   // Detalhe de ticket + mensagens (JSON)

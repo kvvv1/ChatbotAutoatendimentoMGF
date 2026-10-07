@@ -98,6 +98,13 @@ export type LinkHomeResponse = {
   TotalDebitos: number;
 };
 
+/** Operador retornado pelo POST /Operadores */
+export type LinkOperador = {
+  id: number;
+  nome: string;
+  email: string | null;
+};
+
 // ============================================================================
 // CLIENTE HTTP
 // ============================================================================
@@ -396,6 +403,27 @@ export async function linkImpressaoConta(
     console.error('[linkApi] Erro na Impressao-Conta:', error);
     return null;
   }
+}
+
+// Cache em memória pra não bater na API toda vez que o painel abrir o filtro/transferência
+let cachedOperadores: LinkOperador[] | null = null;
+let operadoresCacheTimestamp = 0;
+const OPERADORES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+/**
+ * Busca a lista de operadores cadastrados na autarquia
+ * POST /Operadores
+ */
+export async function linkGetOperadores(config: AppConfig): Promise<LinkOperador[]> {
+  const now = Date.now();
+  if (cachedOperadores && (now - operadoresCacheTimestamp) < OPERADORES_CACHE_TTL_MS) {
+    return cachedOperadores;
+  }
+
+  const result = await linkPost<LinkOperador[]>(config, '/Operadores', {});
+  cachedOperadores = Array.isArray(result) ? result : [];
+  operadoresCacheTimestamp = now;
+  return cachedOperadores;
 }
 
 /**

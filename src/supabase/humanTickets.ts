@@ -194,29 +194,32 @@ function mediaFromContent(content: string): { type: UserMediaItem['type']; label
 
 export async function listHumanTickets(
   config: AppConfig,
-  params?: { status?: HumanTicketStatus | 'abertos' }
+  params?: { status?: HumanTicketStatus | 'abertos'; attendant?: string }
 ): Promise<HumanTicketListItem[]> {
   try {
     const pool = getDb(config);
 
-    let tickets: HumanTicket[];
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+
     if (params?.status === 'abertos') {
-      const [rows] = await pool.query<RowDataPacket[]>(
-        `SELECT * FROM human_tickets WHERE status IN ('pendente', 'em_atendimento') ORDER BY created_at DESC`
-      );
-      tickets = rows as unknown as HumanTicket[];
+      conditions.push(`status IN ('pendente', 'em_atendimento')`);
     } else if (params?.status) {
-      const [rows] = await pool.query<RowDataPacket[]>(
-        'SELECT * FROM human_tickets WHERE status = ? ORDER BY created_at DESC',
-        [params.status]
-      );
-      tickets = rows as unknown as HumanTicket[];
-    } else {
-      const [rows] = await pool.query<RowDataPacket[]>(
-        'SELECT * FROM human_tickets ORDER BY created_at DESC'
-      );
-      tickets = rows as unknown as HumanTicket[];
+      conditions.push('status = ?');
+      values.push(params.status);
     }
+
+    if (params?.attendant) {
+      conditions.push('assigned_attendant = ?');
+      values.push(params.attendant);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT * FROM human_tickets ${whereClause} ORDER BY created_at DESC`,
+      values
+    );
+    const tickets = rows as unknown as HumanTicket[];
 
     if (tickets.length === 0) return [];
 

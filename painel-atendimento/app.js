@@ -1,5 +1,6 @@
 ﻿const appShellEl = document.querySelector('.app-shell');
 const statusFilterEl = document.getElementById('filter-status');
+const operatorFilterEl = document.getElementById('filter-operador');
 const searchConversationEl = document.getElementById('search-conversation');
 const ticketsListEl = document.getElementById('tickets-list');
 const chatTitleEl = document.getElementById('chat-title');
@@ -31,6 +32,13 @@ const filePreviewNameEl = document.getElementById('file-preview-name');
 const filePreviewCaptionEl = document.getElementById('file-preview-caption');
 const filePreviewCancelEl = document.getElementById('file-preview-cancel');
 const filePreviewSendEl = document.getElementById('file-preview-send');
+const transferPopoverEl = document.getElementById('transfer-popover');
+const transferSearchEl = document.getElementById('transfer-search');
+const transferListEl = document.getElementById('transfer-list');
+const transferEmptyEl = document.getElementById('transfer-empty');
+
+let operatorsCache = [];
+let operatorsLoaded = false;
 
 let currentTicket = null;
 let ticketsCache = [];
@@ -689,7 +697,11 @@ async function loadTickets(options = {}) {
   ticketsLoadPromise = (async () => {
     try {
       const status = statusFilterEl.value;
-      const qs = status ? ('?status=' + encodeURIComponent(status)) : '';
+      const attendant = operatorFilterEl ? operatorFilterEl.value : '';
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      if (attendant) params.set('attendant', attendant);
+      const qs = params.toString() ? ('?' + params.toString()) : '';
       const json = await fetchJson(apiUrl('/human-tickets' + qs), { retries: 1 });
       if (seq !== ticketsLoadSeq) return;
 
@@ -768,6 +780,8 @@ function resetConversationPanel(subtitle) {
   sendButtonEl.disabled = true;
   if (qrTriggerBtn) qrTriggerBtn.disabled = true;
   if (attachButtonEl) attachButtonEl.disabled = true;
+  if (transferButtonEl) transferButtonEl.disabled = true;
+  closeTransferPopover();
   cancelFilePreview();
 
   markActiveTicket();
@@ -800,6 +814,7 @@ function applyCurrentTicketHeader() {
   sendButtonEl.disabled = false;
   if (qrTriggerBtn) qrTriggerBtn.disabled = false;
   if (attachButtonEl) attachButtonEl.disabled = false;
+  if (transferButtonEl) transferButtonEl.disabled = false;
 }
 
 function renderCurrentConversation(force = false) {
@@ -1217,32 +1232,85 @@ async function changeTicketStatus() {
   }
 }
 
-async function transferTicket() {
+async function loadOperators(force = false) {
+  if (operatorsLoaded && !force) return operatorsCache;
+  try {
+    const json = await fetchJson(apiUrl('/human-tickets/operadores'), { retries: 1 });
+    operatorsCache = Array.isArray(json.data) ? json.data : [];
+    operatorsLoaded = true;
+    renderOperatorFilterOptions();
+  } catch (err) {
+    console.error(err);
+  }
+  return operatorsCache;
+}
+
+function renderOperatorFilterOptions() {
+  if (!operatorFilterEl) return;
+  const current = operatorFilterEl.value;
+  const rows = operatorsCache.map((op) => `<option value="${escapeHtml(op.nome)}">${escapeHtml(op.nome)}</option>`);
+  operatorFilterEl.innerHTML = '<option value="">Todos os operadores</option>' + rows.join('');
+  if (current && operatorsCache.some((op) => op.nome === current)) {
+    operatorFilterEl.value = current;
+  }
+}
+
+function renderTransferList(filter = '') {
+  if (!transferListEl) return;
+  const f = filter.toLowerCase().trim();
+  const filtered = f
+    ? operatorsCache.filter((op) => op.nome.toLowerCase().includes(f) || (op.email || '').toLowerCase().includes(f))
+    : operatorsCache;
+
+  transferListEl.innerHTML = '';
+  if (!filtered.length) {
+    transferEmptyEl?.classList.remove('hidden');
+    return;
+  }
+  transferEmptyEl?.classList.add('hidden');
+  filtered.forEach((op) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<div class="qr-titulo">${escapeHtml(op.nome)}</div><div class="qr-preview">${escapeHtml(op.email || 'sem e-mail')}</div>`;
+    li.addEventListener('click', () => assignTransferTarget(op.nome));
+    transferListEl.appendChild(li);
+  });
+}
+
+function openTransferPopover() {
+  if (!currentTicket || !transferButtonEl || transferButtonEl.disabled || !transferPopoverEl) return;
+  loadOperators().then(() => {
+    renderTransferList('');
+    if (transferSearchEl) transferSearchEl.value = '';
+    transferPopoverEl.classList.remove('hidden');
+    transferSearchEl?.focus();
+  });
+}
+
+function closeTransferPopover() {
+  transferPopoverEl?.classList.add('hidden');
+}
+
+async function assignTransferTarget(nome) {
   if (!currentTicket) return;
-
-  if (!transferButtonEl) return;
-  const currentAssignee = getResponsibleName(currentTicket);
-  const target = window.prompt('Transferir para qual atendente?', currentAssignee);
-  if (!target || !target.trim()) return;
-
-  setButtonBusy(transferButtonEl, true, 'Transferir', 'Transferindo...');
+  closeTransferPopover();
+  transferButtonEl.disabled = true;
 
   try {
     const json = await fetchJson(apiUrl('/human-tickets/' + encodeURIComponent(currentTicket.id) + '/assignee'), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assignedAttendant: target.trim() }),
+      body: JSON.stringify({ assignedAttendant: nome }),
       retries: 1
     });
     currentTicket = json.ticket;
     chatAttendantEl.textContent = 'Atendente responsavel: ' + getResponsibleName(currentTicket);
     await loadTickets({ silent: true });
-    showToast('Conversa transferida para ' + target.trim() + '.', 'success');
+    showToast('Conversa transferida para ' + nome + '.', 'success');
   } catch (err) {
     console.error(err);
     showToast('Nao foi possivel transferir: ' + normalizeError(err), 'error');
   } finally {
-    setButtonBusy(transferButtonEl, false, 'Transferir', 'Transferindo...');
+    transferButtonEl.disabled = false;
   }
 }
 
@@ -1540,9 +1608,36 @@ if (logoutButtonEl && window.APP_CONFIG?.attendantAuthEnabled) {
 statusFilterEl.addEventListener('change', async () => {
   await loadTickets({ silent: false });
 });
+if (operatorFilterEl) {
+  operatorFilterEl.addEventListener('change', async () => {
+    await loadTickets({ silent: false });
+  });
+}
 searchConversationEl.addEventListener('input', renderTicketList);
 ticketStatusEl.addEventListener('change', changeTicketStatus);
-if (transferButtonEl) transferButtonEl.addEventListener('click', transferTicket);
+if (transferButtonEl) {
+  transferButtonEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (transferPopoverEl && !transferPopoverEl.classList.contains('hidden')) {
+      closeTransferPopover();
+    } else {
+      openTransferPopover();
+    }
+  });
+}
+if (transferSearchEl) {
+  transferSearchEl.addEventListener('input', () => renderTransferList(transferSearchEl.value));
+}
+document.addEventListener('click', (e) => {
+  if (
+    transferPopoverEl &&
+    !transferPopoverEl.classList.contains('hidden') &&
+    !transferPopoverEl.contains(e.target) &&
+    e.target !== transferButtonEl
+  ) {
+    closeTransferPopover();
+  }
+});
 if (closeButtonEl) closeButtonEl.addEventListener('click', closeTicketOneClick);
 if (notesToggleButtonEl) {
   notesToggleButtonEl.addEventListener('click', () => {
@@ -1598,6 +1693,7 @@ messageInputEl.addEventListener('keydown', (ev) => {
 resetConversationPanel('Nenhuma conversa ativa');
 setNotesPanelOpen(false);
 loadTickets({ silent: false });
+loadOperators();
 showToast('Painel pronto.', 'info');
 isBootstrapped = true;
 

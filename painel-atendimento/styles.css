@@ -75,30 +75,50 @@ body {
 }
 
 .sidebar-controls {
-  padding: 14px 16px;
+  padding: 12px 16px 14px;
   border-bottom: 1px solid var(--line);
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .sidebar-controls label {
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--text-soft);
   font-weight: 600;
+  margin-top: 4px;
 }
+.sidebar-controls label:first-child { margin-top: 0; }
 
 .sidebar-controls select,
 .sidebar-controls input,
 .chat-status select {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
   color: var(--text-strong);
-  padding: 9px 10px;
+  padding: 7px 10px;
   font-size: 13px;
+  transition: border-color 0.15s;
+}
+
+.sidebar-controls select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667781' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 15px;
+  padding-right: 28px;
+}
+
+.sidebar-controls select:focus,
+.sidebar-controls input:focus,
+.chat-status select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 #panel-conversations {
@@ -369,6 +389,34 @@ body {
 .notes-toggle-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* ── Transferência de atendimento ─────────────────────────── */
+.transfer-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+#transfer-button svg {
+  fill: none;
+  width: 15px;
+  height: 15px;
+}
+
+.transfer-popover {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: auto;
+  right: 0;
+  width: 260px;
+}
+
+@media (max-width: 720px) {
+  .transfer-popover {
+    width: 240px;
+    right: -40px;
+  }
 }
 
 .chat-messages {
@@ -878,36 +926,36 @@ body {
   align-items: center;
 }
 
-.qr-trigger-btn {
+.chat-input .qr-trigger-btn,
+.chat-input .attach-btn {
   border: 0;
   background: transparent;
-  font-size: 20px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 8px;
+  border-radius: 9px;
   line-height: 1;
   color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.15s, color 0.15s;
   align-self: center;
 }
-.qr-trigger-btn:hover:not(:disabled) { background: #e2e8ed; color: var(--accent); }
-.qr-trigger-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ── Anexo de arquivo ─────────────────────────────────────── */
-.attach-btn {
-  border: 0;
-  background: transparent;
-  font-size: 20px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 8px;
-  line-height: 1;
-  color: var(--text-soft);
-  transition: background 0.15s, color 0.15s;
-  align-self: center;
+.chat-input .qr-trigger-btn svg,
+.chat-input .attach-btn svg {
+  width: 17px;
+  height: 17px;
+  display: block;
 }
-.attach-btn:hover:not(:disabled) { background: #e2e8ed; color: var(--accent); }
-.attach-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.chat-input .qr-trigger-btn:hover:not(:disabled),
+.chat-input .attach-btn:hover:not(:disabled) {
+  background: rgba(0, 168, 132, 0.12);
+  color: var(--accent-dark);
+}
+.chat-input .qr-trigger-btn:disabled,
+.chat-input .attach-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .file-preview-bar {
   border-top: 1px solid var(--line);
