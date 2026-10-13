@@ -92,6 +92,7 @@ function buildCpfChallenge(cpf: string): IdentityChallengeState {
   ]);
   return {
     question: 'Selecione os 4 últimos dígitos do seu CPF:',
+    field: 'cpf',
     options,
     correctId: 'ident_correct',
   };
@@ -107,6 +108,7 @@ function buildPhoneChallenge(phone: string): IdentityChallengeState {
   ]);
   return {
     question: 'Selecione os 4 últimos dígitos do seu telefone:',
+    field: 'phone',
     options,
     correctId: 'ident_correct',
   };
@@ -136,6 +138,7 @@ function buildEmailChallenge(email: string): IdentityChallengeState {
   ]);
   return {
     question: 'Selecione o seu e-mail cadastrado:',
+    field: 'email',
     options,
     correctId: 'ident_correct',
   };
@@ -152,6 +155,7 @@ function buildBairroChallenge(bairro: string): IdentityChallengeState {
   ]);
   return {
     question: 'Selecione o bairro do seu imóvel:',
+    field: 'bairro',
     options,
     correctId: 'ident_correct',
   };
@@ -170,6 +174,7 @@ function buildNomeChallenge(nomeCompleto: string): IdentityChallengeState {
   ]);
   return {
     question: 'Selecione o primeiro nome do titular do cadastro:',
+    field: 'nome',
     options,
     correctId: 'ident_correct',
   };

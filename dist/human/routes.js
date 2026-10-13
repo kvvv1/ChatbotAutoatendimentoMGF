@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isSeteLagoas } from '../config.js';
 import { ZapiClient } from '../zapi/client.js';
 import { listHumanTickets, getHumanTicketById, getMessagesByPhone, updateHumanTicketStatus, updateHumanTicketAssignee, updateHumanTicketCustomerName, listHumanTicketNotes, addHumanTicketNote, getCustomerByPhone, listLigacoesByCustomerId, listUserMediaByPhone } from '../supabase/humanTickets.js';
 import { logMessage } from '../supabase/messages.js';
 import { fetchClienteByCpf, loginByIdEletronico } from '../company/cliente.js';
+import { linkGetOperadores, isLinkApiConfigured } from '../company/linkApi.js';
 import { fetchLigacoesByCpf } from '../company/ligacoes.js';
 import { fetchDadosCadastraisByImovelId, fetchDadosCadastraisByLigacao } from '../company/cadastro.js';
 import { publishHumanEvent, subscribeHumanEvents } from './events.js';
@@ -51,15 +53,32 @@ export async function registerHumanRoutes(app, config) {
     // Listagem de tickets (JSON)
     app.get('/api/human-tickets', async (request, reply) => {
         const querySchema = z
-            .object({ status: statusSchema.optional() })
+            .object({ status: statusSchema.optional(), attendant: z.string().trim().min(1).optional() })
             .partial();
         const parse = querySchema.safeParse(request.query);
         if (!parse.success) {
             return reply.code(400).send({ error: 'invalid_query' });
         }
         const status = parse.data.status;
-        const tickets = await listHumanTickets(config, { status: status });
+        const tickets = await listHumanTickets(config, {
+            status: status,
+            attendant: parse.data.attendant
+        });
         return { data: tickets };
+    });
+    // Lista operadores cadastrados na API Link — usado pro filtro e transferência no painel
+    app.get('/api/human-tickets/operadores', async (request, reply) => {
+        if (!isLinkApiConfigured(config)) {
+            return { data: [] };
+        }
+        try {
+            const operadores = await linkGetOperadores(config);
+            return { data: operadores };
+        }
+        catch (err) {
+            request.log.error({ err }, 'Erro ao buscar operadores na API Link');
+            return reply.code(502).send({ error: 'operadores_unavailable' });
+        }
     });
     // Detalhe de ticket + mensagens (JSON)
     app.get('/api/human-tickets/:id', async (request, reply) => {
@@ -432,6 +451,7 @@ export async function registerHumanRoutes(app, config) {
     // ── Feature flags ─────────────────────────────────────────────────────────
     app.get('/api/features', async () => ({
         enableContacts: config.enableContacts ?? false,
+        enhancedConversationSearch: isSeteLagoas(config),
     }));
     // ── Agenda de Contatos (apenas quando ENABLE_CONTACTS=true) ───────────────
     const { randomUUID } = await import('node:crypto');

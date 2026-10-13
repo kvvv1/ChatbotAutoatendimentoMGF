@@ -6,6 +6,7 @@ dotenvConfig({ path: 'docs/.env', override: false });
 
 export type AppConfig = {
   port: number;
+  municipio?: string;
   entidadeNome: string;
   entidadeNomeCompleto: string;
   dbHost: string;
@@ -69,6 +70,9 @@ export type AppConfig = {
   businessHoursEnd: string;
   businessDayStart: number;
   businessDayEnd: number;
+  businessSaturdayEnabled?: boolean;
+  businessSaturdayStart?: string;
+  businessSaturdayEnd?: string;
   // "Falar com atendente" via ligação em vez de ticket (só ativa se configurado — por entidade)
   humanHandoffCallEnabled: boolean;
   humanHandoffCallPhone?: string;
@@ -99,6 +103,7 @@ export type AppConfig = {
 export function loadConfig(): AppConfig {
   const {
     PORT,
+    MUNICIPIO,
     DB_SERVER,
     DB_PORT,
     DB_USER,
@@ -162,6 +167,9 @@ export function loadConfig(): AppConfig {
     BUSINESS_HOURS_END,
     BUSINESS_DAY_START,
     BUSINESS_DAY_END,
+    BUSINESS_SATURDAY_ENABLED,
+    BUSINESS_SATURDAY_START,
+    BUSINESS_SATURDAY_END,
     HUMAN_HANDOFF_CALL_ENABLED,
     HUMAN_HANDOFF_CALL_PHONE,
     HUMAN_HANDOFF_CALL_MESSAGE,
@@ -186,8 +194,34 @@ export function loadConfig(): AppConfig {
   if (!ZAPI_INSTANCE_ID) throw new Error('ZAPI_INSTANCE_ID não configurado');
   if (!ZAPI_TOKEN) throw new Error('ZAPI_TOKEN não configurado');
 
+  const municipio = MUNICIPIO?.trim().toLowerCase();
+  const seteLagoas = municipio === 'sete-lagoas';
+  const businessHoursStart = BUSINESS_HOURS_START || '08:00';
+  const businessHoursEnd = BUSINESS_HOURS_END || (seteLagoas ? '16:30' : '18:00');
+  const businessDayStart = seteLagoas ? Number(BUSINESS_DAY_START || 1) : Number(BUSINESS_DAY_START) || 1;
+  const businessDayEnd = seteLagoas ? Number(BUSINESS_DAY_END || 5) : Number(BUSINESS_DAY_END) || 5;
+  const saturdayEnabled = BUSINESS_SATURDAY_ENABLED?.trim().toLowerCase();
+  const businessSaturdayEnabled = seteLagoas && saturdayEnabled !== 'false';
+  const businessSaturdayStart = BUSINESS_SATURDAY_START || '07:00';
+  const businessSaturdayEnd = BUSINESS_SATURDAY_END || '18:30';
+
+  if (seteLagoas) {
+    if (saturdayEnabled && saturdayEnabled !== 'true' && saturdayEnabled !== 'false') {
+      throw new Error('BUSINESS_SATURDAY_ENABLED deve ser true ou false');
+    }
+    if (!Number.isInteger(businessDayStart) || !Number.isInteger(businessDayEnd)
+      || businessDayStart < 1 || businessDayEnd > 5 || businessDayEnd < businessDayStart) {
+      throw new Error('BUSINESS_DAY_START e BUSINESS_DAY_END de Sete Lagoas devem formar um intervalo de 1 (segunda) a 5 (sexta)');
+    }
+    validateBusinessHours('BUSINESS_HOURS', businessHoursStart, businessHoursEnd);
+    if (businessSaturdayEnabled) {
+      validateBusinessHours('BUSINESS_SATURDAY', businessSaturdayStart, businessSaturdayEnd);
+    }
+  }
+
   return {
     port: Number(PORT ?? 3000),
+    municipio,
     dbHost: DB_SERVER,
     dbPort: Number(DB_PORT ?? 3306),
     dbUser: DB_USER,
@@ -247,10 +281,13 @@ export function loadConfig(): AppConfig {
     entidadeNome: ENTIDADE_NOME || 'SAAE',
     entidadeNomeCompleto: ENTIDADE_NOME_COMPLETO || ENTIDADE_NOME || 'SAAE',
     enableContacts: ENABLE_CONTACTS === 'true',
-    businessHoursStart: BUSINESS_HOURS_START || '08:00',
-    businessHoursEnd: BUSINESS_HOURS_END || '18:00',
-    businessDayStart: Number(BUSINESS_DAY_START) || 1,
-    businessDayEnd: Number(BUSINESS_DAY_END) || 5,
+    businessHoursStart,
+    businessHoursEnd,
+    businessDayStart,
+    businessDayEnd,
+    businessSaturdayEnabled,
+    businessSaturdayStart,
+    businessSaturdayEnd,
     humanHandoffCallEnabled: HUMAN_HANDOFF_CALL_ENABLED === 'true',
     humanHandoffCallPhone: HUMAN_HANDOFF_CALL_PHONE || undefined,
     humanHandoffCallMessage: HUMAN_HANDOFF_CALL_MESSAGE || undefined,
@@ -266,5 +303,16 @@ export function loadConfig(): AppConfig {
     metaVerifyToken: META_VERIFY_TOKEN || undefined,
     metaApiVersion: META_API_VERSION || undefined,
   };
+}
+
+export function isSeteLagoas(config: AppConfig): boolean {
+  return config.municipio?.trim().toLowerCase() === 'sete-lagoas';
+}
+
+function validateBusinessHours(prefix: string, start: string, end: string): void {
+  const format = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  if (!format.test(start) || !format.test(end) || end <= start) {
+    throw new Error(`${prefix}_START e ${prefix}_END devem usar HH:MM, com início anterior ao fim`);
+  }
 }
 

@@ -1,4 +1,4 @@
-export function mainMenu(): string {
+export function mainMenu(enableFinishSession = false): string {
   const lines: string[] = [];
   lines.push('Toque na opção desejada:');
   lines.push('1️⃣ Vídeo orientativo');
@@ -6,6 +6,7 @@ export function mainMenu(): string {
   lines.push('3️⃣ Histórico de consumo e leituras');
   lines.push('4️⃣ Emissão de 2ª via');
   lines.push('5️⃣ Localização para atendimento presencial');
+  if (enableFinishSession) lines.push('6️⃣ Finalizar sessão');
   lines.push('0️⃣ Falar com atendente');
   return lines.join('\n');
 }
@@ -24,6 +25,7 @@ export const messages = {
   otpAccepted: 'Verificação concluída com sucesso ✅',
   requireLogin: 'Você precisa estar logado para acessar esta opção.',
   requireLigacao: 'Selecione uma ligação primeiro.',
+  identityCpfFailed: 'Por segurança e em respeito à Lei Geral de Proteção de Dados (LGPD), não foi possível validar sua identidade. Solicitamos que entre em contato através do nosso canal de atendimento SAC: 115.',
   videoIntro: '🎬 *Vídeo de teste*\n\nO vídeo orientativo oficial está em produção. Enquanto isso, segue um vídeo demonstrativo:',
   videoUnavailable: 'O vídeo orientativo está indisponível no momento. Tente novamente mais tarde.',
   humanContact: 'Encaminhando para atendimento humano. Em breve um atendente entrará em contato.',

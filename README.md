@@ -45,6 +45,31 @@ Observacoes:
 - Cada `.env.*` precisa ter `PORT` diferente para evitar conflito.
 - O `container_name` ja usa `MUNICIPIO`, entao cada instancia fica identificada por municipio.
 
+### Funcionalidades exclusivas de Sete Lagoas
+
+Configure `MUNICIPIO=sete-lagoas` no arquivo de ambiente da instância para habilitar:
+
+- Reabertura do último atendimento finalizado como `pendente` quando o cliente enviar uma nova mensagem, sem prazo mínimo. O ticket, o histórico e o responsável são preservados. Atendimentos cancelados não são reabertos, e o bot permanece silenciado enquanto há atendimento humano ativo.
+- Opção `6️⃣ Finalizar sessão` no menu, que limpa a identificação e o imóvel selecionado e solicita uma nova identificação.
+- Orientação sobre proteção de dados (LGPD) e contato com o SAC 115 no primeiro erro da confirmação dos últimos dígitos do CPF, encerrando essa validação.
+- Atendimento humano parametrizado por ambiente, com padrão de segunda a sexta, das 08:00 às 16:30, e aos sábados, das 07:00 às 18:30, no fuso `America/Sao_Paulo`. Domingo permanece fechado. A mensagem de horário é gerada pela mesma configuração.
+- Busca de conversas em destaque no painel (ACC-5333), por nome sem distinção de acentos ou por telefone com ou sem formatação, DDD, código 55 e nono dígito. O telefone aparece formatado nos resultados. A opção “Buscar em todas as conversas” remove os filtros de status e operador, preservando o texto pesquisado.
+
+Instâncias com outro `MUNICIPIO`, ou sem essa variável, mantêm os fluxos anteriores. A reabertura se aplica às mensagens recebidas nos webhooks Z-API, Meta e Evolution; não registra uma nova rota de Evolution no servidor.
+
+Validação local: `npm test` executa testes de fluxo e de rotas com persistência simulada, sem enviar mensagens reais; `npm run build` compila o projeto.
+
+O modelo sem credenciais em `deploy/sete-lagoas.env.example` contém as variáveis de horário. Acrescente esses valores ao `.env` completo já usado pelo container no servidor. `BUSINESS_SATURDAY_ENABLED=false` desabilita os sábados. O `.env` operacional não é enviado ao GitHub nem incorporado à imagem.
+
+O workflow `docker-build.yml` valida os testes, compila e publica a imagem em pushes para `formiga` e `main`. Além de `latest`, cada publicação gera a tag `sha-<commit completo>`. Para atualizar apenas Sete Lagoas, configure `CHATBOT_IMAGE=registry.digitalocean.com/gestcom/chatbot:sha-<commit>` no ambiente dessa instância.
+
+Após ajustar o `.env`, recrie o container para carregar os valores novos. No servidor, usando o nome de arquivo e projeto já existentes:
+
+```bash
+ENV_FILE=.env.sete-lagoas docker compose --env-file .env.sete-lagoas --project-name chatbot-sete-lagoas pull
+ENV_FILE=.env.sete-lagoas docker compose --env-file .env.sete-lagoas --project-name chatbot-sete-lagoas up -d --force-recreate
+```
+
 ### Netlify por instancia
 - O painel agora gera `painel-atendimento/config.js` no build com `PANEL_API_BASE_URL`.
 - Em cada site Netlify (um por municipio), configure:

@@ -249,6 +249,24 @@ export async function linkImpressaoConta(config, imovelId, boletoIds) {
         return null;
     }
 }
+// Cache em memória pra não bater na API toda vez que o painel abrir o filtro/transferência
+let cachedOperadores = null;
+let operadoresCacheTimestamp = 0;
+const OPERADORES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+/**
+ * Busca a lista de operadores cadastrados na autarquia
+ * POST /Operadores
+ */
+export async function linkGetOperadores(config) {
+    const now = Date.now();
+    if (cachedOperadores && (now - operadoresCacheTimestamp) < OPERADORES_CACHE_TTL_MS) {
+        return cachedOperadores;
+    }
+    const result = await linkPost(config, '/Operadores', {});
+    cachedOperadores = Array.isArray(result) ? result : [];
+    operadoresCacheTimestamp = now;
+    return cachedOperadores;
+}
 /**
  * Verifica se a API Link está configurada e disponível
  */

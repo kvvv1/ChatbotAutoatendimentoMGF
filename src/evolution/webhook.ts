@@ -1,13 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { AppConfig } from '../config.js';
+import { isSeteLagoas, type AppConfig } from '../config.js';
 import { EvolutionClient } from './client.js';
 import { MemorySessionStore } from '../state/memorySessionStore.js';
 import { logAudit } from '../supabase/audit.js';
-import { hasActiveHumanTicket, logMessage } from '../supabase/messages.js';
+import { logMessage } from '../supabase/messages.js';
 import { ensureOpenHumanTicket } from '../supabase/humanTickets.js';
 import { processMessage } from '../bot/flow.js';
 import { publishHumanEvent } from '../human/events.js';
+import { routeIncomingHumanMessage } from '../human/incoming.js';
 
 const evolutionWebhookSchema = z.object({
   event: z.string().optional(),
@@ -113,6 +114,7 @@ export async function registerEvolutionRoutes(app: FastifyInstance, config: AppC
       }
       function mapTitleToCommand(title: string): string | undefined {
         const t = normalize(title);
+        if (isSeteLagoas(config) && t.includes('finalizar sessao')) return '6';
         if (t.includes('@')) return undefined;
         if (/^\d+/.test(t)) {
           const m = t.match(/^(\d+)/);
@@ -184,9 +186,19 @@ export async function registerEvolutionRoutes(app: FastifyInstance, config: AppC
         return;
       }
 
+      const mediaContent = extractMediaContent();
+      const providerId = key?.id;
+      const dedupeKey = providerId ? String(providerId) : `${phone}:${simpleHash(text || mediaContent || mediaPlaceholder)}:${data?.messageTimestamp ?? ''}`;
+      const recent = getRecentSet(phone);
+      if (isSeteLagoas(config)) {
+        if (!text && !mediaContent && !messageType) return;
+        sweepOldIds(phone);
+        if (recent.has(dedupeKey)) return;
+        recent.set(dedupeKey, Date.now());
+      }
+
       await logAudit(config, { whatsappPhone: phone, action: 'message_received', payload: { payload } });
 
-      const mediaContent = extractMediaContent();
       const displayContent = mediaContent || selectedDisplayText?.trim() || textRaw?.trim() || text || mediaPlaceholder;
       try {
         await logMessage(config, { phone, direction: 'in', content: displayContent });
@@ -201,7 +213,7 @@ export async function registerEvolutionRoutes(app: FastifyInstance, config: AppC
       }
 
       try {
-        if (await hasActiveHumanTicket(config, phone)) {
+        if (await routeIncomingHumanMessage(config, phone)) {
           request.log.info({ phone }, 'Atendimento humano ativo. Bot silenciado.');
           return;
         }
@@ -223,15 +235,14 @@ export async function registerEvolutionRoutes(app: FastifyInstance, config: AppC
       }
 
       // Idempotência / dedupe
-      const providerId = key?.id;
-      const dedupeKey = providerId ? String(providerId) : `${phone}:${simpleHash(text)}:${data?.messageTimestamp ?? ''}`;
-      const recent = getRecentSet(phone);
-      sweepOldIds(phone);
-      if (recent.has(dedupeKey)) {
-        request.log.info({ phone, dedupeKey }, 'Duplicata detectada; ignorando.');
-        return;
+      if (!isSeteLagoas(config)) {
+        sweepOldIds(phone);
+        if (recent.has(dedupeKey)) {
+          request.log.info({ phone, dedupeKey }, 'Duplicata detectada; ignorando.');
+          return;
+        }
+        recent.set(dedupeKey, Date.now());
       }
-      recent.set(dedupeKey, Date.now());
 
       if (!userQueues.has(phone)) userQueues.set(phone, []);
       userQueues.get(phone)!.push(text);

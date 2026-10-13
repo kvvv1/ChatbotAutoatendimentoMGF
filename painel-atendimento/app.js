@@ -2,6 +2,11 @@
 const statusFilterEl = document.getElementById('filter-status');
 const operatorFilterEl = document.getElementById('filter-operador');
 const searchConversationEl = document.getElementById('search-conversation');
+const conversationSearchEl = document.getElementById('conversation-search');
+const clearConversationSearchEl = document.getElementById('clear-conversation-search');
+const searchHelpEl = document.getElementById('conversation-search-help');
+const searchResultsEl = document.getElementById('conversation-search-results');
+const searchAllConversationsEl = document.getElementById('search-all-conversations');
 const ticketsListEl = document.getElementById('tickets-list');
 const chatTitleEl = document.getElementById('chat-title');
 const chatSubtitleEl = document.getElementById('chat-subtitle');
@@ -39,6 +44,7 @@ const transferEmptyEl = document.getElementById('transfer-empty');
 
 let operatorsCache = [];
 let operatorsLoaded = false;
+let enhancedConversationSearch = false;
 
 let currentTicket = null;
 let ticketsCache = [];
@@ -570,6 +576,7 @@ function formatPhoneDisplay(phone) {
 function getTicketPhone(ticket) {
   const raw = typeof ticket?.phone === 'string' ? ticket.phone.trim() : '';
   if (!raw) return 'Sem telefone';
+  if (enhancedConversationSearch) return window.ConversationSearch.formatPhone(raw);
   return formatPhoneDisplay(raw);
 }
 
@@ -591,7 +598,40 @@ function getResponsibleName(ticket) {
   return getAttendantName();
 }
 
+async function initializeConversationSearch() {
+  try {
+    const features = await fetchJson(apiUrl('/features'), { retries: 1 });
+    if (!features.enhancedConversationSearch || !window.ConversationSearch || !conversationSearchEl) return;
+    enhancedConversationSearch = true;
+    conversationSearchEl.classList.add('enhanced-search');
+    conversationSearchEl.parentElement.prepend(conversationSearchEl);
+    conversationSearchEl.querySelector('label').textContent = 'Buscar por nome ou telefone';
+    conversationSearchEl.querySelector('.conversation-search-icon').classList.remove('hidden');
+    searchConversationEl.placeholder = 'Ex.: José ou (31) 99999-9999';
+    searchConversationEl.setAttribute('aria-describedby', 'conversation-search-help conversation-search-results');
+    searchHelpEl.classList.remove('hidden');
+    searchResultsEl.classList.remove('hidden');
+    renderTicketList();
+  } catch (err) {
+    console.warn('Não foi possível carregar as opções de busca do painel.', err);
+  }
+}
+
+function updateConversationSearch(count) {
+  if (!enhancedConversationSearch) return;
+  const hasQuery = Boolean(searchConversationEl.value.trim());
+  const hasFilters = Boolean(statusFilterEl.value || operatorFilterEl?.value);
+  clearConversationSearchEl.classList.toggle('hidden', !hasQuery);
+  searchAllConversationsEl.classList.toggle('hidden', !hasQuery || !hasFilters);
+  const result = count === 1 ? '1 conversa encontrada' : `${count} conversas encontradas`;
+  const summary = hasFilters ? `${result} nos filtros selecionados.` : `${result} em todos os status e operadores.`;
+  if (searchResultsEl.textContent !== summary) searchResultsEl.textContent = summary;
+}
+
 function applySearchFilter(tickets) {
+  if (enhancedConversationSearch) {
+    return tickets.filter(ticket => window.ConversationSearch.matches(ticket, searchConversationEl.value));
+  }
   const q = (searchConversationEl.value || '').trim().toLowerCase();
   if (!q) return tickets;
 
@@ -604,9 +644,15 @@ function applySearchFilter(tickets) {
 
 function renderTicketList() {
   const visibleTickets = applySearchFilter(ticketsCache);
+  updateConversationSearch(visibleTickets.length);
 
   if (!visibleTickets.length) {
     ticketsListEl.innerHTML = '<div class="chat-empty">Nenhuma conversa encontrada para o filtro/busca.</div>';
+    if (enhancedConversationSearch) {
+      ticketsListEl.firstElementChild.textContent = searchConversationEl.value.trim()
+        ? 'Nenhuma conversa encontrada. Confira o nome ou telefone e os filtros selecionados.'
+        : 'Nenhuma conversa nos filtros selecionados.';
+    }
     if (currentTicket) {
       const hasCurrent = ticketsCache.some((t) => t.id === currentTicket.id);
       if (!hasCurrent) {
@@ -638,6 +684,12 @@ function renderTicketList() {
     main.appendChild(phone);
     main.appendChild(time);
 
+    const number = document.createElement('div');
+    if (enhancedConversationSearch) {
+      number.className = 'ticket-number';
+      number.textContent = getTicketPhone(t);
+    }
+
     const meta = document.createElement('div');
     meta.className = 'ticket-meta';
 
@@ -668,6 +720,7 @@ function renderTicketList() {
     foot.textContent = ticketCode(t.id);
 
     div.appendChild(main);
+    if (enhancedConversationSearch) div.appendChild(number);
     div.appendChild(meta);
     div.appendChild(foot);
 
@@ -708,7 +761,7 @@ async function loadTickets(options = {}) {
       ticketsCache = Array.isArray(json.data) ? json.data : [];
       consecutiveLoadErrors = 0;
 
-      if (!ticketsCache.length) {
+      if (!ticketsCache.length && !enhancedConversationSearch) {
         ticketsListEl.innerHTML = '<div class="chat-empty">Nenhuma conversa encontrada para este filtro.</div>';
         if (currentTicket) {
           currentTicket = null;
@@ -1614,6 +1667,30 @@ if (operatorFilterEl) {
   });
 }
 searchConversationEl.addEventListener('input', renderTicketList);
+searchConversationEl.addEventListener('search', renderTicketList);
+clearConversationSearchEl?.addEventListener('click', () => {
+  searchConversationEl.value = '';
+  renderTicketList();
+  searchConversationEl.focus();
+});
+searchConversationEl.addEventListener('keydown', (event) => {
+  if (enhancedConversationSearch && event.key === 'Escape') {
+    event.preventDefault();
+    searchConversationEl.value = '';
+    renderTicketList();
+  }
+});
+searchAllConversationsEl?.addEventListener('click', async () => {
+  statusFilterEl.value = '';
+  if (operatorFilterEl) operatorFilterEl.value = '';
+  searchAllConversationsEl.disabled = true;
+  try {
+    await loadTickets({ silent: false });
+  } finally {
+    searchAllConversationsEl.disabled = false;
+    searchConversationEl.focus();
+  }
+});
 ticketStatusEl.addEventListener('change', changeTicketStatus);
 if (transferButtonEl) {
   transferButtonEl.addEventListener('click', (e) => {
@@ -1692,6 +1769,7 @@ messageInputEl.addEventListener('keydown', (ev) => {
 
 resetConversationPanel('Nenhuma conversa ativa');
 setNotesPanelOpen(false);
+initializeConversationSearch();
 loadTickets({ silent: false });
 loadOperators();
 showToast('Painel pronto.', 'info');

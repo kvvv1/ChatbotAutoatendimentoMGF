@@ -9,6 +9,7 @@
     "admin:dev": "tsx watch src/admin/server.ts",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test tests/*.test.ts",
     "build:panel-config": "node scripts/generate-panel-config.mjs",
     "build:netlify": "npm run build:panel-config",
     "reset-sessions": "tsx src/scripts/reset-sessions.ts",

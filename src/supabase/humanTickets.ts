@@ -1,6 +1,6 @@
 ﻿import { randomUUID } from 'node:crypto';
-import type { RowDataPacket } from 'mysql2/promise';
-import type { AppConfig } from '../config.js';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { isSeteLagoas, type AppConfig } from '../config.js';
 import { getDb } from './client.js';
 
 export type HumanTicketStatus = 'pendente' | 'em_atendimento' | 'finalizado' | 'cancelado';
@@ -425,6 +425,52 @@ export async function updateHumanTicketStatus(
   } catch (err) {
     logDbError('updateHumanTicketStatus', err);
     return null;
+  }
+}
+
+/** Reabre o último atendimento finalizado, sem criar outro ticket ou perder o histórico. */
+export async function reopenFinalizedHumanTicket(
+  config: AppConfig,
+  phone: string
+): Promise<HumanTicket | null> {
+  if (!isSeteLagoas(config)) return null;
+
+  const connection = await getDb(config).getConnection();
+  try {
+    await connection.beginTransaction();
+    // Bloqueia os atendimentos deste telefone para duas mensagens simultâneas
+    // não reabrirem tickets diferentes nem concorrerem com a finalização.
+    const [rows] = await connection.query<RowDataPacket[]>(
+      'SELECT * FROM human_tickets WHERE phone = ? ORDER BY created_at DESC, id DESC FOR UPDATE',
+      [phone]
+    );
+    const tickets = rows as unknown as HumanTicket[];
+    const latest = tickets[0];
+    const hasActive = tickets.some(t => t.status === 'pendente' || t.status === 'em_atendimento');
+    if (hasActive || latest?.status !== 'finalizado') {
+      await connection.commit();
+      return null;
+    }
+
+    const [result] = await connection.query<ResultSetHeader>(
+      "UPDATE human_tickets SET status = 'pendente', updated_at = NOW(6) WHERE id = ? AND status = 'finalizado'",
+      [latest.id]
+    );
+    if (result.affectedRows !== 1) {
+      await connection.commit();
+      return null;
+    }
+    const [updated] = await connection.query<RowDataPacket[]>(
+      'SELECT * FROM human_tickets WHERE id = ? LIMIT 1',
+      [latest.id]
+    );
+    await connection.commit();
+    return (updated[0] as unknown as HumanTicket) ?? null;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
   }
 }
 

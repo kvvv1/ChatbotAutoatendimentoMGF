@@ -1,3 +1,4 @@
+import { isSeteLagoas } from '../config.js';
 const WEEKDAY_NAMES = ['', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'];
 const ISO_WEEKDAY_BY_SHORT_NAME = {
     Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7
@@ -25,6 +26,16 @@ function timeToMinutes(hhmm) {
 }
 export function isWithinBusinessHours(config, date = new Date()) {
     const { isoWeekday, minutesSinceMidnight } = nowInBrasilia(date);
+    if (isSeteLagoas(config)) {
+        if (isoWeekday === 7)
+            return false;
+        if (isoWeekday === 6) {
+            if (!config.businessSaturdayEnabled || !config.businessSaturdayStart || !config.businessSaturdayEnd)
+                return false;
+            return minutesSinceMidnight >= timeToMinutes(config.businessSaturdayStart)
+                && minutesSinceMidnight < timeToMinutes(config.businessSaturdayEnd);
+        }
+    }
     if (isoWeekday < config.businessDayStart || isoWeekday > config.businessDayEnd)
         return false;
     const start = timeToMinutes(config.businessHoursStart);
@@ -35,5 +46,11 @@ export function businessHoursMessage(config) {
     const dayRange = config.businessDayStart === config.businessDayEnd
         ? WEEKDAY_NAMES[config.businessDayStart]
         : `${WEEKDAY_NAMES[config.businessDayStart]} a ${WEEKDAY_NAMES[config.businessDayEnd]}`;
+    if (isSeteLagoas(config)) {
+        const weekdays = config.businessDayStart === 1 && config.businessDayEnd === 5 ? 'segunda a sexta-feira' : dayRange;
+        const saturday = config.businessSaturdayEnabled && config.businessSaturdayStart && config.businessSaturdayEnd
+            ? `, e aos *sábados*, das *${config.businessSaturdayStart}* às *${config.businessSaturdayEnd}*` : '';
+        return `⏰ Nosso atendimento humano funciona de *${weekdays}*, das *${config.businessHoursStart}* às *${config.businessHoursEnd}*${saturday}.\n\nFora desse horário não conseguimos te transferir para um atendente agora, mas você pode continuar usando as outras opções do menu normalmente.`;
+    }
     return `⏰ Nosso atendimento humano funciona de *${dayRange}*, das *${config.businessHoursStart}* às *${config.businessHoursEnd}*.\n\nFora desse horário não conseguimos te transferir para um atendente agora, mas você pode continuar usando as outras opções do menu normalmente.`;
 }

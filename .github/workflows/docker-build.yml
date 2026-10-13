@@ -14,6 +14,18 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
 
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Validar testes e compilação
+        run: |
+          npm ci
+          npm test
+          npm run build
+
       - name: Login no registry da DigitalOcean
         uses: docker/login-action@v3
         with:
@@ -27,4 +39,6 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: registry.digitalocean.com/gestcom/chatbot:latest
+          tags: |
+            registry.digitalocean.com/gestcom/chatbot:latest
+            registry.digitalocean.com/gestcom/chatbot:sha-${{ github.sha }}

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isSeteLagoas } from '../config.js';
 import { getDb } from './client.js';
 function logDbError(scope, error) {
     try {
@@ -152,19 +153,22 @@ function mediaFromContent(content) {
 export async function listHumanTickets(config, params) {
     try {
         const pool = getDb(config);
-        let tickets;
+        const conditions = [];
+        const values = [];
         if (params?.status === 'abertos') {
-            const [rows] = await pool.query(`SELECT * FROM human_tickets WHERE status IN ('pendente', 'em_atendimento') ORDER BY created_at DESC`);
-            tickets = rows;
+            conditions.push(`status IN ('pendente', 'em_atendimento')`);
         }
         else if (params?.status) {
-            const [rows] = await pool.query('SELECT * FROM human_tickets WHERE status = ? ORDER BY created_at DESC', [params.status]);
-            tickets = rows;
+            conditions.push('status = ?');
+            values.push(params.status);
         }
-        else {
-            const [rows] = await pool.query('SELECT * FROM human_tickets ORDER BY created_at DESC');
-            tickets = rows;
+        if (params?.attendant) {
+            conditions.push('assigned_attendant = ?');
+            values.push(params.attendant);
         }
+        const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        const [rows] = await pool.query(`SELECT * FROM human_tickets ${whereClause} ORDER BY created_at DESC`, values);
+        const tickets = rows;
         if (tickets.length === 0)
             return [];
         const phones = [...new Set(tickets.map((t) => t.phone).filter(Boolean))];
@@ -337,6 +341,40 @@ export async function updateHumanTicketStatus(config, id, status) {
     catch (err) {
         logDbError('updateHumanTicketStatus', err);
         return null;
+    }
+}
+/** Reabre o último atendimento finalizado, sem criar outro ticket ou perder o histórico. */
+export async function reopenFinalizedHumanTicket(config, phone) {
+    if (!isSeteLagoas(config))
+        return null;
+    const connection = await getDb(config).getConnection();
+    try {
+        await connection.beginTransaction();
+        // Bloqueia os atendimentos deste telefone para duas mensagens simultâneas
+        // não reabrirem tickets diferentes nem concorrerem com a finalização.
+        const [rows] = await connection.query('SELECT * FROM human_tickets WHERE phone = ? ORDER BY created_at DESC, id DESC FOR UPDATE', [phone]);
+        const tickets = rows;
+        const latest = tickets[0];
+        const hasActive = tickets.some(t => t.status === 'pendente' || t.status === 'em_atendimento');
+        if (hasActive || latest?.status !== 'finalizado') {
+            await connection.commit();
+            return null;
+        }
+        const [result] = await connection.query("UPDATE human_tickets SET status = 'pendente', updated_at = NOW(6) WHERE id = ? AND status = 'finalizado'", [latest.id]);
+        if (result.affectedRows !== 1) {
+            await connection.commit();
+            return null;
+        }
+        const [updated] = await connection.query('SELECT * FROM human_tickets WHERE id = ? LIMIT 1', [latest.id]);
+        await connection.commit();
+        return updated[0] ?? null;
+    }
+    catch (err) {
+        await connection.rollback();
+        throw err;
+    }
+    finally {
+        connection.release();
     }
 }
 export async function ensureOpenHumanTicket(config, phone, customerName) {

@@ -4,6 +4,7 @@ export type ChallengeOption = {
 };
 
 export type IdentityChallengeState = {
+  field?: 'cpf' | 'phone' | 'email' | 'bairro' | 'nome';
   question: string;
   options: ChallengeOption[];
   correctId: string;

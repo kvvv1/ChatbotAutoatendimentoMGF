@@ -3,6 +3,7 @@ import { z } from 'zod';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AppConfig } from '../config.js';
+import { isSeteLagoas } from '../config.js';
 import { ZapiClient } from '../zapi/client.js';
 import {
   listHumanTickets,
@@ -540,6 +541,7 @@ export async function registerHumanRoutes(app: FastifyInstance, config: AppConfi
   // ── Feature flags ─────────────────────────────────────────────────────────
   app.get('/api/features', async () => ({
     enableContacts: config.enableContacts ?? false,
+    enhancedConversationSearch: isSeteLagoas(config),
   }));
 
   // ── Agenda de Contatos (apenas quando ENABLE_CONTACTS=true) ───────────────

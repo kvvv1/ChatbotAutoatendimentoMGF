@@ -3,9 +3,10 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config.js';
 import { MetaClient } from './client.js';
 import { MemorySessionStore } from '../state/memorySessionStore.js';
-import { hasActiveHumanTicket, logMessage } from '../supabase/messages.js';
+import { logMessage } from '../supabase/messages.js';
 import { processMessage } from '../bot/flow.js';
 import { publishHumanEvent } from '../human/events.js';
+import { routeIncomingHumanMessage } from '../human/incoming.js';
 
 /**
  * Webhook da WhatsApp Cloud API oficial da Meta.
@@ -121,7 +122,7 @@ export async function registerMetaRoutes(rootApp: FastifyInstance, config: AppCo
       }
 
       try {
-        if (await hasActiveHumanTicket(config, phone)) {
+        if (await routeIncomingHumanMessage(config, phone)) {
           request.log.info({ phone }, 'Atendimento humano ativo. Bot silenciado.');
           return;
         }

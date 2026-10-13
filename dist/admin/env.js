@@ -22,6 +22,14 @@ const SCHEMA = [
     // Sessão
     { key: 'SESSION_MAX_INACTIVITY_MINUTES', required: false, group: 'Sessão' },
     { key: 'SESSION_MAX_AGE_HOURS', required: false, group: 'Sessão' },
+    // Horário do atendimento humano
+    { key: 'BUSINESS_DAY_START', required: false, group: 'Horário de Atendimento' },
+    { key: 'BUSINESS_DAY_END', required: false, group: 'Horário de Atendimento' },
+    { key: 'BUSINESS_HOURS_START', required: false, group: 'Horário de Atendimento' },
+    { key: 'BUSINESS_HOURS_END', required: false, group: 'Horário de Atendimento' },
+    { key: 'BUSINESS_SATURDAY_ENABLED', required: false, group: 'Horário de Atendimento' },
+    { key: 'BUSINESS_SATURDAY_START', required: false, group: 'Horário de Atendimento' },
+    { key: 'BUSINESS_SATURDAY_END', required: false, group: 'Horário de Atendimento' },
     // SMTP
     { key: 'SMTP_HOST', required: false, group: 'SMTP' },
     { key: 'SMTP_PORT', required: false, group: 'SMTP' },

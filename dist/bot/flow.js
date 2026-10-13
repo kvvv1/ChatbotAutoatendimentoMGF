@@ -1,3 +1,4 @@
+import { isSeteLagoas } from '../config.js';
 import { messages, mainMenu } from './menus.js';
 import { createAndSendOtp, verifyOtp } from '../otp/service.js';
 import { fetchLigacoesByCpf, imoveisToLigacoes } from '../company/ligacoes.js';
@@ -245,22 +246,26 @@ const MENU_ITEMS = [
     { id: '5', title: '5️⃣ Localização para atendimento presencial' },
     { id: '0', title: '0️⃣ Falar com atendente' }
 ];
-function menuSections() {
+function menuSections(config) {
+    const otherItems = isSeteLagoas(config)
+        ? [{ id: '6', title: '6️⃣ Finalizar sessão' }, ...MENU_ITEMS.slice(5)]
+        : MENU_ITEMS.slice(5);
     return [
         { title: 'Autoatendimento', rows: MENU_ITEMS.slice(0, 5) },
-        { title: 'Outros serviços', rows: MENU_ITEMS.slice(5) }
+        { title: 'Outros serviços', rows: otherItems }
     ];
 }
-function menuInteractive(prefix) {
+function menuInteractive(config, prefix) {
     return {
         type: 'list',
         text: prefix ? `${prefix}\n\n${MENU_PROMPT}` : MENU_PROMPT,
         buttonText: 'Abrir menu',
-        sections: menuSections()
+        sections: menuSections(config)
     };
 }
-function menuFallbackText(prefix) {
-    return prefix ? `${prefix}\n\n${mainMenu()}` : mainMenu();
+function menuFallbackText(config, prefix) {
+    const menu = mainMenu(isSeteLagoas(config));
+    return prefix ? `${prefix}\n\n${menu}` : menu;
 }
 export async function processMessage(config, phone, text, sessionStore) {
     const replies = [];
@@ -293,7 +298,8 @@ export async function processMessage(config, phone, text, sessionStore) {
         }
         const state = session.state || { name: 'idle' };
         // ENCERRAR ATENDIMENTO - reseta completamente a sessão e volta ao início
-        if (normalizedText === 'encerrar atendimento') {
+        const finishSession = isSeteLagoas(config) && ((state.name === 'main_menu' && text === '6') || /^(?:6[\uFE0F\u20E3]*\s*)?finalizar sessao$/.test(normalizeUserText(text)));
+        if (normalizedText === 'encerrar atendimento' || finishSession) {
             try {
                 // Se o SessionStore suportar delete, limpa a sessão persistida
                 if (typeof sessionStore.delete === 'function') {
@@ -367,7 +373,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                             waveform: true
                         });
                     }
-                    replies.push(menuInteractive());
+                    replies.push(menuInteractive(config));
                     // menuFallbackText removido - só menu interativo
                     await sessionStore.save({
                         phone,
@@ -1055,15 +1061,15 @@ export async function processMessage(config, phone, text, sessionStore) {
                             break;
                         }
                         default:
-                            replies.push(menuInteractive());
+                            replies.push(menuInteractive(config));
                     }
                     if (showMenuAfter) {
-                        replies.push(menuInteractive());
+                        replies.push(menuInteractive(config));
                     }
                 }
                 catch (err) {
                     // Fallback em caso de erro: só menu em texto
-                    replies.push(menuFallbackText());
+                    replies.push(menuFallbackText(config));
                 }
                 break;
             }
@@ -1150,7 +1156,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                                     waveform: true
                                                 });
                                             }
-                                            replies.push(menuInteractive('Agora escolha uma opção do menu para essa ligação.'));
+                                            replies.push(menuInteractive(config, 'Agora escolha uma opção do menu para essa ligação.'));
                                             await sessionStore.save({
                                                 phone,
                                                 state: { name: 'main_menu', cpf, ligacaoId: lig.id, menuAudioPlayed: true },
@@ -1187,7 +1193,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                 }
                                 catch (err) {
                                     // Se der erro ao buscar ligações, cai para o menu padrão
-                                    replies.push(menuInteractive(messages.otpAccepted));
+                                    replies.push(menuInteractive(config, messages.otpAccepted));
                                     try {
                                         await sessionStore.save({
                                             phone,
@@ -1559,7 +1565,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                     replies.push(buildDadosCadastraisMessage(lig, dados));
                                     if (config.menuAudioUrl)
                                         replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
-                                    replies.push(menuInteractive('Agora escolha uma opção do menu para esse imóvel.'));
+                                    replies.push(menuInteractive(config, 'Agora escolha uma opção do menu para esse imóvel.'));
                                     await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, imovelId: lig.imovelId, ligacaoId: lig.id, menuAudioPlayed: true }, updatedAt: now });
                                 }
                                 else {
@@ -1580,14 +1586,14 @@ export async function processMessage(config, phone, text, sessionStore) {
                                     else {
                                         if (config.menuAudioUrl)
                                             replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
-                                        replies.push(menuInteractive());
+                                        replies.push(menuInteractive(config));
                                         await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, menuAudioPlayed: true }, updatedAt: now });
                                     }
                                 }
                                 catch {
                                     if (config.menuAudioUrl)
                                         replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
-                                    replies.push(menuInteractive());
+                                    replies.push(menuInteractive(config));
                                     await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, menuAudioPlayed: true }, updatedAt: now });
                                 }
                             }
@@ -1603,7 +1609,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                         replies.push(`Ligação encontrada:\n\n${lig.label}${detalhes}`);
                                         if (config.menuAudioUrl)
                                             replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
-                                        replies.push(menuInteractive('Agora escolha uma opção do menu para essa ligação.'));
+                                        replies.push(menuInteractive(config, 'Agora escolha uma opção do menu para essa ligação.'));
                                         await sessionStore.save({ phone, state: { name: 'main_menu', cpf, email, ligacaoId: lig.id, menuAudioPlayed: true }, updatedAt: now });
                                     }
                                     else {
@@ -1617,7 +1623,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                 }
                             }
                             catch {
-                                replies.push(menuInteractive(messages.otpAccepted));
+                                replies.push(menuInteractive(config, messages.otpAccepted));
                                 try {
                                     await sessionStore.save({ phone, state: { name: 'main_menu', cpf, email }, updatedAt: now });
                                 }
@@ -1646,6 +1652,13 @@ export async function processMessage(config, phone, text, sessionStore) {
                     const selectedId = text.trim();
                     const isCorrect = selectedId === challenge.correctId;
                     if (!isCorrect) {
+                        // A pergunta também identifica sessões iniciadas antes da inclusão de field.
+                        const isCpfChallenge = challenge.field === 'cpf' || (!challenge.field && /\bCPF\b/i.test(challenge.question));
+                        if (isSeteLagoas(config) && isCpfChallenge) {
+                            replies.push(messages.identityCpfFailed);
+                            await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
+                            break;
+                        }
                         if (attemptsLeft <= 1) {
                             replies.push('Não foi possível verificar sua identidade. Por segurança, o atendimento foi encerrado.');
                             await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
@@ -1703,7 +1716,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                             replies.push(buildDadosCadastraisMessage(lig, dados));
                             if (config.menuAudioUrl)
                                 replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
-                            replies.push(menuInteractive('Agora escolha uma opção do menu para esse imóvel.'));
+                            replies.push(menuInteractive(config, 'Agora escolha uma opção do menu para esse imóvel.'));
                             await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, imovelId: lig.imovelId, ligacaoId: lig.id, menuAudioPlayed: true }, updatedAt: now });
                         }
                         else {
@@ -1724,14 +1737,14 @@ export async function processMessage(config, phone, text, sessionStore) {
                             else {
                                 if (config.menuAudioUrl)
                                     replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
-                                replies.push(menuInteractive());
+                                replies.push(menuInteractive(config));
                                 await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, menuAudioPlayed: true }, updatedAt: now });
                             }
                         }
                         catch {
                             if (config.menuAudioUrl)
                                 replies.push({ type: 'audio', audioUrl: config.menuAudioUrl, waveform: true });
-                            replies.push(menuInteractive());
+                            replies.push(menuInteractive(config));
                             await sessionStore.save({ phone, state: { name: 'main_menu', idEletronico, nomeCliente, menuAudioPlayed: true }, updatedAt: now });
                         }
                     }
@@ -1853,7 +1866,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                             waveform: true
                         });
                     }
-                    replies.push(menuInteractive('Agora escolha uma opção do menu para esse imóvel.'));
+                    replies.push(menuInteractive(config, 'Agora escolha uma opção do menu para esse imóvel.'));
                     try {
                         await sessionStore.save({
                             phone,
@@ -1874,7 +1887,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                     }
                 }
                 catch (err) {
-                    replies.push(menuFallbackText());
+                    replies.push(menuFallbackText(config));
                 }
                 break;
             }
@@ -2021,7 +2034,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                             buttonText: 'Copiar código PIX'
                         });
                     }
-                    replies.push(menuInteractive('Toque na opção desejada para voltar ao menu inicial.'));
+                    replies.push(menuInteractive(config, 'Toque na opção desejada para voltar ao menu inicial.'));
                     try {
                         await sessionStore.save({
                             phone,
@@ -2034,14 +2047,14 @@ export async function processMessage(config, phone, text, sessionStore) {
                 }
                 catch {
                     replies.push('Não foi possível processar a seleção da fatura.');
-                    replies.push(menuInteractive());
+                    replies.push(menuInteractive(config));
                 }
                 break;
             }
             case 'request_servico': {
                 // API de serviços ainda não implementada
                 replies.push('�️ *Solicitar Serviços*\n\nEsta opção estará disponível em breve!');
-                replies.push(menuInteractive('Posso ajudar em mais alguma coisa?'));
+                replies.push(menuInteractive(config, 'Posso ajudar em mais alguma coisa?'));
                 try {
                     await sessionStore.save({
                         phone,
@@ -2055,7 +2068,7 @@ export async function processMessage(config, phone, text, sessionStore) {
             case 'acompanhar_servico': {
                 // API de serviços ainda não implementada
                 replies.push('� *Acompanhar Solicitações*\n\nEsta opção estará disponível em breve!');
-                replies.push(menuInteractive('Posso ajudar em mais alguma coisa?'));
+                replies.push(menuInteractive(config, 'Posso ajudar em mais alguma coisa?'));
                 try {
                     await sessionStore.save({
                         phone,
@@ -2068,7 +2081,7 @@ export async function processMessage(config, phone, text, sessionStore) {
             }
             default: {
                 try {
-                    replies.push(menuInteractive());
+                    replies.push(menuInteractive(config));
                     // Atualiza estado apenas se já houver CPF; caso contrário, retorna ao fluxo de login
                     const cpf = state?.cpf;
                     const email = state?.email;

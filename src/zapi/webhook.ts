@@ -1,13 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { AppConfig } from '../config.js';
+import { isSeteLagoas, type AppConfig } from '../config.js';
 import { ZapiClient } from './client.js';
 import { MemorySessionStore } from '../state/memorySessionStore.js';
 import { logAudit } from '../supabase/audit.js';
-import { hasActiveHumanTicket, logMessage } from '../supabase/messages.js';
+import { logMessage } from '../supabase/messages.js';
 import { ensureOpenHumanTicket } from '../supabase/humanTickets.js';
 import { processMessage } from '../bot/flow.js';
 import { publishHumanEvent } from '../human/events.js';
+import { routeIncomingHumanMessage } from '../human/incoming.js';
 
 const zapiWebhookSchema = z.object({
   event: z.string().optional(),
@@ -214,6 +215,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
       }
       function mapTitleToCommand(title: string): string | undefined {
         const t = normalize(title);
+        if (isSeteLagoas(config) && t.includes('finalizar sessao')) return '6';
         if (/^\d+/.test(t)) {
           // Se começar com número (ex.: "0) Video explicativo"), tenta capturar
           const m = t.match(/^(\d+)/);
@@ -273,6 +275,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
       // Heurística: varre o payload procurando um título conhecido quando id/título/texto não vieram nos campos padrão
       if (!text) {
         const knownLabels: Array<{ label: string; id: string }> = [
+          ...(isSeteLagoas(config) ? [{ label: 'Finalizar sessão', id: '6' }] : []),
           // Espelha exatamente os títulos usados em MENU_ITEMS em src/bot/flow.ts
           { label: 'Vídeo orientativo', id: '1' },
           { label: 'Minhas ligações', id: '2' },
@@ -390,13 +393,27 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         return null;
       }
 
+      const mediaContent = extractMediaContent();
+      const providerId =
+        (payload as any)?.id ||
+        (payload as any)?.messageId ||
+        (payload as any)?.key?.id;
+      const dedupeKey = providerId ? String(providerId) : `${phone}:${simpleHash(text || mediaContent || mediaPlaceholder)}:${(payload as any)?.timestamp || (payload as any)?.t || ''}`;
+      const recent = getRecentSet(phone);
+      // Em Sete Lagoas, filtra reentregas antes de reabrir o atendimento, inclusive mídias.
+      if (isSeteLagoas(config)) {
+        if (!text && !mediaContent && mediaPlaceholder === '[Mensagem recebida]') return;
+        sweepOldIds(phone);
+        if (recent.has(dedupeKey)) return;
+        recent.set(dedupeKey, Date.now());
+      }
+
       await logAudit(config, {
         whatsappPhone: phone,
         action: 'message_received',
         payload: { payload }
       });
 
-      const mediaContent = extractMediaContent();
       const displayContent = mediaContent ||
         (typeof selectedTitle === 'string' && selectedTitle.trim().length > 0
           ? selectedTitle.trim()
@@ -416,7 +433,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
 
       // Silenciar se houver atendimento humano ativo
       try {
-        if (await hasActiveHumanTicket(config, phone)) {
+        if (await routeIncomingHumanMessage(config, phone)) {
           request.log.info({ phone }, 'Atendimento humano ativo. Bot silenciado.');
           return;
         }
@@ -432,18 +449,14 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
       }
 
       // Idempotência / dedupe
-      const providerId =
-        (payload as any)?.id ||
-        (payload as any)?.messageId ||
-        (payload as any)?.key?.id;
-      const dedupeKey = providerId ? String(providerId) : `${phone}:${simpleHash(text)}:${(payload as any)?.timestamp || (payload as any)?.t || ''}`;
-      const recent = getRecentSet(phone);
-      sweepOldIds(phone);
-      if (recent.has(dedupeKey)) {
-        request.log.info({ phone, dedupeKey }, 'Duplicata detectada; ignorando.');
-        return;
+      if (!isSeteLagoas(config)) {
+        sweepOldIds(phone);
+        if (recent.has(dedupeKey)) {
+          request.log.info({ phone, dedupeKey }, 'Duplicata detectada; ignorando.');
+          return;
+        }
+        recent.set(dedupeKey, Date.now());
       }
-      recent.set(dedupeKey, Date.now());
 
       // Enfileirar e aplicar debounce por usuário
       if (!userQueues.has(phone)) userQueues.set(phone, []);

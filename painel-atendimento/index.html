@@ -33,13 +33,17 @@
           <select id="filter-operador">
             <option value="">Todos os operadores</option>
           </select>
-          <label for="search-conversation">Buscar conversa</label>
-          <input
-            id="search-conversation"
-            type="search"
-            placeholder="Nome ou numero do cliente"
-            autocomplete="off"
-          />
+          <div id="conversation-search" class="conversation-search">
+            <label for="search-conversation">Buscar conversa</label>
+            <div class="conversation-search-input">
+              <svg class="conversation-search-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
+              <input id="search-conversation" type="search" placeholder="Nome ou numero do cliente" autocomplete="off" />
+              <button id="clear-conversation-search" class="conversation-search-clear hidden" type="button" aria-label="Limpar busca" title="Limpar busca">×</button>
+            </div>
+            <p id="conversation-search-help" class="conversation-search-help hidden">Digite o nome ou cole o telefone, com ou sem DDD e +55.</p>
+            <p id="conversation-search-results" class="conversation-search-results hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+            <button id="search-all-conversations" class="conversation-search-all hidden" type="button">Buscar em todas as conversas</button>
+          </div>
         </div>
         <div id="tickets-list" class="tickets-list">
           <div class="chat-empty">Carregando conversas...</div>
@@ -238,6 +242,7 @@
 
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script src="/painel-atendimento/config.js"></script>
+  <script src="/painel-atendimento/conversation-search.js" defer></script>
   <script src="/painel-atendimento/app.js" defer></script>
   <script src="/painel-atendimento/contacts.js" defer></script>
 </body>
