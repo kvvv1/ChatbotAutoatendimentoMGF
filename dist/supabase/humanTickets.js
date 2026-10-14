@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { isSeteLagoas } from '../config.js';
 import { getDb } from './client.js';
+import { logAudit } from './audit.js';
+import { publishHumanEvent } from '../human/events.js';
 function logDbError(scope, error) {
     try {
         if (!error)
@@ -343,7 +345,7 @@ export async function updateHumanTicketStatus(config, id, status) {
         return null;
     }
 }
-/** Reabre o último atendimento finalizado, sem criar outro ticket ou perder o histórico. */
+/** Reabre o último atendimento finalizado quando há uma solicitação de atendimento humano. */
 export async function reopenFinalizedHumanTicket(config, phone) {
     if (!isSeteLagoas(config))
         return null;
@@ -379,6 +381,20 @@ export async function reopenFinalizedHumanTicket(config, phone) {
 }
 export async function ensureOpenHumanTicket(config, phone, customerName) {
     try {
+        const reopened = await reopenFinalizedHumanTicket(config, phone);
+        if (reopened) {
+            if (customerName && !reopened.customer_name) {
+                await updateHumanTicketCustomerName(config, reopened.id, customerName);
+                reopened.customer_name = customerName;
+            }
+            publishHumanEvent({ type: 'ticket_update', phone, at: new Date().toISOString() });
+            await logAudit(config, {
+                whatsappPhone: phone,
+                action: 'human_ticket_reopened',
+                payload: { ticketId: reopened.id, previousStatus: 'finalizado', status: 'pendente', reason: 'human_requested' }
+            });
+            return reopened;
+        }
         const pool = getDb(config);
         const [existingRows] = await pool.query(`SELECT * FROM human_tickets WHERE phone = ? AND status IN ('pendente', 'em_atendimento') ORDER BY created_at DESC LIMIT 1`, [phone]);
         const existing = existingRows;

@@ -380,7 +380,7 @@ export async function registerZapiRoutes(app, config) {
                 payload?.key?.id;
             const dedupeKey = providerId ? String(providerId) : `${phone}:${simpleHash(text || mediaContent || mediaPlaceholder)}:${payload?.timestamp || payload?.t || ''}`;
             const recent = getRecentSet(phone);
-            // Em Sete Lagoas, filtra reentregas antes de reabrir o atendimento, inclusive mídias.
+            // Em Sete Lagoas, filtra reentregas antes de registrar e processar, inclusive mídias.
             if (isSeteLagoas(config)) {
                 if (!text && !mediaContent && mediaPlaceholder === '[Mensagem recebida]')
                     return;

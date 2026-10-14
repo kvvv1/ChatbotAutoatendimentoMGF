@@ -5,7 +5,6 @@ import { ZapiClient } from './client.js';
 import { MemorySessionStore } from '../state/memorySessionStore.js';
 import { logAudit } from '../supabase/audit.js';
 import { logMessage } from '../supabase/messages.js';
-import { ensureOpenHumanTicket } from '../supabase/humanTickets.js';
 import { processMessage } from '../bot/flow.js';
 import { publishHumanEvent } from '../human/events.js';
 import { routeIncomingHumanMessage } from '../human/incoming.js';
@@ -404,7 +403,7 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
         (payload as any)?.key?.id;
       const dedupeKey = providerId ? String(providerId) : `${phone}:${simpleHash(text || mediaContent || mediaPlaceholder)}:${(payload as any)?.timestamp || (payload as any)?.t || ''}`;
       const recent = getRecentSet(phone);
-      // Em Sete Lagoas, filtra reentregas antes de reabrir o atendimento, inclusive mídias.
+      // Em Sete Lagoas, filtra reentregas antes de registrar e processar, inclusive mídias.
       if (isSeteLagoas(config)) {
         if (!text && !mediaContent && mediaPlaceholder === '[Mensagem recebida]') return;
         sweepOldIds(phone);

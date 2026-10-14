@@ -222,7 +222,9 @@ export async function registerEvolutionRoutes(app: FastifyInstance, config: AppC
       }
 
       try {
-        if (isHumanRequestText(selectedDisplayText) || isHumanRequestText(textRaw) || isHumanRequestText(text)) {
+        // Em Sete Lagoas, o fluxo autenticado do menu valida o horário e
+        // registra a solicitação. O webhook não deve antecipar essa transferência.
+        if (!isSeteLagoas(config) && (isHumanRequestText(selectedDisplayText) || isHumanRequestText(textRaw) || isHumanRequestText(text))) {
           await ensureOpenHumanTicket(config, phone);
         }
       } catch (e) {

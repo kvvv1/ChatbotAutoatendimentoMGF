@@ -49,13 +49,13 @@ Observacoes:
 
 Configure `MUNICIPIO=7lagoas` ou `MUNICIPIO=sete-lagoas` no arquivo de ambiente da instância para habilitar as mesmas funcionalidades. Preserve o identificador já usado no servidor, assim como o nome do container e o projeto Compose:
 
-- Reabertura do último atendimento finalizado como `pendente` quando o cliente enviar uma nova mensagem, sem prazo mínimo. O ticket, o histórico e o responsável são preservados. Atendimentos cancelados não são reabertos, e o bot permanece silenciado enquanto há atendimento humano ativo.
+- Após finalizar no painel, uma nova mensagem comum (por exemplo, “oi”) volta ao autoatendimento e mantém o ticket como `finalizado`. Ao escolher “Falar com atendente” no menu, dentro do horário de atendimento, o último ticket finalizado é reaberto como `pendente`, preservando o histórico e o responsável. Atendimentos cancelados não são reabertos; uma nova solicitação cria outro ticket. O bot permanece silenciado enquanto há atendimento humano pendente ou em andamento.
 - Opção `6️⃣ Finalizar sessão` no menu, que limpa a identificação e o imóvel selecionado e solicita uma nova identificação.
 - Orientação sobre proteção de dados (LGPD) e contato com o SAC 115 no primeiro erro da confirmação dos últimos dígitos do CPF. Nas demais perguntas de identificação (telefone, e-mail, bairro e nome), a orientação aparece quando as tentativas se esgotam, encerrando a validação. A seleção aceita o ID do botão, o rótulo da opção ou o número correspondente ao fallback em texto.
 - Atendimento humano parametrizado por ambiente, com padrão de segunda a sexta, das 08:00 às 16:30, e aos sábados, das 07:00 às 18:30, no fuso `America/Sao_Paulo`. Domingo permanece fechado. A mensagem de horário é gerada pela mesma configuração.
 - Busca de conversas em destaque no painel (ACC-5333), por nome sem distinção de acentos ou por telefone com ou sem formatação, DDD, código 55 e nono dígito. O telefone aparece formatado nos resultados. A opção “Buscar em todas as conversas” remove os filtros de status e operador, preservando o texto pesquisado.
 
-Instâncias com outro `MUNICIPIO`, ou sem essa variável, mantêm os fluxos anteriores. A reabertura se aplica às mensagens recebidas nos webhooks Z-API, Meta e Evolution; não registra uma nova rota de Evolution no servidor.
+Instâncias com outro `MUNICIPIO`, ou sem essa variável, mantêm os fluxos anteriores. A regra se aplica aos webhooks Z-API, Meta e Evolution; não registra uma nova rota de Evolution no servidor.
 
 Validação local: `npm test` executa testes de fluxo e de rotas com persistência simulada, sem enviar mensagens reais; `npm run build` compila o projeto.
 
