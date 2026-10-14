@@ -116,7 +116,7 @@ afterEach(async () => {
   mock.restoreAll();
 });
 
-test('MUNICIPIO é carregado e somente sete-lagoas habilita a regra', () => {
+test('MUNICIPIO é carregado e os dois identificadores de Sete Lagoas habilitam a regra', () => {
   const env = {
     MUNICIPIO: ' SETE-LAGOAS ', DB_SERVER: 'test', DB_USER: 'test', DB_PASSWORD: 'test',
     DB_DATABASE: 'test', ZAPI_BASE_URL: 'https://whatsapp.invalid', ZAPI_INSTANCE_ID: 'test', ZAPI_TOKEN: 'test'
@@ -127,6 +127,9 @@ test('MUNICIPIO é carregado e somente sete-lagoas habilita a regra', () => {
     const loaded = loadConfig();
     assert.equal(loaded.municipio, 'sete-lagoas');
     assert.equal(isSeteLagoas(loaded), true);
+    assert.equal(isSeteLagoas({ municipio: ' 7LAGOAS ' }), true);
+    process.env.MUNICIPIO = '7lagoas';
+    assert.equal(loadConfig().municipio, '7lagoas');
     assert.equal(isSeteLagoas({ ...loaded, municipio: 'formiga' }), false);
     assert.equal(isSeteLagoas({ ...loaded, municipio: undefined }), false);
   } finally {
@@ -135,6 +138,12 @@ test('MUNICIPIO é carregado e somente sete-lagoas habilita a regra', () => {
       else process.env[key] = value;
     }
   }
+});
+
+test('7lagoas reabre atendimentos com o mesmo fluxo de sete-lagoas', async () => {
+  assert.equal(await routeIncomingHumanMessage({ ...config, municipio: '7lagoas' }, phone), true);
+  assert.equal(db.tickets[0].status, 'pendente');
+  assert.equal(db.audits[0][4], 'human_ticket_reopened');
 });
 
 test('reabre o mesmo ticket como pendente, preservando responsável e histórico', async () => {
@@ -173,13 +182,13 @@ test('outras cidades e instâncias sem MUNICIPIO não reabrem tickets', async ()
 });
 
 test('API habilita a busca melhorada somente para Sete Lagoas', async () => {
-  for (const municipio of ['sete-lagoas', 'formiga', undefined]) {
+  for (const municipio of ['sete-lagoas', '7lagoas', 'formiga', undefined]) {
     const app = Fastify();
     try {
       await registerHumanRoutes(app, { ...config, municipio });
       const response = await app.inject({ method: 'GET', url: '/api/features' });
       assert.equal(response.statusCode, 200);
-      assert.equal(response.json().enhancedConversationSearch, municipio === 'sete-lagoas');
+      assert.equal(response.json().enhancedConversationSearch, municipio === 'sete-lagoas' || municipio === '7lagoas');
     } finally {
       await app.close();
     }

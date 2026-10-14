@@ -47,7 +47,7 @@ Observacoes:
 
 ### Funcionalidades exclusivas de Sete Lagoas
 
-Configure `MUNICIPIO=sete-lagoas` no arquivo de ambiente da instância para habilitar:
+Configure `MUNICIPIO=7lagoas` ou `MUNICIPIO=sete-lagoas` no arquivo de ambiente da instância para habilitar as mesmas funcionalidades. Preserve o identificador já usado no servidor, assim como o nome do container e o projeto Compose:
 
 - Reabertura do último atendimento finalizado como `pendente` quando o cliente enviar uma nova mensagem, sem prazo mínimo. O ticket, o histórico e o responsável são preservados. Atendimentos cancelados não são reabertos, e o bot permanece silenciado enquanto há atendimento humano ativo.
 - Opção `6️⃣ Finalizar sessão` no menu, que limpa a identificação e o imóvel selecionado e solicita uma nova identificação.
@@ -77,7 +77,7 @@ docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revis
 docker exec chatbot-sete-lagoas printenv MUNICIPIO
 ```
 
-O primeiro comando deve retornar o commit correspondente à tag `sha-<commit>` selecionada; o segundo deve retornar `sete-lagoas`.
+Use o nome real do container nesses comandos (por exemplo, `chatbot`). O primeiro comando deve retornar o commit correspondente à tag `sha-<commit>` selecionada; o segundo deve retornar `7lagoas` ou `sete-lagoas`.
 
 ### Netlify por instancia
 - O painel agora gera `painel-atendimento/config.js` no build com `PANEL_API_BASE_URL`.

@@ -45,6 +45,18 @@ test('finalizar sessão limpa os dados do imóvel e pede uma nova identificaçã
   }
 });
 
+test('7lagoas habilita finalizar sessão e a orientação LGPD/SAC 115', async () => {
+  const instance = { ...config, municipio: '7lagoas' };
+  const store = await storeWith(authenticated);
+  const replies = await processMessage(instance, phone, 'menu', store);
+  const list = replies.find(reply => typeof reply !== 'string' && reply.type === 'list') as any;
+  assert.ok(list.sections.some((section: any) => section.rows.some((row: any) => row.id === '6')));
+  await processMessage(instance, phone, '6', store);
+  assert.deepEqual((await store.getByPhone(phone))?.state, { name: 'awaiting_login_id' });
+  await store.save({ phone, state: verification(cpfChallenge), updatedAt: new Date().toISOString() });
+  assert.deepEqual(await processMessage(instance, phone, 'ident_wrong_1', store), [messages.identityVerificationFailed]);
+});
+
 test('outras cidades mantêm o menu e a opção 6 não encerra sessão', async () => {
   for (const municipio of ['formiga', 'oliveira', undefined]) {
     const store = await storeWith(authenticated);

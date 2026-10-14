@@ -23,7 +23,7 @@ export function loadConfig() {
     if (!ZAPI_TOKEN)
         throw new Error('ZAPI_TOKEN não configurado');
     const municipio = MUNICIPIO?.trim().toLowerCase();
-    const seteLagoas = municipio === 'sete-lagoas';
+    const seteLagoas = isSeteLagoas({ municipio });
     const businessHoursStart = BUSINESS_HOURS_START || '08:00';
     const businessHoursEnd = BUSINESS_HOURS_END || (seteLagoas ? '16:30' : '18:00');
     const businessDayStart = seteLagoas ? Number(BUSINESS_DAY_START || 1) : Number(BUSINESS_DAY_START) || 1;
@@ -131,7 +131,8 @@ export function loadConfig() {
     };
 }
 export function isSeteLagoas(config) {
-    return config.municipio?.trim().toLowerCase() === 'sete-lagoas';
+    const municipio = config.municipio?.trim().toLowerCase();
+    return municipio === 'sete-lagoas' || municipio === '7lagoas';
 }
 function validateBusinessHours(prefix, start, end) {
     const format = /^(?:[01]\d|2[0-3]):[0-5]\d$/;

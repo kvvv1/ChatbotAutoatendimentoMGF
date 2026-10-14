@@ -195,7 +195,7 @@ export function loadConfig(): AppConfig {
   if (!ZAPI_TOKEN) throw new Error('ZAPI_TOKEN não configurado');
 
   const municipio = MUNICIPIO?.trim().toLowerCase();
-  const seteLagoas = municipio === 'sete-lagoas';
+  const seteLagoas = isSeteLagoas({ municipio });
   const businessHoursStart = BUSINESS_HOURS_START || '08:00';
   const businessHoursEnd = BUSINESS_HOURS_END || (seteLagoas ? '16:30' : '18:00');
   const businessDayStart = seteLagoas ? Number(BUSINESS_DAY_START || 1) : Number(BUSINESS_DAY_START) || 1;
@@ -305,8 +305,9 @@ export function loadConfig(): AppConfig {
   };
 }
 
-export function isSeteLagoas(config: AppConfig): boolean {
-  return config.municipio?.trim().toLowerCase() === 'sete-lagoas';
+export function isSeteLagoas(config: Pick<AppConfig, 'municipio'>): boolean {
+  const municipio = config.municipio?.trim().toLowerCase();
+  return municipio === 'sete-lagoas' || municipio === '7lagoas';
 }
 
 function validateBusinessHours(prefix: string, start: string, end: string): void {

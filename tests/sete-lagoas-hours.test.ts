@@ -42,6 +42,17 @@ test('ambiente de Sete Lagoas tem os horários solicitados como padrão', () => 
   assert.equal(loaded.businessSaturdayEnd, '18:30');
 });
 
+test('7lagoas mantém o identificador existente e ativa os mesmos horários e mensagem', () => {
+  const loaded = loadWithEnvironment({ MUNICIPIO: ' 7LAGOAS ' });
+  assert.equal(loaded.municipio, '7lagoas');
+  assert.equal(loaded.businessHoursEnd, '16:30');
+  assert.equal(loaded.businessSaturdayEnabled, true);
+  assert.equal(loaded.businessSaturdayStart, '07:00');
+  assert.equal(loaded.businessSaturdayEnd, '18:30');
+  assert.equal(businessHoursMessage(loaded), businessHoursMessage(loadWithEnvironment()));
+  assert.equal(isWithinBusinessHours(loaded, new Date('2026-10-17T12:00:00-03:00')), true);
+});
+
 test('alterar o ambiente muda os horários reais e a mensagem, inclusive sábado', () => {
   const loaded = loadWithEnvironment({ BUSINESS_HOURS_START: '09:00', BUSINESS_HOURS_END: '15:00',
     BUSINESS_SATURDAY_START: '10:00', BUSINESS_SATURDAY_END: '12:00' });
