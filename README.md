@@ -51,7 +51,7 @@ Configure `MUNICIPIO=sete-lagoas` no arquivo de ambiente da instância para habi
 
 - Reabertura do último atendimento finalizado como `pendente` quando o cliente enviar uma nova mensagem, sem prazo mínimo. O ticket, o histórico e o responsável são preservados. Atendimentos cancelados não são reabertos, e o bot permanece silenciado enquanto há atendimento humano ativo.
 - Opção `6️⃣ Finalizar sessão` no menu, que limpa a identificação e o imóvel selecionado e solicita uma nova identificação.
-- Orientação sobre proteção de dados (LGPD) e contato com o SAC 115 no primeiro erro da confirmação dos últimos dígitos do CPF, encerrando essa validação.
+- Orientação sobre proteção de dados (LGPD) e contato com o SAC 115 no primeiro erro da confirmação dos últimos dígitos do CPF. Nas demais perguntas de identificação (telefone, e-mail, bairro e nome), a orientação aparece quando as tentativas se esgotam, encerrando a validação. A seleção aceita o ID do botão, o rótulo da opção ou o número correspondente ao fallback em texto.
 - Atendimento humano parametrizado por ambiente, com padrão de segunda a sexta, das 08:00 às 16:30, e aos sábados, das 07:00 às 18:30, no fuso `America/Sao_Paulo`. Domingo permanece fechado. A mensagem de horário é gerada pela mesma configuração.
 - Busca de conversas em destaque no painel (ACC-5333), por nome sem distinção de acentos ou por telefone com ou sem formatação, DDD, código 55 e nono dígito. O telefone aparece formatado nos resultados. A opção “Buscar em todas as conversas” remove os filtros de status e operador, preservando o texto pesquisado.
 
@@ -69,6 +69,15 @@ Após ajustar o `.env`, recrie o container para carregar os valores novos. No se
 ENV_FILE=.env.sete-lagoas docker compose --env-file .env.sete-lagoas --project-name chatbot-sete-lagoas pull
 ENV_FILE=.env.sete-lagoas docker compose --env-file .env.sete-lagoas --project-name chatbot-sete-lagoas up -d --force-recreate
 ```
+
+`pull` baixa a imagem; a recriação é necessária para trocar a versão em execução. Para conferir o commit da imagem e a identificação da instância, sem exibir credenciais:
+
+```bash
+docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' chatbot-sete-lagoas
+docker exec chatbot-sete-lagoas printenv MUNICIPIO
+```
+
+O primeiro comando deve retornar o commit correspondente à tag `sha-<commit>` selecionada; o segundo deve retornar `sete-lagoas`.
 
 ### Netlify por instancia
 - O painel agora gera `painel-atendimento/config.js` no build com `PANEL_API_BASE_URL`.

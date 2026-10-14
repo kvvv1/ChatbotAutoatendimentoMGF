@@ -262,7 +262,11 @@ export async function registerZapiRoutes(app: FastifyInstance, config: AppConfig
       }
 
       let text = '';
-      if (typeof selectedTitle === 'string') {
+      // Em Sete Lagoas, preserva o ID da opção; "1287" é um rótulo, não um comando.
+      if (isSeteLagoas(config) && typeof selectedId === 'string') {
+        text = selectedId.trim();
+      }
+      if (!text && typeof selectedTitle === 'string') {
         const mapped = mapTitleToCommand(selectedTitle);
         if (mapped) text = mapped;
       }

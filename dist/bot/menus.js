@@ -25,7 +25,7 @@ export const messages = {
     otpAccepted: 'Verificação concluída com sucesso ✅',
     requireLogin: 'Você precisa estar logado para acessar esta opção.',
     requireLigacao: 'Selecione uma ligação primeiro.',
-    identityCpfFailed: 'Por segurança e em respeito à Lei Geral de Proteção de Dados (LGPD), não foi possível validar sua identidade. Solicitamos que entre em contato através do nosso canal de atendimento SAC: 115.',
+    identityVerificationFailed: 'Por segurança e em respeito à Lei Geral de Proteção de Dados (LGPD), não foi possível validar sua identidade. Solicitamos que entre em contato através do nosso canal de atendimento SAC: 115.',
     videoIntro: '🎬 *Vídeo de teste*\n\nO vídeo orientativo oficial está em produção. Enquanto isso, segue um vídeo demonstrativo:',
     videoUnavailable: 'O vídeo orientativo está indisponível no momento. Tente novamente mais tarde.',
     humanContact: 'Encaminhando para atendimento humano. Em breve um atendente entrará em contato.',

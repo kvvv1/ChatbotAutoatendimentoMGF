@@ -1649,18 +1649,29 @@ export async function processMessage(config, phone, text, sessionStore) {
                     const secondaryChallenge = state?.secondaryChallenge;
                     const step = state?.step;
                     const attemptsLeft = state?.attemptsLeft ?? 2;
-                    const selectedId = text.trim();
+                    let selectedId = text.trim();
+                    if (isSeteLagoas(config) && !challenge.options.some(option => option.id === selectedId)) {
+                        // Alguns retornos trazem somente o rótulo; o fallback em texto aceita 1, 2 ou 3.
+                        const matchingOptions = challenge.options.filter(option => normalizeUserText(option.text) === normalizeUserText(selectedId));
+                        if (matchingOptions.length === 1) {
+                            selectedId = matchingOptions[0].id;
+                        }
+                        else if (/^[1-3]$/.test(selectedId) && matchingOptions.length === 0) {
+                            selectedId = challenge.options[Number(selectedId) - 1]?.id ?? selectedId;
+                        }
+                    }
                     const isCorrect = selectedId === challenge.correctId;
                     if (!isCorrect) {
                         // A pergunta também identifica sessões iniciadas antes da inclusão de field.
                         const isCpfChallenge = challenge.field === 'cpf' || (!challenge.field && /\bCPF\b/i.test(challenge.question));
                         if (isSeteLagoas(config) && isCpfChallenge) {
-                            replies.push(messages.identityCpfFailed);
+                            replies.push(messages.identityVerificationFailed);
                             await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
                             break;
                         }
                         if (attemptsLeft <= 1) {
-                            replies.push('Não foi possível verificar sua identidade. Por segurança, o atendimento foi encerrado.');
+                            replies.push(isSeteLagoas(config) ? messages.identityVerificationFailed
+                                : 'Não foi possível verificar sua identidade. Por segurança, o atendimento foi encerrado.');
                             await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
                             break;
                         }

@@ -39,6 +39,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          labels: org.opencontainers.image.revision=${{ github.sha }}
           tags: |
             registry.digitalocean.com/gestcom/chatbot:latest
             registry.digitalocean.com/gestcom/chatbot:sha-${{ github.sha }}

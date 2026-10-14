@@ -12,6 +12,8 @@ import { registerHumanRoutes } from '../src/human/routes.js';
 import { registerZapiRoutes } from '../src/zapi/webhook.js';
 import { registerEvolutionRoutes } from '../src/evolution/webhook.js';
 import { registerMetaRoutes } from '../src/meta/webhook.js';
+import { ZapiClient } from '../src/zapi/client.js';
+import { MemorySessionStore } from '../src/state/memorySessionStore.js';
 
 const phone = '5531999999999';
 const ticketId = 'a39d1138-3667-4da4-b58c-75ae878dc2ba';
@@ -238,12 +240,47 @@ const providers = [
 ];
 
 async function waitUntil(predicate: () => boolean) {
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 1000; i++) {
     if (predicate()) return;
     await new Promise(resolve => setTimeout(resolve, 5));
   }
   assert.fail('Webhook não completou o processamento esperado');
 }
+
+test('Z-API preserva o ID correto do botão quando o título contém os dígitos do telefone', async () => {
+  db.tickets = [];
+  let saved: any;
+  mock.method(MemorySessionStore.prototype, 'getByPhone', async () => ({
+    phone, updatedAt: new Date().toISOString(), state: {
+      name: 'awaiting_identity_verification', idEletronico: '123@A', nomeCliente: 'Cliente',
+      challenge: { field: 'phone', question: 'Selecione os 4 últimos dígitos do seu telefone:',
+        correctId: 'ident_correct', options: [{ id: 'ident_correct', text: '1287' }, { id: 'ident_wrong_1', text: '6024' }] },
+      secondaryChallenge: { field: 'nome', question: 'Selecione o primeiro nome do titular do cadastro:',
+        correctId: 'ident_correct', options: [{ id: 'ident_correct', text: 'Cliente' }] },
+      step: 'primary', attemptsLeft: 2
+    }
+  }));
+  mock.method(MemorySessionStore.prototype, 'save', async (session: any) => { saved = session; });
+  mock.method(ZapiClient.prototype, 'sendText', async () => {});
+  mock.method(ZapiClient.prototype, 'sendButtonList', async () => {});
+  const app = Fastify();
+  try {
+    await registerZapiRoutes(app, config);
+    for (const [buttonId, expectedStep] of [['ident_correct', 'secondary'], [undefined, 'secondary'], ['ident_wrong_1', 'primary']] as const) {
+      saved = undefined;
+      const response = await app.inject({ method: 'POST', url: '/webhook/zapi', payload: {
+        phone, id: `identity-button-${buttonId ?? 'label'}`, buttonsResponseMessage: { buttonId, text: '1287' }
+      } });
+      assert.equal(response.statusCode, 200);
+      await waitUntil(() => Boolean(saved));
+      assert.equal(saved.state.step, expectedStep);
+      assert.equal(saved.state.challenge.field, expectedStep === 'secondary' ? 'nome' : 'phone');
+      assert.equal(saved.state.attemptsLeft, expectedStep === 'secondary' ? 2 : 1);
+    }
+  } finally {
+    await app.close();
+  }
+});
 
 for (const provider of providers) {
   for (const media of [false, true]) {
