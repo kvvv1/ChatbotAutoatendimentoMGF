@@ -1662,13 +1662,6 @@ export async function processMessage(config, phone, text, sessionStore) {
                     }
                     const isCorrect = selectedId === challenge.correctId;
                     if (!isCorrect) {
-                        // A pergunta também identifica sessões iniciadas antes da inclusão de field.
-                        const isCpfChallenge = challenge.field === 'cpf' || (!challenge.field && /\bCPF\b/i.test(challenge.question));
-                        if (isSeteLagoas(config) && isCpfChallenge) {
-                            replies.push(messages.identityVerificationFailed);
-                            await sessionStore.save({ phone, state: { name: 'idle' }, updatedAt: now });
-                            break;
-                        }
                         if (attemptsLeft <= 1) {
                             replies.push(isSeteLagoas(config) ? messages.identityVerificationFailed
                                 : 'Não foi possível verificar sua identidade. Por segurança, o atendimento foi encerrado.');
