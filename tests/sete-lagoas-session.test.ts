@@ -57,6 +57,7 @@ test('7lagoas habilita finalizar sessão e a orientação LGPD/SAC 115', async (
   const first = await processMessage(instance, phone, 'ident_wrong_1', store);
   assert.ok(first.includes('Resposta incorreta. Tente novamente:'));
   assert.ok(!first.includes(messages.identityVerificationFailed));
+  assert.ok((await processMessage(instance, phone, 'ident_wrong_1', store)).includes('Resposta incorreta. Tente novamente:'));
   assert.deepEqual(await processMessage(instance, phone, 'ident_wrong_1', store), [messages.identityVerificationFailed]);
 });
 
@@ -70,16 +71,16 @@ test('outras cidades mantêm o menu e a opção 6 não encerra sessão', async (
   }
 });
 
-function verification(challenge: IdentityChallengeState): ConversationState {
+function verification(challenge: IdentityChallengeState, attemptsLeft = 3): ConversationState {
   return { name: 'awaiting_identity_verification', idEletronico: '123@A', imovelId: 123,
-    nomeCliente: 'Cliente', challenge, step: 'primary', attemptsLeft: 2 };
+    nomeCliente: 'Cliente', challenge, step: 'primary', attemptsLeft };
 }
 const cpfChallenge: IdentityChallengeState = {
   field: 'cpf', question: 'Selecione os 4 últimos dígitos do seu CPF:', correctId: 'ident_correct',
   options: [{ id: 'ident_correct', text: '8900' }, { id: 'ident_wrong_1', text: '0000' }]
 };
 
-test('CPF mantém duas tentativas e orienta LGPD/SAC 115 apenas no segundo erro', async () => {
+test('CPF permite dois erros e orienta LGPD/SAC 115 apenas no terceiro erro', async () => {
   for (const municipio of ['sete-lagoas', '7lagoas']) {
     for (const field of ['cpf', undefined] as const) {
       const instance = { ...config, municipio };
@@ -89,22 +90,27 @@ test('CPF mantém duas tentativas e orienta LGPD/SAC 115 apenas no segundo erro'
       const first = await processMessage(instance, phone, 'ident_wrong_1', store);
       assert.equal(first[0], 'Resposta incorreta. Tente novamente:');
       assert.ok(!first.includes(messages.identityVerificationFailed));
-      assert.deepEqual((await store.getByPhone(phone))?.state, { ...initial, attemptsLeft: 1 });
+      assert.deepEqual((await store.getByPhone(phone))?.state, { ...initial, attemptsLeft: 2 });
       const buttons = first.find(reply => typeof reply !== 'string' && reply.type === 'buttons') as any;
       assert.equal(buttons.text, challenge.question);
       assert.deepEqual(buttons.buttons, challenge.options.map(option => ({ id: option.id, text: option.text })));
       const second = await processMessage(instance, phone, 'ident_wrong_1', store);
-      assert.deepEqual(second, [messages.identityVerificationFailed]);
-      assert.match(second[0] as string, /LGPD/);
-      assert.match(second[0] as string, /SAC: 115/);
+      assert.equal(second[0], 'Resposta incorreta. Tente novamente:');
+      assert.ok(!second.includes(messages.identityVerificationFailed));
+      assert.deepEqual((await store.getByPhone(phone))?.state, { ...initial, attemptsLeft: 1 });
+      const third = await processMessage(instance, phone, 'ident_wrong_1', store);
+      assert.deepEqual(third, [messages.identityVerificationFailed]);
+      assert.match(third[0] as string, /LGPD/);
+      assert.match(third[0] as string, /SAC: 115/);
       assert.deepEqual((await store.getByPhone(phone))?.state, { name: 'idle' });
     }
   }
 });
 
-test('CPF correto na segunda tentativa segue a próxima confirmação com duas tentativas', async () => {
+test('CPF correto na terceira tentativa segue a próxima confirmação com três tentativas', async () => {
   const secondary: IdentityChallengeState = { ...cpfChallenge, field: 'nome', question: 'Selecione o primeiro nome do titular:' };
   const store = await storeWith({ ...verification(cpfChallenge), secondaryChallenge: secondary } as ConversationState);
+  await processMessage(config, phone, 'ident_wrong_1', store);
   await processMessage(config, phone, 'ident_wrong_1', store);
   const replies = await processMessage(config, phone, 'ident_correct', store);
   assert.ok(replies.includes('Correto! Mais uma confirmação:'));
@@ -112,14 +118,16 @@ test('CPF correto na segunda tentativa segue a próxima confirmação com duas t
   const saved = (await store.getByPhone(phone))?.state as any;
   assert.equal(saved.step, 'secondary');
   assert.equal(saved.challenge.field, 'nome');
-  assert.equal(saved.attemptsLeft, 2);
+  assert.equal(saved.attemptsLeft, 3);
 });
 
-test('confirmação de CPF na etapa secundária também mantém as duas tentativas', async () => {
+test('confirmação de CPF na etapa secundária também permite três tentativas', async () => {
   const store = await storeWith({ ...verification(cpfChallenge), step: 'secondary' } as ConversationState);
   const first = await processMessage(config, phone, 'ident_wrong_1', store);
   assert.ok(first.includes('Resposta incorreta. Tente novamente:'));
   assert.equal(((await store.getByPhone(phone))?.state as any).step, 'secondary');
+  assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 2);
+  assert.ok((await processMessage(config, phone, 'ident_wrong_1', store)).includes('Resposta incorreta. Tente novamente:'));
   assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 1);
   assert.deepEqual(await processMessage(config, phone, 'ident_wrong_1', store), [messages.identityVerificationFailed]);
   assert.deepEqual((await store.getByPhone(phone))?.state, { name: 'idle' });
@@ -137,17 +145,18 @@ test('CPF correto segue a próxima confirmação', async () => {
   assert.equal(saved.challenge.field, 'bairro');
 });
 
-test('erros em outras perguntas e em outras cidades mantêm as tentativas existentes', async () => {
+test('primeiro erro preserva a validação, com três tentativas em Sete Lagoas e duas nas demais cidades', async () => {
   for (const [instance, challenge] of [
     [config, { ...cpfChallenge, field: 'bairro', question: 'Selecione o bairro do seu imóvel:' }],
     [{ ...config, municipio: 'formiga' }, cpfChallenge]
   ] as const) {
-    const store = await storeWith(verification(challenge));
+    const initialAttempts = instance.municipio === 'sete-lagoas' ? 3 : 2;
+    const store = await storeWith(verification(challenge, initialAttempts));
     const replies = await processMessage(instance, phone, 'ident_wrong_1', store);
     assert.ok(replies.includes('Resposta incorreta. Tente novamente:'));
     const saved = (await store.getByPhone(phone))?.state as any;
     assert.equal(saved.name, 'awaiting_identity_verification');
-    assert.equal(saved.attemptsLeft, 1);
+    assert.equal(saved.attemptsLeft, initialAttempts - 1);
     assert.ok(!replies.includes(messages.identityVerificationFailed));
   }
 });
@@ -165,9 +174,12 @@ test('telefone, email, bairro e nome orientam LGPD e SAC 115 ao esgotar as tenta
     const first = await processMessage(config, phone, 'ident_wrong_1', store);
     assert.ok(first.includes('Resposta incorreta. Tente novamente:'));
     assert.ok(!first.includes(messages.identityVerificationFailed));
-    assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 1);
+    assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 2);
     const second = await processMessage(config, phone, 'ident_wrong_1', store);
-    assert.deepEqual(second, [messages.identityVerificationFailed]);
+    assert.ok(second.includes('Resposta incorreta. Tente novamente:'));
+    assert.ok(!second.includes(messages.identityVerificationFailed));
+    assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 1);
+    assert.deepEqual(await processMessage(config, phone, 'ident_wrong_1', store), [messages.identityVerificationFailed]);
     assert.deepEqual((await store.getByPhone(phone))?.state, { name: 'idle' });
   }
 });
@@ -190,7 +202,7 @@ test('rótulo e número do fallback identificam a opção correta em Sete Lagoas
     const store = await storeWith(verification(challenge));
     const replies = await processMessage(config, phone, input, store);
     assert.ok(replies.includes('Resposta incorreta. Tente novamente:'));
-    assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 1);
+    assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 2);
   }
 });
 
@@ -200,16 +212,34 @@ test('rótulos ambíguos não são aceitos como resposta correta', async () => {
   const store = await storeWith(verification(challenge));
   const replies = await processMessage(config, phone, '1287', store);
   assert.ok(replies.includes('Resposta incorreta. Tente novamente:'));
-  assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 1);
+  assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 2);
 });
 
 test('outras cidades mantêm a mensagem anterior ao esgotar tentativas', async () => {
   for (const municipio of ['formiga', 'oliveira', undefined]) {
     const challenge = { ...cpfChallenge, field: 'phone' as const, question: 'Selecione seu telefone:' };
-    const store = await storeWith(verification(challenge));
+    const store = await storeWith(verification(challenge, 2));
     await processMessage({ ...config, municipio }, phone, 'ident_wrong_1', store);
     const replies = await processMessage({ ...config, municipio }, phone, 'ident_wrong_1', store);
     assert.deepEqual(replies, ['Não foi possível verificar sua identidade. Por segurança, o atendimento foi encerrado.']);
     assert.deepEqual((await store.getByPhone(phone))?.state, { name: 'idle' });
   }
+});
+
+test('sessão sem contador usa três tentativas apenas em Sete Lagoas', async () => {
+  for (const municipio of ['sete-lagoas', '7lagoas', 'formiga', undefined]) {
+    const initial = verification(cpfChallenge) as any;
+    delete initial.attemptsLeft;
+    const store = await storeWith(initial);
+    const replies = await processMessage({ ...config, municipio }, phone, 'ident_wrong_1', store);
+    assert.ok(replies.includes('Resposta incorreta. Tente novamente:'));
+    assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, municipio === 'sete-lagoas' || municipio === '7lagoas' ? 2 : 1);
+  }
+});
+
+test('confirmação secundária mantém duas tentativas nas demais cidades', async () => {
+  const secondary: IdentityChallengeState = { ...cpfChallenge, field: 'nome', question: 'Selecione o nome:' };
+  const store = await storeWith({ ...verification(cpfChallenge, 2), secondaryChallenge: secondary } as ConversationState);
+  await processMessage({ ...config, municipio: 'formiga' }, phone, 'ident_correct', store);
+  assert.equal(((await store.getByPhone(phone))?.state as any).attemptsLeft, 2);
 });

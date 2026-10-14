@@ -269,6 +269,7 @@ function menuFallbackText(config, prefix) {
 }
 export async function processMessage(config, phone, text, sessionStore) {
     const replies = [];
+    const identityAttempts = isSeteLagoas(config) ? 3 : 2;
     try {
         // Validações básicas de entrada
         if (!phone || typeof phone !== 'string') {
@@ -662,7 +663,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                     challenge: challengeSet.primary,
                                     secondaryChallenge: challengeSet.secondary,
                                     step: 'primary',
-                                    attemptsLeft: 2
+                                    attemptsLeft: identityAttempts
                                 },
                                 updatedAt: now
                             });
@@ -1648,7 +1649,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                     const challenge = state?.challenge;
                     const secondaryChallenge = state?.secondaryChallenge;
                     const step = state?.step;
-                    const attemptsLeft = state?.attemptsLeft ?? 2;
+                    const attemptsLeft = state?.attemptsLeft ?? identityAttempts;
                     let selectedId = text.trim();
                     if (isSeteLagoas(config) && !challenge.options.some(option => option.id === selectedId)) {
                         // Alguns retornos trazem somente o rótulo; o fallback em texto aceita 1, 2 ou 3.
@@ -1701,7 +1702,7 @@ export async function processMessage(config, phone, text, sessionStore) {
                                 ligacoes: storedLigacoes,
                                 challenge: secondaryChallenge,
                                 step: 'secondary',
-                                attemptsLeft: 2
+                                attemptsLeft: identityAttempts
                             },
                             updatedAt: now
                         });

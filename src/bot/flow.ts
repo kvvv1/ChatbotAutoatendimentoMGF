@@ -316,6 +316,7 @@ export async function processMessage(
   sessionStore: SessionStore
 ): Promise<BotReply[]> {
   const replies: BotReply[] = [];
+  const identityAttempts = isSeteLagoas(config) ? 3 : 2;
   
   try {
     // Validações básicas de entrada
@@ -732,7 +733,7 @@ export async function processMessage(
                   challenge: challengeSet.primary,
                   secondaryChallenge: challengeSet.secondary,
                   step: 'primary',
-                  attemptsLeft: 2
+                  attemptsLeft: identityAttempts
                 },
                 updatedAt: now
               });
@@ -1711,7 +1712,7 @@ export async function processMessage(
           const challenge = (state as any)?.challenge as { field?: string; question: string; options: { id: string; text: string }[]; correctId: string };
           const secondaryChallenge = (state as any)?.secondaryChallenge as { question: string; options: { id: string; text: string }[]; correctId: string } | undefined;
           const step = (state as any)?.step as 'primary' | 'secondary';
-          const attemptsLeft = ((state as any)?.attemptsLeft as number) ?? 2;
+          const attemptsLeft = ((state as any)?.attemptsLeft as number) ?? identityAttempts;
 
           let selectedId = text.trim();
           if (isSeteLagoas(config) && !challenge.options.some(option => option.id === selectedId)) {
@@ -1766,7 +1767,7 @@ export async function processMessage(
                 ligacoes: storedLigacoes,
                 challenge: secondaryChallenge,
                 step: 'secondary',
-                attemptsLeft: 2
+                attemptsLeft: identityAttempts
               },
               updatedAt: now
             });

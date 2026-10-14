@@ -338,7 +338,7 @@ test('Z-API preserva o ID correto do botão quando o título contém os dígitos
         correctId: 'ident_correct', options: [{ id: 'ident_correct', text: '1287' }, { id: 'ident_wrong_1', text: '6024' }] },
       secondaryChallenge: { field: 'nome', question: 'Selecione o primeiro nome do titular do cadastro:',
         correctId: 'ident_correct', options: [{ id: 'ident_correct', text: 'Cliente' }] },
-      step: 'primary', attemptsLeft: 2
+      step: 'primary', attemptsLeft: 3
     }
   }));
   mock.method(MemorySessionStore.prototype, 'save', async (session: any) => { saved = session; });
@@ -356,7 +356,7 @@ test('Z-API preserva o ID correto do botão quando o título contém os dígitos
       await waitUntil(() => Boolean(saved));
       assert.equal(saved.state.step, expectedStep);
       assert.equal(saved.state.challenge.field, expectedStep === 'secondary' ? 'nome' : 'phone');
-      assert.equal(saved.state.attemptsLeft, expectedStep === 'secondary' ? 2 : 1);
+      assert.equal(saved.state.attemptsLeft, expectedStep === 'secondary' ? 3 : 2);
     }
   } finally {
     await app.close();
