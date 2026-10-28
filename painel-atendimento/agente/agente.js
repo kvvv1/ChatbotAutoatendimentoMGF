@@ -533,7 +533,7 @@
   // ---- Início ----
   el.brandTitle.textContent = ctx.title || 'Agente MGF';
   el.systemName.textContent = ctx.sistemaNome + (ctx.entidade ? ' · ' + ctx.entidade : '');
-  document.title = (ctx.title || 'Agente MGF') + ' · ' + (ctx.sigla || '');
+  document.title = ctx.title || 'Agente MGF';
   if (!active() || active().messages.length) {
     const empty = state.conversations.find(c => !c.messages.length);
     if (empty) state.activeId = empty.id; else newConversation();
