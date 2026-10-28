@@ -26,12 +26,26 @@ function nowInBrasilia(date: Date): { isoWeekday: number; minutesSinceMidnight: 
   };
 }
 
+/** Data atual em Brasília no formato AAAA-MM-DD */
+function todayInBrasilia(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(date);
+}
+
+function isClosedDay(config: AppConfig, date: Date): boolean {
+  if (!config.businessClosedFrom) return false;
+  const today = todayInBrasilia(date);
+  return today >= config.businessClosedFrom && today <= (config.businessClosedUntil ?? config.businessClosedFrom);
+}
+
 function timeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
 }
 
 export function isWithinBusinessHours(config: AppConfig, date: Date = new Date()): boolean {
+  if (isClosedDay(config, date)) return false;
   const { isoWeekday, minutesSinceMidnight } = nowInBrasilia(date);
 
   if (isSeteLagoas(config)) {
@@ -50,7 +64,14 @@ export function isWithinBusinessHours(config: AppConfig, date: Date = new Date()
   return minutesSinceMidnight >= start && minutesSinceMidnight < end;
 }
 
-export function businessHoursMessage(config: AppConfig): string {
+export function businessHoursMessage(config: AppConfig, date: Date = new Date()): string {
+  const message = config.businessHoursMessage ?? defaultBusinessHoursMessage(config);
+  const noticeActive = config.businessHoursNotice
+    && (!config.businessHoursNoticeUntil || todayInBrasilia(date) <= config.businessHoursNoticeUntil);
+  return noticeActive ? `${message}\n\n${config.businessHoursNotice}` : message;
+}
+
+function defaultBusinessHoursMessage(config: AppConfig): string {
   const dayRange = config.businessDayStart === config.businessDayEnd
     ? WEEKDAY_NAMES[config.businessDayStart]
     : `${WEEKDAY_NAMES[config.businessDayStart]} a ${WEEKDAY_NAMES[config.businessDayEnd]}`;

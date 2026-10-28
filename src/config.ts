@@ -73,6 +73,12 @@ export type AppConfig = {
   businessSaturdayEnabled?: boolean;
   businessSaturdayStart?: string;
   businessSaturdayEnd?: string;
+  // Mensagem fora do horário: texto próprio, aviso temporário (some após a data) e dias sem expediente
+  businessHoursMessage?: string;
+  businessHoursNotice?: string;
+  businessHoursNoticeUntil?: string;
+  businessClosedFrom?: string;
+  businessClosedUntil?: string;
   // "Falar com atendente" via ligação em vez de ticket (só ativa se configurado — por entidade)
   humanHandoffCallEnabled: boolean;
   humanHandoffCallPhone?: string;
@@ -170,6 +176,11 @@ export function loadConfig(): AppConfig {
     BUSINESS_SATURDAY_ENABLED,
     BUSINESS_SATURDAY_START,
     BUSINESS_SATURDAY_END,
+    BUSINESS_HOURS_MESSAGE,
+    BUSINESS_HOURS_NOTICE,
+    BUSINESS_HOURS_NOTICE_UNTIL,
+    BUSINESS_CLOSED_FROM,
+    BUSINESS_CLOSED_UNTIL,
     HUMAN_HANDOFF_CALL_ENABLED,
     HUMAN_HANDOFF_CALL_PHONE,
     HUMAN_HANDOFF_CALL_MESSAGE,
@@ -218,6 +229,10 @@ export function loadConfig(): AppConfig {
       validateBusinessHours('BUSINESS_SATURDAY', businessSaturdayStart, businessSaturdayEnd);
     }
   }
+
+  validateIsoDate('BUSINESS_HOURS_NOTICE_UNTIL', BUSINESS_HOURS_NOTICE_UNTIL);
+  validateIsoDate('BUSINESS_CLOSED_FROM', BUSINESS_CLOSED_FROM);
+  validateIsoDate('BUSINESS_CLOSED_UNTIL', BUSINESS_CLOSED_UNTIL);
 
   return {
     port: Number(PORT ?? 3000),
@@ -288,6 +303,11 @@ export function loadConfig(): AppConfig {
     businessSaturdayEnabled,
     businessSaturdayStart,
     businessSaturdayEnd,
+    businessHoursMessage: envText(BUSINESS_HOURS_MESSAGE),
+    businessHoursNotice: envText(BUSINESS_HOURS_NOTICE),
+    businessHoursNoticeUntil: BUSINESS_HOURS_NOTICE_UNTIL?.trim() || undefined,
+    businessClosedFrom: BUSINESS_CLOSED_FROM?.trim() || undefined,
+    businessClosedUntil: BUSINESS_CLOSED_UNTIL?.trim() || BUSINESS_CLOSED_FROM?.trim() || undefined,
     humanHandoffCallEnabled: HUMAN_HANDOFF_CALL_ENABLED === 'true',
     humanHandoffCallPhone: HUMAN_HANDOFF_CALL_PHONE || undefined,
     humanHandoffCallMessage: HUMAN_HANDOFF_CALL_MESSAGE || undefined,
@@ -315,5 +335,17 @@ function validateBusinessHours(prefix: string, start: string, end: string): void
   if (!format.test(start) || !format.test(end) || end <= start) {
     throw new Error(`${prefix}_START e ${prefix}_END devem usar HH:MM, com início anterior ao fim`);
   }
+}
+
+function validateIsoDate(key: string, value: string | undefined): void {
+  if (value?.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    throw new Error(`${key} deve usar o formato AAAA-MM-DD`);
+  }
+}
+
+/** Texto multilinha vindo do .env: aceita "\n" literal como quebra de linha */
+function envText(value: string | undefined): string | undefined {
+  const text = value?.replace(/\\n/g, '\n').trim();
+  return text || undefined;
 }
 

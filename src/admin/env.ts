@@ -53,6 +53,11 @@ const SCHEMA: Array<{ key: string; required: boolean; group: string; sensitive?:
   { key: 'BUSINESS_SATURDAY_ENABLED', required: false, group: 'Horário de Atendimento' },
   { key: 'BUSINESS_SATURDAY_START', required: false, group: 'Horário de Atendimento' },
   { key: 'BUSINESS_SATURDAY_END', required: false, group: 'Horário de Atendimento' },
+  { key: 'BUSINESS_HOURS_MESSAGE', required: false, group: 'Horário de Atendimento' },
+  { key: 'BUSINESS_HOURS_NOTICE', required: false, group: 'Horário de Atendimento' },
+  { key: 'BUSINESS_HOURS_NOTICE_UNTIL', required: false, group: 'Horário de Atendimento' },
+  { key: 'BUSINESS_CLOSED_FROM', required: false, group: 'Horário de Atendimento' },
+  { key: 'BUSINESS_CLOSED_UNTIL', required: false, group: 'Horário de Atendimento' },
   // SMTP
   { key: 'SMTP_HOST', required: false, group: 'SMTP' },
   { key: 'SMTP_PORT', required: false, group: 'SMTP' },
