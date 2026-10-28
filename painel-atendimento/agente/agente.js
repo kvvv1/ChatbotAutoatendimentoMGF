@@ -532,7 +532,10 @@
 
   // ---- Início ----
   el.brandTitle.textContent = ctx.title || 'Agente MGF';
-  el.systemName.textContent = ctx.sistemaNome + (ctx.entidade ? ' · ' + ctx.entidade : '');
+  // Evita repetir a sigla quando a entidade já começa com ela ("SAAE - Água e Esgoto" + "SAAE São João...")
+  const sigla = String(ctx.sistemaNome || '').match(/^(\S+)\s*-\s*(.+)$/);
+  const sistemaLabel = sigla && String(ctx.entidade || '').startsWith(sigla[1]) ? sigla[2] : ctx.sistemaNome;
+  el.systemName.textContent = sistemaLabel + (ctx.entidade ? ' · ' + ctx.entidade : '');
   document.title = ctx.title || 'Agente MGF';
   if (!active() || active().messages.length) {
     const empty = state.conversations.find(c => !c.messages.length);
