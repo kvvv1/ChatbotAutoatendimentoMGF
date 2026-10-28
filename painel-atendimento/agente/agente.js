@@ -29,8 +29,18 @@
     menuBtn: $('menu-btn'), sidebarClose: $('sidebar-close'), backdrop: $('backdrop'), toast: $('toast')
   };
 
+  // Ícone oficial do Agente MGF (GESTCOM): WebP com fallback PNG, 1x/2x/3x
+  const BRAND_DIR = 'assets/brand/gestcom-icon-';
+  function brandIcon(size, sources, lazy) {
+    const set = (ext) => sources.map((px, i) => BRAND_DIR + px + '.' + ext + ' ' + (i + 1) + 'x').join(', ');
+    return '<picture><source type="image/webp" srcset="' + set('webp') + '">' +
+      '<img src="' + BRAND_DIR + sources[0] + '.png" srcset="' + set('png') + '" width="' + size + '" height="' + size +
+      '" alt="Agente MGF - GESTCOM" decoding="async"' + (lazy ? ' loading="lazy"' : '') + ' draggable="false"></picture>';
+  }
+  const BRAND_AVATAR = brandIcon(32, [32, 64, 96], true);
+  const BRAND_WELCOME = brandIcon(56, [56, 112, 168]);
+
   const ICON = {
-    spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
     copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>',
     retry: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/></svg>',
@@ -134,7 +144,7 @@
   function renderWelcome() {
     const w = document.createElement('div');
     w.className = 'welcome';
-    w.innerHTML = '<div class="welcome-mark">' + ICON.spark + '</div><h1></h1><p></p><div class="cards"></div>';
+    w.innerHTML = '<div class="welcome-mark">' + BRAND_WELCOME + '</div><h1></h1><p></p><div class="cards"></div>';
     w.querySelector('h1').textContent = ctx.welcomeTitle || 'Olá!';
     w.querySelector('p').textContent = ctx.welcomeDescription || '';
     const cards = w.querySelector('.cards');
@@ -158,7 +168,7 @@
       row.firstChild.textContent = m.text;
       return row;
     }
-    row.innerHTML = '<div class="avatar">' + ICON.spark + '</div><div class="body"><div class="content"></div></div>';
+    row.innerHTML = '<div class="avatar">' + BRAND_AVATAR + '</div><div class="body"><div class="content"></div></div>';
     const body = row.querySelector('.body');
     const content = row.querySelector('.content');
     content.innerHTML = m.html || escapeHtml(m.text || '');
@@ -211,7 +221,7 @@
     row.id = 'typing';
     const label = sending && sending.mode === 'pdf' ? 'Gerando relatório, pode levar até 2 minutos...'
       : sending && sending.mode === 'bi' ? 'Montando o painel de BI...' : 'Consultando o sistema...';
-    row.innerHTML = '<div class="avatar">' + ICON.spark + '</div><div class="body"><div class="typing"><span></span><span></span><span></span><em class="typing-label"></em></div></div>';
+    row.innerHTML = '<div class="avatar">' + BRAND_AVATAR + '</div><div class="body"><div class="typing"><span></span><span></span><span></span><em class="typing-label"></em></div></div>';
     row.querySelector('.typing-label').textContent = label;
     return row;
   }
@@ -521,9 +531,9 @@
   });
 
   // ---- Início ----
-  el.brandTitle.textContent = ctx.title || 'Agente I.A.M.';
+  el.brandTitle.textContent = ctx.title || 'Agente MGF';
   el.systemName.textContent = ctx.sistemaNome + (ctx.entidade ? ' · ' + ctx.entidade : '');
-  document.title = (ctx.title || 'Agente I.A.M.') + ' · ' + (ctx.sigla || '');
+  document.title = (ctx.title || 'Agente MGF') + ' · ' + (ctx.sigla || '');
   if (!active() || active().messages.length) {
     const empty = state.conversations.find(c => !c.messages.length);
     if (empty) state.activeId = empty.id; else newConversation();

@@ -1,4 +1,4 @@
-// Configuração da tela do Agente I.A.M. (MGF).
+// Configuração da tela do Agente MGF.
 // Pode ser sobrescrita pela URL do iframe: ?entidade=...&municipio=...&usuario=...&schema=...
 // ou pelo sistema hospedeiro via postMessage({ type: 'agente-iam:contexto', entidade, municipio, usuario, schema }).
 window.AGENTE_IAM_CONFIG = Object.freeze({
@@ -9,9 +9,9 @@ window.AGENTE_IAM_CONFIG = Object.freeze({
   entidade: 'SAAE São João Batista do Glória',
   municipio: 'São João Batista do Glória',
 
-  title: 'Agente I.A.M.',
+  title: 'Agente MGF',
   storageKey: 'mgf-agente-iam',
-  welcomeTitle: 'Olá! Sou o Agente I.A.M.',
+  welcomeTitle: 'Olá! Sou o Agente MGF',
   welcomeDescription: 'Pergunte sobre ligações, leituras e consumo, contas, arrecadação, inadimplência, parcelamentos e ordens de serviço. Também gero relatórios em PDF e painéis de BI.',
 
   welcomeSuggestions: [
