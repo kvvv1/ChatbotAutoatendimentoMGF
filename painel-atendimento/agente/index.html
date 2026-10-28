@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agente I.A.M.</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%235b6788'/%3E%3Cpath d='M12 5l1.5 3.6L17 10l-3.5 1.4L12 15l-1.5-3.6L7 10l3.5-1.4z' fill='white'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="agente.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar" aria-label="Histórico de conversas">
+      <div class="sidebar-top">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+          </span>
+          <span class="brand-title" id="brand-title">Agente I.A.M.</span>
+          <button class="icon-btn sidebar-close" id="sidebar-close" aria-label="Fechar histórico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <button class="new-chat" id="new-chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Novo chat
+        </button>
+        <label class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+          <input id="search" type="search" placeholder="Pesquisar conversas" autocomplete="off" aria-label="Pesquisar conversas" />
+        </label>
+      </div>
+      <nav class="history" id="history" role="list"></nav>
+      <div class="sidebar-foot">
+        <span class="session-label">Sessão</span>
+        <button class="session-id" id="session-id" title="Clique para copiar">—</button>
+      </div>
+    </aside>
+    <div class="backdrop" id="backdrop"></div>
+
+    <main class="chat">
+      <header class="chat-header">
+        <button class="icon-btn menu-btn" id="menu-btn" aria-label="Abrir histórico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <div class="chat-title">
+          <strong id="chat-title">Novo chat</strong>
+          <span class="chat-sub"><span class="status-dot"></span><span id="system-name"></span></span>
+        </div>
+        <span class="mode-badge hidden" id="mode-badge"></span>
+      </header>
+
+      <section class="messages" id="messages" aria-live="polite"></section>
+
+      <section class="composer-wrap">
+        <div class="chips" id="chips"></div>
+        <form class="composer" id="composer">
+          <textarea id="input" rows="1" placeholder="Pergunte algo ao agente..." aria-label="Mensagem"></textarea>
+          <button type="submit" class="send" id="send" aria-label="Enviar" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
+        </form>
+        <p class="disclaimer">As respostas são geradas por IA a partir dos dados do sistema. Confira informações críticas.</p>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="agente.config.js"></script>
+  <script src="agente.js"></script>
+</body>
+</html>
