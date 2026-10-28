@@ -289,7 +289,7 @@
 
     const reply = { id: uid(), role: 'assistant', time: Date.now() };
     try {
-      const resp = await callAgent(text, c.sessionId, mode, controller);
+      const resp = await callAgent(text, c.sessionId, mode, controller, buildHistorico(c));
       Object.assign(reply, toReply(resp, reply.id));
     } catch (e) {
       const aborted = e && e.name === 'AbortError' && !controller.timedOut;
@@ -317,11 +317,39 @@
     sendMessage(msg.retryText);
   }
 
-  async function callAgent(text, sessionId, mode, controller) {
+  // Conversa até aqui, como o usuário viu (tabelas viram linhas "| a | b |"), para relatórios "da conversa"
+  const HISTORY_MAX_MSGS = 16;
+  const HISTORY_MAX_CHARS = 20000;
+  function buildHistorico(conv) {
+    const msgs = conv.messages.slice(0, -1).filter(m => !m.error); // a última é a pergunta atual
+    const out = [];
+    let total = 0;
+    for (let i = msgs.length - 1; i >= 0 && out.length < HISTORY_MAX_MSGS; i--) {
+      const m = msgs[i];
+      const texto = (m.role === 'user' ? m.text : htmlToPlain(m.html || escapeHtml(m.text || ''))).trim();
+      if (!texto) continue;
+      total += texto.length;
+      if (total > HISTORY_MAX_CHARS) break;
+      out.unshift({ papel: m.role === 'user' ? 'usuario' : 'agente', texto });
+    }
+    return out;
+  }
+  function htmlToPlain(html) {
+    const root = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstChild;
+    root.querySelectorAll('.mf-callout-attention').forEach(n => n.remove()); // avisos de tabela omitida
+    root.querySelectorAll('table').forEach(t => {
+      const rows = [...t.querySelectorAll('tr')].map(tr => '| ' + [...tr.children].map(td => td.textContent.trim()).join(' | ') + ' |');
+      t.replaceWith(document.createTextNode('\n' + rows.join('\n') + '\n'));
+    });
+    root.querySelectorAll('p,h1,h2,h3,h4,li,div,br').forEach(n => n.after(document.createTextNode('\n')));
+    return root.textContent.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n');
+  }
+
+  async function callAgent(text, sessionId, mode, controller, historico) {
     const payload = {
       sigla: ctx.sigla, sistema: ctx.sigla, sistemaNome: ctx.sistemaNome, schema: ctx.schema,
       entidade: ctx.entidade, municipio: ctx.municipio, username: ctx.usuario || '',
-      mensagem: text, sessionId
+      mensagem: text, sessionId, historico: historico || []
     };
     if (mode) payload.formatoSaida = mode;
     const url = ctx.endpoint + (ctx.endpoint.includes('?') ? '&' : '?') + 'sessionId=' + encodeURIComponent(sessionId);
