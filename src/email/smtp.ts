@@ -34,13 +34,14 @@ export async function sendOtpEmail(
 
   console.log(`[SMTP] Enviando OTP para ${params.to}...`);
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: config.smtpFrom!,
       to: params.to,
       subject,
       text
     });
-    console.log(`[SMTP] OTP enviado com sucesso para ${params.to}`);
+    // messageId/response permitem rastrear o envio no painel do provedor SMTP
+    console.log(`[SMTP] OTP enviado com sucesso para ${params.to} (messageId: ${info.messageId}, resposta: ${info.response})`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[SMTP] ERRO ao enviar para ${params.to}:`, msg);

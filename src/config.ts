@@ -53,6 +53,8 @@ export type AppConfig = {
   otpExpiresMinutes: number;
   otpMaxAttempts: number;
   otpMock?: boolean;
+  // Ignora o e-mail cadastrado no login e verifica só pelo desafio de identidade — por entidade
+  ignorarEmailOtp: boolean;
   videoTutorialUrl?: string;
   videoTutorialCaption?: string;
   videoTutorialIntro?: string;
@@ -154,6 +156,7 @@ export function loadConfig(): AppConfig {
     OTP_EXPIRES_MINUTES,
     OTP_MAX_ATTEMPTS,
     OTP_MOCK,
+    IGNORAR_EMAIL_OTP,
     VIDEO_TUTORIAL_URL,
     VIDEO_TUTORIAL_CAPTION,
     VIDEO_TUTORIAL_INTRO,
@@ -281,6 +284,7 @@ export function loadConfig(): AppConfig {
     otpExpiresMinutes: Number(OTP_EXPIRES_MINUTES ?? 10),
     otpMaxAttempts: Number(OTP_MAX_ATTEMPTS ?? 5),
     otpMock: OTP_MOCK === 'true',
+    ignorarEmailOtp: IGNORAR_EMAIL_OTP === 'true',
     videoTutorialUrl: VIDEO_TUTORIAL_URL,
     videoTutorialCaption: VIDEO_TUTORIAL_CAPTION,
     videoTutorialIntro: VIDEO_TUTORIAL_INTRO,

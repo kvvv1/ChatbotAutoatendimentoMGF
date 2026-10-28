@@ -69,6 +69,7 @@ const SCHEMA: Array<{ key: string; required: boolean; group: string; sensitive?:
   { key: 'OTP_EXPIRES_MINUTES', required: false, group: 'OTP' },
   { key: 'OTP_MAX_ATTEMPTS', required: false, group: 'OTP' },
   { key: 'OTP_MOCK', required: false, group: 'OTP' },
+  { key: 'IGNORAR_EMAIL_OTP', required: false, group: 'OTP' },
   // Gestcom API
   { key: 'LINK_API_BASE_URL', required: false, group: 'Gestcom API' },
   { key: 'LINK_API_TOKEN', required: false, group: 'Gestcom API', sensitive: true },

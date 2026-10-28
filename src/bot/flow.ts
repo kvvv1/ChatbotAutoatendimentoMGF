@@ -90,6 +90,18 @@ function isValidEmail(email: string): boolean {
   }
 }
 
+// Cadastro da GestCom pode vir com espaços, maiúsculas ou mais de um e-mail ("a@x.com; b@y.com") — usa o primeiro válido
+function normalizeCadastroEmail(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  return raw.split(/[;,\s]+/).map(e => e.trim().toLowerCase()).find(isValidEmail);
+}
+
+// Mostra o e-mail parcialmente pro cliente saber pra onde foi o código (ex.: jo***@gmail.com)
+function maskEmail(email: string): string {
+  const [user, domain] = email.split('@');
+  return `${user.slice(0, 2)}***@${domain}`;
+}
+
 function normalizeUserText(value: string): string {
   try {
     return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -681,16 +693,18 @@ export async function processMessage(
             const challengeSet = buildChallenges(dadosVerificacao);
 
             // Verifica se há email disponível para OTP
-            const emailCadastrado = dadosVerificacao.Email;
-            const temEmail = typeof emailCadastrado === 'string' && emailCadastrado.includes('@');
-            if (!temEmail) {
-              console.warn(`[OTP] Email ausente ou inválido para ID ${resolvedIdEletronico} (valor: ${emailCadastrado ?? 'null'}) — seguindo para desafio de identidade`);
+            const emailCadastrado = normalizeCadastroEmail(dadosVerificacao.Email);
+            const temEmail = !config.ignorarEmailOtp && !!emailCadastrado;
+            if (config.ignorarEmailOtp) {
+              console.log(`[OTP] IGNORAR_EMAIL_OTP ativo — ID ${resolvedIdEletronico} segue direto para desafio de identidade`);
+            } else if (!temEmail) {
+              console.warn(`[OTP] Email ausente ou inválido para ID ${resolvedIdEletronico} (valor: ${dadosVerificacao.Email ?? 'null'}) — seguindo para desafio de identidade`);
             }
 
             if (temEmail) {
               try {
                 await createAndSendOtp(config, { phone, identifier: resolvedIdEletronico, email: emailCadastrado! });
-                replies.push('Para proteger seu atendimento, enviamos um código de verificação para o seu e-mail cadastrado. 🔒');
+                replies.push(`Para proteger seu atendimento, enviamos um código de verificação para o seu e-mail cadastrado (${maskEmail(emailCadastrado!)}). 🔒\nSe não encontrar, confira a caixa de spam.`);
                 replies.push('Digite o código de 6 dígitos recebido:');
                 await sessionStore.save({
                   phone,
