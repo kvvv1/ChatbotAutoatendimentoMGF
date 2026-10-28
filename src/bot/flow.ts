@@ -13,7 +13,7 @@ import { isLinkApiConfigured, linkImpressaoConta, linkGetDadosCadastrais, type L
 import { buildChallenges } from './identityChallenge.js';
 import { fetchDadosAutarquia, formatarTelefone } from '../company/autarquia.js';
 import { ensureOpenHumanTicket } from '../supabase/humanTickets.js';
-import { isWithinBusinessHours, businessHoursMessage } from './businessHours.js';
+import { isWithinBusinessHours, businessHoursMessage, greetingHoursMessage } from './businessHours.js';
 
 function onlyDigits(value: string): string {
   try {
@@ -378,6 +378,8 @@ export async function processMessage(
 
       replies.push('✅ Atendimento encerrado. Vamos começar novamente.');
       replies.push(messages.welcome(config.entidadeNome));
+      const hoursMessage = greetingHoursMessage(config);
+      if (hoursMessage) replies.push(hoursMessage);
       if (config.welcomeAudioUrl) {
         replies.push({
           type: 'audio',
@@ -466,6 +468,8 @@ export async function processMessage(
     // Se está no estado inicial (idle)
     if (state.name === 'idle') {
       replies.push(messages.welcome(config.entidadeNome));
+      const hoursMessage = greetingHoursMessage(config);
+      if (hoursMessage) replies.push(hoursMessage);
       if (config.welcomeAudioUrl) {
         replies.push({
           type: 'audio',

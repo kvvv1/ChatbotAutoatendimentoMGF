@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { loadConfig, type AppConfig } from '../src/config.js';
-import { isWithinBusinessHours, businessHoursMessage } from '../src/bot/businessHours.js';
+import { isWithinBusinessHours, businessHoursMessage, greetingHoursMessage } from '../src/bot/businessHours.js';
+import { processMessage } from '../src/bot/flow.js';
+import { MemorySessionStore } from '../src/state/memorySessionStore.js';
 
 const base = { municipio: 'sabinopolis', businessDayStart: 1, businessDayEnd: 5,
   businessHoursStart: '08:00', businessHoursEnd: '16:15' } as AppConfig;
@@ -67,4 +69,30 @@ test('BUSINESS_CLOSED_UNTIL vazio considera apenas o dia de BUSINESS_CLOSED_FROM
 
 test('datas fora do formato AAAA-MM-DD são rejeitadas', () => {
   assert.throws(() => loadWithEnvironment({ BUSINESS_HOURS_NOTICE_UNTIL: '02/11/2026' }), /AAAA-MM-DD/);
+});
+
+test('saudação: cidade sem mensagem nem aviso não muda', () => {
+  assert.equal(greetingHoursMessage(base, new Date('2026-10-28T22:00:00Z')), undefined);
+  const expired = { ...base, businessHoursNotice: 'Aviso.', businessHoursNoticeUntil: '2026-11-02' } as AppConfig;
+  assert.equal(greetingHoursMessage(expired, new Date('2026-11-03T22:00:00Z')), undefined);
+});
+
+test('saudação: fora do horário mostra a mensagem completa; dentro do horário só o aviso', () => {
+  const config = { ...base, businessHoursMessage: 'Horário.', businessHoursNotice: 'Aviso.',
+    businessHoursNoticeUntil: '2026-11-02', businessClosedFrom: '2026-10-30', businessClosedUntil: '2026-10-30' } as AppConfig;
+  assert.equal(greetingHoursMessage(config, at('2026-10-29')), 'Aviso.');
+  assert.equal(greetingHoursMessage(config, at('2026-10-30')), 'Horário.\n\nAviso.');
+  assert.equal(greetingHoursMessage(config, new Date('2026-11-03T22:00:00Z')), 'Horário.');
+  assert.equal(greetingHoursMessage(config, at('2026-11-03')), undefined);
+});
+
+test('"oi" no recesso mostra o aviso logo após a saudação', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-29T10:00:00-03:00') });
+  const config = { ...base, entidadeNome: 'DMAES Ponte Nova', businessHoursEnd: '17:00',
+    businessHoursNotice: 'Aviso de recesso.', businessHoursNoticeUntil: '2026-11-02',
+    businessClosedFrom: '2026-10-28', businessClosedUntil: '2026-11-02' } as AppConfig;
+  const replies = await processMessage(config, '5531988887777', 'oi', new MemorySessionStore());
+  const texts = replies.filter((r): r is string => typeof r === 'string');
+  assert.match(texts[0], /Sou o autoatendimento do DMAES Ponte Nova/);
+  assert.match(texts[1], /\n\nAviso de recesso\.$/);
 });

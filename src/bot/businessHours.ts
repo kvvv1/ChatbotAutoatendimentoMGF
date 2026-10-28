@@ -64,11 +64,24 @@ export function isWithinBusinessHours(config: AppConfig, date: Date = new Date()
   return minutesSinceMidnight >= start && minutesSinceMidnight < end;
 }
 
+function activeNotice(config: AppConfig, date: Date): string | undefined {
+  if (!config.businessHoursNotice) return undefined;
+  if (config.businessHoursNoticeUntil && todayInBrasilia(date) > config.businessHoursNoticeUntil) return undefined;
+  return config.businessHoursNotice;
+}
+
 export function businessHoursMessage(config: AppConfig, date: Date = new Date()): string {
   const message = config.businessHoursMessage ?? defaultBusinessHoursMessage(config);
-  const noticeActive = config.businessHoursNotice
-    && (!config.businessHoursNoticeUntil || todayInBrasilia(date) <= config.businessHoursNoticeUntil);
-  return noticeActive ? `${message}\n\n${config.businessHoursNotice}` : message;
+  const notice = activeNotice(config, date);
+  return notice ? `${message}\n\n${notice}` : message;
+}
+
+/** Texto exibido na saudação — só para quem configurou BUSINESS_HOURS_MESSAGE ou tem aviso ativo */
+export function greetingHoursMessage(config: AppConfig, date: Date = new Date()): string | undefined {
+  const notice = activeNotice(config, date);
+  if (!config.businessHoursMessage && !notice) return undefined;
+  if (!isWithinBusinessHours(config, date)) return businessHoursMessage(config, date);
+  return notice;
 }
 
 function defaultBusinessHoursMessage(config: AppConfig): string {
