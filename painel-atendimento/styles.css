@@ -512,7 +512,8 @@ body {
   height: 15px;
 }
 
-.transfer-popover {
+/* .qr-popover.transfer-popover: precisa vencer o .qr-popover declarado mais abaixo (que abre para cima) */
+.qr-popover.transfer-popover {
   top: calc(100% + 8px);
   bottom: auto;
   left: auto;
@@ -521,7 +522,7 @@ body {
 }
 
 @media (max-width: 720px) {
-  .transfer-popover {
+  .qr-popover.transfer-popover {
     width: 240px;
     right: -40px;
   }

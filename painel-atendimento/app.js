@@ -1641,7 +1641,7 @@ function handleGlobalShortcuts(ev) {
   if (key === 't') {
     if (!transferButtonEl) return;
     ev.preventDefault();
-    if (!transferButtonEl.disabled) transferTicket();
+    if (!transferButtonEl.disabled) openTransferPopover();
     return;
   }
 
