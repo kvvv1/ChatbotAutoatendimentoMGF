@@ -101,7 +101,7 @@ test('CPF permite dois erros e orienta LGPD/SAC 115 apenas no terceiro erro', as
       const third = await processMessage(instance, phone, 'ident_wrong_1', store);
       assert.deepEqual(third, [messages.identityVerificationFailed]);
       assert.match(third[0] as string, /LGPD/);
-      assert.match(third[0] as string, /SAC: 115/);
+      assert.match(third[0] as string, /2106-0100 e nos fins de semana através do SAC pelo número 115\./);
       assert.deepEqual((await store.getByPhone(phone))?.state, { name: 'idle' });
     }
   }
