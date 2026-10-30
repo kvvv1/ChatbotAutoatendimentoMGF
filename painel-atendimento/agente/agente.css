@@ -366,6 +366,13 @@ svg { width: 18px; height: 18px; flex: none; }
 .send:disabled { opacity: .35; cursor: default; }
 .send.stop { background: var(--secondary); }
 .disclaimer { text-align: center; font-size: 11px; color: var(--text-soft); margin: 8px auto 0; }
+/* Aviso de privacidade (LGPD, item 445): recolhido no rodapé, abre ao clicar */
+.privacidade summary { cursor: pointer; list-style: none; }
+.privacidade summary::-webkit-details-marker { display: none; }
+.privacidade-link { text-decoration: underline; color: var(--secondary); }
+.privacidade summary:focus-visible { outline: 2px solid var(--secondary); outline-offset: 2px; border-radius: 4px; }
+.privacidade p { text-align: left; font-size: 12px; line-height: 1.55; color: var(--text); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 8px 0 0; max-height: 40vh; overflow-y: auto; }
 
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
