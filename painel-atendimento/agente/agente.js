@@ -26,8 +26,34 @@
     app: $('app'), history: $('history'), search: $('search'), newChat: $('new-chat'), sessionId: $('session-id'),
     messages: $('messages'), chips: $('chips'), composer: $('composer'), input: $('input'), send: $('send'),
     chatTitle: $('chat-title'), systemName: $('system-name'), modeBadge: $('mode-badge'), brandTitle: $('brand-title'),
-    menuBtn: $('menu-btn'), sidebarClose: $('sidebar-close'), backdrop: $('backdrop'), toast: $('toast')
+    menuBtn: $('menu-btn'), sidebarClose: $('sidebar-close'), backdrop: $('backdrop'), toast: $('toast'),
+    waModal: $('wa-modal'), waForm: $('wa-form'), waPhone: $('wa-phone'), waError: $('wa-error'), waDesc: $('wa-desc'),
+    waResult: $('wa-result'), waSubmit: $('wa-submit'), waCancel: $('wa-cancel'), waClose: $('wa-close')
   };
+
+  // ---- Identidade estável do usuário ----
+  // ctx.usuario vem do iframe (?usuario=) ou do postMessage; sem ele, usa um id anônimo persistente.
+  const USER_KEY = ctx.usuarioStorageKey || 'mgf-agente-usuario';
+  let anonUser = null;
+  function uuid4() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    const b = new Uint8Array(16);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(b);
+    else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
+  function currentUser() {
+    if (ctx.usuario) return String(ctx.usuario);
+    if (anonUser) return anonUser;
+    try { anonUser = localStorage.getItem(USER_KEY); } catch (e) { anonUser = null; }
+    if (!anonUser || !/^anon-[0-9a-f-]{36}$/i.test(anonUser)) {
+      anonUser = 'anon-' + uuid4();
+      try { localStorage.setItem(USER_KEY, anonUser); } catch (e) { /* fica só em memória nesta sessão */ }
+    }
+    return anonUser;
+  }
 
   // Ícone oficial do Agente MGF (GESTCOM): WebP com fallback PNG, 1x/2x/3x
   const BRAND_DIR = 'assets/brand/gestcom-icon-';
@@ -49,7 +75,15 @@
     download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
     open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
     send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
-    stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>'
+    stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    sparkle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z"/></svg>',
+    history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    barcode: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5v14M7 5v14M11 5v14M14 5v14M17 5v14M20 5v14"/></svg>',
+    whatsapp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20l1.2-4.2A8.5 8.5 0 1 1 20 11.5z"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 1c-1-.4-2-1.4-2.4-2.4l1-1-1-2z"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7L20 8.6M20 3v5.6h-5.6"/></svg>'
   };
 
   // ---- Estado ----
@@ -138,7 +172,8 @@
       if (sending && sending.convId === c.id) el.messages.appendChild(renderTyping());
     }
     renderChips();
-    scrollToBottom(false);
+    if (c && c.messages.length) scrollToBottom(false);
+    else el.messages.scrollTop = 0; // boas-vindas abre no topo (título e "Continuar de onde parou" visíveis)
   }
 
   function renderWelcome() {
@@ -147,6 +182,8 @@
     w.innerHTML = '<div class="welcome-mark">' + BRAND_WELCOME + '</div><h1></h1><p></p><div class="cards"></div>';
     w.querySelector('h1').textContent = ctx.welcomeTitle || 'Olá!';
     w.querySelector('p').textContent = ctx.welcomeDescription || '';
+    const recentes = recentQuestions(3);
+    if (recentes.length) w.insertBefore(renderResume(recentes), w.querySelector('.cards'));
     const cards = w.querySelector('.cards');
     (ctx.welcomeSuggestions || []).forEach(s => {
       const b = document.createElement('button');
@@ -158,6 +195,47 @@
       cards.appendChild(b);
     });
     return w;
+  }
+
+  // Últimas perguntas feitas em outras conversas (a mais recente de cada conversa)
+  function recentQuestions(n) {
+    const seen = new Set();
+    const out = [];
+    state.conversations
+      .filter(c => c.id !== state.activeId && c.messages.some(m => m.role === 'user'))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .forEach(c => {
+        const u = [...c.messages].reverse().find(m => m.role === 'user' && m.text);
+        const key = u && u.text.trim().toLowerCase();
+        if (!u || seen.has(key) || out.length >= n) return;
+        seen.add(key);
+        out.push({ convId: c.id, text: u.text.trim(), time: c.updatedAt });
+      });
+    return out;
+  }
+  function fmtWhen(ts) {
+    const g = groupLabel(ts);
+    return (g === 'Hoje' || g === 'Ontem' ? g : new Date(ts).toLocaleDateString('pt-BR')) + ', ' + fmtTime(ts);
+  }
+  function renderResume(list) {
+    const sec = document.createElement('section');
+    sec.className = 'resume';
+    sec.setAttribute('aria-labelledby', 'resume-title');
+    sec.innerHTML = '<h2 class="resume-title" id="resume-title">' + ICON.history + 'Continuar de onde parou</h2><div class="resume-list"></div>';
+    const box = sec.querySelector('.resume-list');
+    list.forEach(r => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'resume-item';
+      b.innerHTML = ICON.history + '<span class="resume-q"></span><span class="resume-when"></span>' + ICON.arrow;
+      b.querySelector('.resume-q').textContent = r.text;
+      b.querySelector('.resume-when').textContent = fmtWhen(r.time);
+      b.setAttribute('aria-label', 'Continuar a conversa: ' + r.text + ' (' + fmtWhen(r.time) + ')');
+      b.title = r.text;
+      b.addEventListener('click', () => selectConversation(r.convId));
+      box.appendChild(b);
+    });
+    return sec;
   }
 
   function renderMessage(m, conv) {
@@ -175,6 +253,7 @@
 
     if (m.pdf) body.appendChild(renderPdfCard(m));
     if (m.biUrl) body.appendChild(renderBiCard(m));
+    if (m.acao && m.acao.tipo === 'segunda_via' && !m.error) body.appendChild(renderSegundaVia(m));
 
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -215,15 +294,69 @@
     return card;
   }
 
+  // ---- Indicador de etapas ----
+  // O backend não envia progresso: as etapas avançam por tempo decorrido (ms) e a última fica
+  // "em andamento" até a resposta chegar.
+  const PROGRESS = {
+    '': {
+      titulo: 'Preparando sua resposta',
+      etapas: [['Entendendo a pergunta', 0], ['Consultando o banco de dados', 2500], ['Conferindo os números', 9000], ['Montando a resposta', 16000]]
+    },
+    pdf: {
+      titulo: 'Gerando o relatório…',
+      dica: 'Relatórios em PDF podem levar até 2 minutos.',
+      etapas: [['Entendendo o pedido', 0], ['Consultando o banco de dados', 3000], ['Conferindo os números', 15000], ['Montando o relatório', 30000], ['Preparando o PDF para download', 80000]]
+    },
+    bi: {
+      titulo: 'Montando o painel de BI…',
+      dica: 'O painel abre em uma nova aba quando estiver pronto.',
+      etapas: [['Entendendo o pedido', 0], ['Consultando o banco de dados', 3000], ['Calculando os indicadores', 12000], ['Publicando o painel', 25000]]
+    }
+  };
+  let progressTimer = null;
+
+  function progressStep(cfg, elapsed) {
+    let idx = 0;
+    cfg.etapas.forEach(([, at], i) => { if (elapsed >= at) idx = i; });
+    return idx;
+  }
   function renderTyping() {
+    const cfg = PROGRESS[(sending && sending.mode) || ''] || PROGRESS[''];
     const row = document.createElement('div');
     row.className = 'msg assistant';
     row.id = 'typing';
-    const label = sending && sending.mode === 'pdf' ? 'Gerando relatório, pode levar até 2 minutos...'
-      : sending && sending.mode === 'bi' ? 'Montando o painel de BI...' : 'Consultando o sistema...';
-    row.innerHTML = '<div class="avatar">' + BRAND_AVATAR + '</div><div class="body"><div class="typing"><span></span><span></span><span></span><em class="typing-label"></em></div></div>';
-    row.querySelector('.typing-label').textContent = label;
+    row.innerHTML = '<div class="avatar">' + BRAND_AVATAR + '</div><div class="body"><div class="progress">' +
+      '<div class="progress-head"><span class="progress-title"></span><span class="progress-time" aria-hidden="true"></span></div>' +
+      '<ol class="steps" aria-hidden="true"></ol>' + (cfg.dica ? '<p class="progress-hint"></p>' : '') +
+      '<span class="sr-only" role="status" aria-live="polite" aria-atomic="true"></span></div></div>';
+    row.querySelector('.progress-title').textContent = cfg.titulo;
+    if (cfg.dica) row.querySelector('.progress-hint').textContent = cfg.dica;
+    const ol = row.querySelector('.steps');
+    cfg.etapas.forEach(([label]) => {
+      const li = document.createElement('li');
+      li.className = 'step';
+      li.innerHTML = '<span class="step-mark"></span><span class="step-label"></span>';
+      li.querySelector('.step-label').textContent = label;
+      ol.appendChild(li);
+    });
+    updateProgress(row);
     return row;
+  }
+  function updateProgress(root) {
+    const row = root || document.getElementById('typing');
+    if (!row || !sending) return;
+    const cfg = PROGRESS[sending.mode || ''] || PROGRESS[''];
+    const elapsed = Date.now() - sending.startedAt;
+    const idx = progressStep(cfg, elapsed);
+    const secs = Math.floor(elapsed / 1000);
+    row.querySelector('.progress-time').textContent = secs < 60 ? secs + ' s' : Math.floor(secs / 60) + ' min ' + String(secs % 60).padStart(2, '0') + ' s';
+    if (row.dataset.step === String(idx)) return; // só mexe no DOM (e anuncia) quando a etapa muda
+    row.dataset.step = String(idx);
+    row.querySelectorAll('.step').forEach((li, i) => {
+      li.className = 'step ' + (i < idx ? 'done' : i === idx ? 'current' : 'todo');
+      li.querySelector('.step-mark').innerHTML = i < idx ? ICON.check : '';
+    });
+    row.querySelector('[role="status"]').textContent = 'Etapa ' + (idx + 1) + ' de ' + cfg.etapas.length + ': ' + cfg.etapas[idx][0];
   }
 
   function actionButton(icon, label, fn) {
@@ -246,20 +379,45 @@
     el.chips.innerHTML = '';
     if (!c || !c.messages.length) return;
     const lastUser = [...c.messages].reverse().find(m => m.role === 'user');
+    const lastReply = [...c.messages].reverse().find(m => m.role === 'assistant');
     const text = ' ' + (lastUser ? lastUser.text.toLowerCase() : '') + ' ';
     let pool = [];
     (ctx.domainKeywords || []).forEach(g => { if (g.palavrasChave.some(k => text.includes(k))) pool.push(...g.suggestions); });
     pool = pool.concat(pick(ctx.followUpSuggestions || [], 3));
-    const asked = new Set(c.messages.filter(m => m.role === 'user').map(m => m.text.trim().toLowerCase()));
-    [...new Set(pool)].filter(s => !asked.has(s.toLowerCase())).slice(0, 4).forEach(s => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'chip';
-      b.textContent = s;
-      b.disabled = !!sending;
-      b.addEventListener('click', () => sendMessage(s));
-      el.chips.appendChild(b);
+    const seen = new Set(c.messages.filter(m => m.role === 'user').map(m => m.text.trim().toLowerCase()));
+
+    // Sugestões personalizadas pelo servidor (histórico do usuário) vêm primeiro, em destaque
+    const personal = [];
+    ((lastReply && !lastReply.error && lastReply.sugestoes) || []).forEach(s => {
+      const k = s.trim().toLowerCase();
+      if (k && !seen.has(k) && personal.length < 3) { seen.add(k); personal.push(s.trim()); }
     });
+    if (personal.length) {
+      const group = document.createElement('div');
+      group.className = 'chip-group';
+      group.setAttribute('role', 'group');
+      group.setAttribute('aria-labelledby', 'chips-personal-label');
+      group.innerHTML = '<span class="chips-label" id="chips-personal-label">' + ICON.sparkle + 'Sugestões para você</span>';
+      personal.forEach(s => group.appendChild(chip(s, 'chip chip-personal')));
+      el.chips.appendChild(group);
+    }
+    const contextual = [...new Set(pool)].filter(s => !seen.has(s.toLowerCase())).slice(0, personal.length ? 3 : 4);
+    if (personal.length && contextual.length) {
+      const sep = document.createElement('span');
+      sep.className = 'chips-sep';
+      sep.setAttribute('aria-hidden', 'true');
+      el.chips.appendChild(sep);
+    }
+    contextual.forEach(s => el.chips.appendChild(chip(s, 'chip')));
+  }
+  function chip(s, cls) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = cls;
+    b.textContent = s;
+    b.disabled = !!sending;
+    b.addEventListener('click', () => sendMessage(s));
+    return b;
   }
 
   // ---- Envio ----
@@ -281,11 +439,13 @@
     el.input.value = '';
     autoresize();
     const controller = new AbortController();
-    sending = { controller, convId: c.id, mode };
+    sending = { controller, convId: c.id, mode, startedAt: Date.now() };
     updateComposer();
     persist();
     renderHistory();
     renderMessages();
+    clearInterval(progressTimer);
+    progressTimer = setInterval(() => updateProgress(), 500);
 
     const reply = { id: uid(), role: 'assistant', time: Date.now() };
     try {
@@ -300,6 +460,8 @@
       reply.time = Date.now();
       c.messages.push(reply);
       c.updatedAt = Date.now();
+      clearInterval(progressTimer);
+      progressTimer = null;
       sending = null;
       updateComposer();
       persist();
@@ -348,7 +510,7 @@
   async function callAgent(text, sessionId, mode, controller, historico) {
     const payload = {
       sigla: ctx.sigla, sistema: ctx.sigla, sistemaNome: ctx.sistemaNome, schema: ctx.schema,
-      entidade: ctx.entidade, municipio: ctx.municipio, username: ctx.usuario || '',
+      entidade: ctx.entidade, municipio: ctx.municipio, username: currentUser(),
       mensagem: text, sessionId, historico: historico || []
     };
     if (mode) payload.formatoSaida = mode;
@@ -402,6 +564,17 @@
     r.error = resp.error === true || resp.pdfError === true;
     r.text = String(resp.text || '').replace(/__CHART__[\s\S]*?__ENDCHART__/g, '').trim();
     const html = String(resp.html || '').replace(/__CHART__[\s\S]*?__ENDCHART__/g, '');
+    // Contratos novos (opcionais): sugestões personalizadas e ação de 2ª via
+    if (Array.isArray(resp.sugestoes)) {
+      const s = resp.sugestoes.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim().slice(0, 200)).slice(0, 3);
+      if (s.length) r.sugestoes = s;
+    }
+    const acao = resp.acao;
+    if (acao && typeof acao === 'object' && acao.tipo === 'segunda_via') {
+      const mat = Number(acao.matricula);
+      if (Number.isFinite(mat) && mat > 0) r.acao = { tipo: 'segunda_via', matricula: mat };
+    }
+    if (r.acao && !r.text && !html.trim()) r.text = 'Encontrei os boletos da matrícula ' + r.acao.matricula + '.';
     r.html = html.trim() ? sanitize(html) : markdownToHtml(r.text);
     if (!r.text && !html.trim() && !r.pdf && !r.biUrl) { r.error = true; r.text = 'O agente não retornou resposta. Reformule a pergunta.'; r.html = '<p>' + r.text + '</p>'; }
     return r;
@@ -473,11 +646,320 @@
   function downloadPdf(m) {
     const bytes = pdfStore.get(m.id);
     if (!bytes) return;
+    downloadBytes(bytes, m.pdfName || 'relatorio.pdf');
+  }
+  function downloadBytes(bytes, name) {
     const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
     const a = document.createElement('a');
-    a.href = url; a.download = m.pdfName || 'relatorio.pdf';
+    a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  const isPdf = b => b.length > 3 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+
+  // ---- 2ª via de boletos ----
+  // Chamada genérica aos webhooks auxiliares, com mensagens amigáveis para 404 / rede / tempo.
+  async function callService(url, body, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs || 45000);
+    let res;
+    try {
+      res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error('O serviço demorou demais para responder. Tente novamente.');
+      throw new Error('Não foi possível conectar ao serviço de 2ª via. Ele pode estar indisponível no momento ou sua conexão caiu.');
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.status === 404) throw new Error('O serviço de 2ª via ainda não está disponível. Tente novamente mais tarde.');
+    if (!res.ok) throw new Error(res.status >= 500 ? 'O serviço de 2ª via está indisponível no momento. Tente novamente em instantes.' : 'O serviço de 2ª via recusou a solicitação (erro ' + res.status + ').');
+    return res;
+  }
+  async function readJson(res) {
+    const raw = (await res.text()).trim();
+    if (!raw) return {};
+    try { return unwrap(JSON.parse(raw)); } catch (e) { throw new Error('O serviço de 2ª via devolveu uma resposta inválida.'); }
+  }
+
+  const svCache = new Map();   // msgId -> Promise<dados> (refeito ao reabrir a conversa)
+  const svBusy = new Set();    // chaves de ações em andamento (evita clique duplo)
+  const svStatus = new Map();  // chave do boleto -> texto de status (ex.: enviado por WhatsApp)
+  const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  function fmtDate(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[3] + '/' + m[2] + '/' + m[1] : String(iso || '');
+  }
+  function fmtRef(r) {
+    const s = String(r || '');
+    const iso = s.match(/^(\d{4})-(\d{2})/);
+    if (iso) return iso[2] + '/' + iso[1];
+    const mm = s.match(/^(\d{1,2})\/(\d{4})$/);
+    return mm ? mm[1].padStart(2, '0') + '/' + mm[2] : s;
+  }
+  function fmtEndereco(e) {
+    if (!e) return '';
+    if (typeof e === 'string') return e;
+    const linha = [e.logradouro || e.rua, e.numero].filter(Boolean).join(', ');
+    return [linha, e.complemento, e.bairro, e.cidade || e.municipio].filter(Boolean).join(' · ');
+  }
+  function normalizeBoletos(d) {
+    const boletos = (Array.isArray(d.boletos) ? d.boletos : []).map(b => ({
+      boletoId: b.boletoId != null ? b.boletoId : b.id,
+      referencias: (Array.isArray(b.referencias) ? b.referencias : b.referencia ? [b.referencia] : []).map(fmtRef),
+      vencimento: b.vencimento || '',
+      valor: Number(b.valor) || 0,
+      situacao: b.situacao || 'Em aberto',
+      diasAtraso: Number(b.diasAtraso) || 0,
+      linhaDigitavel: b.linhaDigitavel ? String(b.linhaDigitavel) : '',
+      temPix: !!b.temPix
+    }));
+    const total = d.totalEmAberto != null ? Number(d.totalEmAberto) : boletos.reduce((s, b) => s + b.valor, 0);
+    return {
+      matricula: d.matricula,
+      nome: (d.cliente && d.cliente.nome) || '',
+      endereco: fmtEndereco(d.endereco),
+      boletos, total,
+      sugestao: (d.sugestaoPagamento && d.sugestaoPagamento.texto) || ''
+    };
+  }
+  function loadBoletos(m) {
+    if (!svCache.has(m.id)) {
+      const p = callService(ctx.boletosEndpoint, { schema: ctx.schema, matricula: m.acao.matricula, usuario: currentUser() })
+        .then(readJson).then(normalizeBoletos);
+      p.catch(() => svCache.delete(m.id)); // erro não fica em cache: "Tentar novamente" refaz a busca
+      svCache.set(m.id, p);
+    }
+    return svCache.get(m.id);
+  }
+
+  function renderSegundaVia(m) {
+    const mat = m.acao.matricula;
+    const card = document.createElement('section');
+    card.className = 'sv-card';
+    card.setAttribute('aria-label', '2ª via de boletos da matrícula ' + mat);
+    card.innerHTML = '<div class="sv-head"><div class="att-icon" aria-hidden="true">' + ICON.barcode + '</div>' +
+      '<div class="sv-head-text"><strong>2ª via de boletos</strong><span></span></div>' +
+      '<button type="button" class="icon-btn sv-refresh" aria-label="Atualizar boletos" title="Atualizar">' + ICON.refresh + '</button></div>' +
+      '<div class="sv-body" aria-busy="true"><div class="sv-state"><span class="btn-spin" aria-hidden="true"></span>Buscando boletos da matrícula…</div></div>';
+    card.querySelector('.sv-head-text span').textContent = 'Matrícula ' + mat;
+    card.querySelector('.sv-refresh').addEventListener('click', () => { svCache.delete(m.id); card.replaceWith(renderSegundaVia(m)); });
+    const body = card.querySelector('.sv-body');
+    loadBoletos(m).then(d => {
+      body.removeAttribute('aria-busy');
+      fillSegundaVia(body, d, m);
+    }, err => {
+      body.removeAttribute('aria-busy');
+      body.innerHTML = '<div class="sv-error" role="alert"><p></p><button type="button" class="btn-secondary">' + ICON.retry + 'Tentar novamente</button></div>';
+      body.querySelector('p').textContent = (err && err.message) || 'Não foi possível consultar os boletos agora.';
+      body.querySelector('button').addEventListener('click', () => card.replaceWith(renderSegundaVia(m)));
+    });
+    return card;
+  }
+
+  function fillSegundaVia(body, d, m) {
+    body.innerHTML = '';
+    if (d.nome || d.endereco) {
+      const cli = document.createElement('div');
+      cli.className = 'sv-client';
+      cli.innerHTML = '<strong></strong><span></span>';
+      cli.querySelector('strong').textContent = d.nome || 'Cliente não identificado';
+      cli.querySelector('span').textContent = d.endereco;
+      body.appendChild(cli);
+    }
+    if (!d.boletos.length) {
+      const p = document.createElement('div');
+      p.className = 'sv-state';
+      p.textContent = 'Nenhum boleto em aberto para esta matrícula.';
+      body.appendChild(p);
+      return;
+    }
+    const ul = document.createElement('ul');
+    ul.className = 'sv-list';
+    d.boletos.forEach(b => ul.appendChild(renderBoleto(b, d, m)));
+    body.appendChild(ul);
+
+    const total = document.createElement('div');
+    total.className = 'sv-total';
+    total.innerHTML = '<span>Total em aberto</span><strong></strong>';
+    total.querySelector('strong').textContent = brl(d.total);
+    body.appendChild(total);
+
+    if (d.sugestao) {
+      const tip = document.createElement('div');
+      tip.className = 'sv-tip';
+      tip.innerHTML = ICON.calendar + '<p></p>';
+      tip.querySelector('p').textContent = d.sugestao;
+      body.appendChild(tip);
+    }
+  }
+
+  function renderBoleto(b, d, m) {
+    const mat = m.acao.matricula;
+    const ref = b.referencias.join(', ') || fmtRef(String(b.vencimento).slice(0, 7));
+    const vencido = /vencid/i.test(b.situacao) || b.diasAtraso > 0;
+    const li = document.createElement('li');
+    li.className = 'sv-item';
+    li.dataset.svKey = ctx.schema + ':' + mat + ':' + b.boletoId;
+    li.innerHTML = '<div class="sv-item-head"><div class="sv-item-info"><span class="sv-ref"></span><span class="sv-venc"></span></div>' +
+      '<div class="sv-item-val"><strong></strong><span class="sv-badges"><span class="sv-badge"></span></span></div></div>' +
+      '<div class="sv-item-actions"></div><p class="sv-item-status" role="status"></p>';
+    li.querySelector('.sv-ref').textContent = 'Ref. ' + ref;
+    li.querySelector('.sv-venc').textContent = 'Vencimento ' + fmtDate(b.vencimento);
+    li.querySelector('.sv-item-val strong').textContent = brl(b.valor);
+    const badge = li.querySelector('.sv-badge');
+    badge.className = 'sv-badge ' + (vencido ? 'sv-badge-late' : 'sv-badge-open');
+    badge.textContent = vencido ? 'Vencido' + (b.diasAtraso ? ' · ' + b.diasAtraso + (b.diasAtraso === 1 ? ' dia' : ' dias') : '') : (b.situacao || 'Em aberto');
+    if (b.temPix) {
+      const pix = document.createElement('span');
+      pix.className = 'sv-badge sv-badge-pix';
+      pix.textContent = 'Pix';
+      badge.after(pix);
+    }
+    const key = ctx.schema + ':' + mat + ':' + b.boletoId;
+    li.querySelector('.sv-item-status').textContent = svStatus.get(key) || '';
+    const desc = 'boleto ' + ref + ' de ' + brl(b.valor);
+    const acts = li.querySelector('.sv-item-actions');
+
+    acts.appendChild(svButton(ICON.download, 'Baixar 2ª via (PDF)', 'Gerando PDF…', 'pdf:' + key, 'Baixar 2ª via em PDF do ' + desc, async () => {
+      const res = await callService(ctx.segundaViaEndpoint, { schema: ctx.schema, matricula: mat, boletoId: b.boletoId, usuario: currentUser() }, 90000);
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (!isPdf(bytes)) {
+        let msg = '';
+        try { const j = unwrap(JSON.parse(new TextDecoder().decode(bytes))); msg = j.mensagem || j.message || ''; } catch (e) { /* não é JSON */ }
+        throw new Error(msg || 'O serviço não devolveu um PDF válido para este boleto.');
+      }
+      const mmaaaa = (b.referencias[0] || fmtRef(String(b.vencimento).slice(0, 7))).replace(/\D/g, '');
+      downloadBytes(bytes, '2a-via-' + mat + '-' + (mmaaaa || b.boletoId) + '.pdf');
+      toast('2ª via baixada');
+    }));
+
+    const copyBtn = svButton(ICON.copy, 'Copiar linha digitável', '', null, 'Copiar linha digitável do ' + desc, () => copyText(b.linhaDigitavel));
+    if (!b.linhaDigitavel) { copyBtn.disabled = true; copyBtn.title = 'Linha digitável indisponível'; }
+    acts.appendChild(copyBtn);
+
+    acts.appendChild(svButton(ICON.whatsapp, 'Enviar por WhatsApp', '', null, 'Enviar por WhatsApp o ' + desc, (ev) => {
+      openWhatsapp({ key, mat, boletoId: b.boletoId, resumo: 'Matrícula ' + mat + ' · ' + (d.nome ? d.nome + ' · ' : '') + 'Ref. ' + ref + ' · ' + brl(b.valor) }, ev.currentTarget);
+    }));
+    return li;
+  }
+
+  // Botão com estado de carregamento; a chave é global para sobreviver a re-renderizações.
+  function svButton(icon, label, busyLabel, key, aria, fn) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-secondary';
+    btn.setAttribute('aria-label', aria || label);
+    if (key) btn.dataset.busyKey = key;
+    btn.dataset.icon = icon; btn.dataset.label = label; btn.dataset.busyLabel = busyLabel || label;
+    paintButton(btn, key && svBusy.has(key));
+    btn.addEventListener('click', async ev => {
+      if (!key) return fn(ev);
+      if (svBusy.has(key)) return;
+      svBusy.add(key); setBusyKey(key, true);
+      try { await fn(ev); }
+      catch (e) { toast((e && e.message) || 'Não foi possível concluir a ação.', 4500); }
+      finally { svBusy.delete(key); setBusyKey(key, false); }
+    });
+    return btn;
+  }
+  function paintButton(btn, busy) {
+    btn.disabled = !!busy;
+    btn.setAttribute('aria-busy', busy ? 'true' : 'false');
+    btn.innerHTML = (busy ? '<span class="btn-spin" aria-hidden="true"></span>' : btn.dataset.icon) + '<span></span>';
+    btn.lastChild.textContent = busy ? btn.dataset.busyLabel : btn.dataset.label;
+  }
+  function setBusyKey(key, busy) {
+    document.querySelectorAll('[data-busy-key]').forEach(b => { if (b.dataset.busyKey === key) paintButton(b, busy); });
+  }
+
+  // ---- Modal do WhatsApp ----
+  let wa = null; // { key, mat, boletoId, resumo, opener, sending }
+  const phoneDigits = v => String(v || '').replace(/\D/g, '').slice(0, 11);
+  function maskPhone(v) {
+    const d = phoneDigits(v);
+    if (!d) return '';
+    if (d.length <= 2) return '(' + d;
+    if (d.length <= 7) return '(' + d.slice(0, 2) + ') ' + d.slice(2);
+    return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+  }
+  function validatePhone(d) {
+    if (!d) return 'Informe o telefone com DDD.';
+    if (d.length >= 2 && !/^[1-9][1-9]/.test(d)) return 'DDD inválido.';
+    if (d.length >= 3 && d[2] !== '9') return 'Para WhatsApp, informe um celular (começa com 9 depois do DDD).';
+    if (d.length < 11) return 'Número incompleto: informe o DDD e os 9 dígitos do celular.';
+    return '';
+  }
+  function setWaError(msg) {
+    el.waError.textContent = msg;
+    el.waPhone.setAttribute('aria-invalid', msg ? 'true' : 'false');
+  }
+  function setWaSending(on) {
+    wa.sending = on;
+    el.waSubmit.disabled = on;
+    el.waPhone.readOnly = on;
+    el.waSubmit.innerHTML = on ? '<span class="btn-spin" aria-hidden="true"></span><span>Enviando…</span>' : '<span>Enviar pelo WhatsApp</span>';
+  }
+  function openWhatsapp(info, opener) {
+    wa = Object.assign({ opener, sending: false }, info);
+    el.waDesc.textContent = info.resumo;
+    el.waPhone.value = '';
+    setWaError('');
+    el.waResult.textContent = ''; el.waResult.className = 'modal-result';
+    setWaSending(false);
+    el.waModal.classList.remove('hidden');
+    el.app.inert = true;
+    el.app.setAttribute('aria-hidden', 'true');
+    el.waPhone.focus();
+  }
+  function closeWhatsapp() {
+    if (!wa) return;
+    const opener = wa.opener;
+    el.waModal.classList.add('hidden');
+    el.app.inert = false;
+    el.app.removeAttribute('aria-hidden');
+    wa = null;
+    // o botão de origem pode ter sido recriado; volta o foco se ainda estiver na tela
+    if (opener && document.body.contains(opener)) opener.focus(); else el.input.focus();
+  }
+  async function submitWhatsapp(e) {
+    e.preventDefault();
+    if (!wa || wa.sending) return;
+    const d = phoneDigits(el.waPhone.value);
+    const err = validatePhone(d);
+    setWaError(err);
+    if (err) { el.waPhone.focus(); return; }
+    const cur = wa;
+    setWaSending(true);
+    el.waResult.textContent = ''; el.waResult.className = 'modal-result';
+    try {
+      const res = await callService(ctx.whatsappEndpoint, { schema: ctx.schema, matricula: cur.mat, boletoId: cur.boletoId, telefone: d, usuario: currentUser() }, 45000);
+      const j = await readJson(res);
+      if (j.ok !== true) throw new Error(j.mensagem || 'O envio não foi confirmado pelo serviço. Tente novamente.');
+      const msg = j.mensagem || '2ª via enviada por WhatsApp.';
+      svStatus.set(cur.key, 'Enviado por WhatsApp para ' + maskPhone(d) + ' às ' + fmtTime(Date.now()) + '.');
+      document.querySelectorAll('.sv-item').forEach(li => {
+        if (li.dataset.svKey === cur.key) li.querySelector('.sv-item-status').textContent = svStatus.get(cur.key);
+      });
+      if (wa === cur) closeWhatsapp();
+      toast(msg, 3500);
+    } catch (ex) {
+      if (wa === cur) {
+        setWaSending(false);
+        el.waResult.className = 'modal-result err';
+        el.waResult.textContent = (ex && ex.message) || 'Não foi possível enviar agora.';
+      }
+    }
+  }
+  function trapFocus(e) {
+    if (!wa) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeWhatsapp(); return; }
+    if (e.key !== 'Tab') return;
+    const f = [...el.waModal.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled && x.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    else if (!el.waModal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
   }
   async function copyText(t) {
     try { await navigator.clipboard.writeText(t); toast('Copiado'); }
@@ -488,9 +970,9 @@
     }
   }
   let toastTimer;
-  function toast(msg) {
+  function toast(msg, ms) {
     el.toast.textContent = msg; el.toast.classList.add('show');
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.toast.classList.remove('show'), 1800);
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.toast.classList.remove('show'), ms || 1800);
   }
   function scrollToBottom(smooth) {
     requestAnimationFrame(() => el.messages.scrollTo({ top: el.messages.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }));
@@ -513,6 +995,7 @@
 
   // ---- Ações de conversa ----
   function selectConversation(id) {
+    svCache.clear(); // ao (re)abrir uma conversa, os boletos dos cartões de 2ª via são buscados de novo
     state.activeId = id;
     persist();
     renderHistory();
@@ -554,7 +1037,17 @@
   el.menuBtn.addEventListener('click', () => el.app.classList.add('sidebar-open'));
   el.sidebarClose.addEventListener('click', closeSidebar);
   el.backdrop.addEventListener('click', closeSidebar);
+  el.waForm.addEventListener('submit', submitWhatsapp);
+  el.waPhone.addEventListener('input', () => {
+    el.waPhone.value = maskPhone(el.waPhone.value);
+    if (el.waError.textContent) setWaError(validatePhone(phoneDigits(el.waPhone.value)) && el.waError.textContent);
+  });
+  el.waCancel.addEventListener('click', closeWhatsapp);
+  el.waClose.addEventListener('click', closeWhatsapp);
+  el.waModal.addEventListener('mousedown', e => { if (e.target === el.waModal) closeWhatsapp(); });
+  document.addEventListener('keydown', trapFocus);
   document.addEventListener('keydown', e => {
+    if (wa) return;
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'o') { e.preventDefault(); startNewChat(); }
   });
 

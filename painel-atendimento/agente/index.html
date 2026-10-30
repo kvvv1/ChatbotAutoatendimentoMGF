@@ -65,6 +65,35 @@
   </div>
   <div class="toast" id="toast" role="status"></div>
 
+  <!-- Modal: enviar 2ª via por WhatsApp -->
+  <div class="modal-backdrop hidden" id="wa-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wa-title" aria-describedby="wa-desc">
+      <div class="modal-head">
+        <h2 id="wa-title">Enviar 2ª via por WhatsApp</h2>
+        <button type="button" class="icon-btn" id="wa-close" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <p class="modal-desc" id="wa-desc"></p>
+      <form id="wa-form" novalidate>
+        <label class="field-label" for="wa-phone">Telefone com DDD</label>
+        <input class="field-input" id="wa-phone" type="tel" inputmode="numeric" autocomplete="off" maxlength="15"
+               placeholder="(35) 99999-9999" aria-describedby="wa-help wa-error" aria-invalid="false" />
+        <p class="field-help" id="wa-help">Celular com WhatsApp, no formato (99) 99999-9999.</p>
+        <p class="field-error" id="wa-error" role="alert"></p>
+        <div class="modal-warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>
+          <strong>Confirme o número com o cliente antes de enviar.</strong>
+        </div>
+        <p class="modal-result" id="wa-result" role="status"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="wa-cancel">Cancelar</button>
+          <button type="submit" class="btn-primary" id="wa-submit">Enviar pelo WhatsApp</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="agente.config.js"></script>
   <script src="agente.js"></script>
 </body>

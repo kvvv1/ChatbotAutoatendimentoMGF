@@ -5,6 +5,12 @@ window.AGENTE_IAM_CONFIG = Object.freeze({
   sigla: 'MGF',
   sistemaNome: 'SAAE - Água e Esgoto',
   endpoint: 'https://n8n.webcidadao.com.br/webhook/fac26cd6-e470-45b9-8554-8399b0829212',
+  // 2ª via de boletos (cartão exibido quando a resposta traz acao.tipo === 'segunda_via')
+  boletosEndpoint: 'https://n8n.webcidadao.com.br/webhook/mgf-boletos',
+  segundaViaEndpoint: 'https://n8n.webcidadao.com.br/webhook/mgf-segunda-via',
+  whatsappEndpoint: 'https://n8n.webcidadao.com.br/webhook/mgf-enviar-whatsapp',
+  // Id anônimo persistente quando o hospedeiro não informa o usuário (formato 'anon-<uuid>')
+  usuarioStorageKey: 'mgf-agente-usuario',
   schema: 'gloria',
   entidade: 'SAAE São João Batista do Glória',
   municipio: 'São João Batista do Glória',
