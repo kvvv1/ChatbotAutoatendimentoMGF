@@ -67,7 +67,13 @@
     } catch (e) { return doToken; }
   }
   const operador = carregarOperador();
-  if (operador) ctx.usuario = operador.email || operador.id || operador.nome;
+  const identidadeOperador = () => (operador ? operador.email || operador.id || operador.nome : '');
+  if (operador) ctx.usuario = identidadeOperador();
+  // Sem sessão assinada a tela não abre: os webhooks recusariam tudo mesmo (quem decide é o servidor)
+  if (ctx.exigirLogin !== false && !(operador && operador.token)) {
+    const aviso = document.getElementById('acesso-bloqueado');
+    if (aviso) aviso.classList.remove('hidden');
+  }
 
   // ---- Identidade estável do usuário ----
   // ctx.usuario vem do token do iframe, de ?usuario= ou do postMessage; sem ele, usa um id anônimo persistente.
@@ -83,6 +89,7 @@
     return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
   }
   function currentUser() {
+    if (operador) return identidadeOperador(); // o postMessage não troca a identidade do token
     if (ctx.usuario) return String(ctx.usuario);
     if (anonUser) return anonUser;
     try { anonUser = localStorage.getItem(USER_KEY); } catch (e) { anonUser = null; }
@@ -133,7 +140,9 @@
   };
 
   // ---- Estado ----
-  const storageKey = (ctx.storageKey || 'mgf-agente-iam') + ':v1';
+  // Histórico separado por operador: no mesmo computador, um atendente não vê a conversa do outro
+  const escopoOperador = operador ? ':' + identidadeOperador() : '';
+  const storageKey = (ctx.storageKey || 'mgf-agente-iam') + escopoOperador + ':v1';
   const pdfStore = new Map(); // PDFs ficam só em memória (não cabem no localStorage)
   let state = load();
   let sending = null; // { controller, convId }
@@ -631,6 +640,7 @@
     const payload = {
       sigla: ctx.sigla, sistema: ctx.sigla, sistemaNome: ctx.sistemaNome, schema: ctx.schema,
       entidade: ctx.entidade, municipio: ctx.municipio, username: currentUser(),
+      tokenOperador: operador && operador.token ? operador.token : undefined,
       mensagem: text, sessionId, historico: historico || []
     };
     if (mode) payload.formatoSaida = mode;
@@ -806,7 +816,8 @@
     const timer = setTimeout(() => controller.abort(), timeoutMs || 45000);
     let res;
     try {
-      res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
+      const comToken = { ...body, tokenOperador: operador && operador.token ? operador.token : undefined };
+      res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(comToken), signal: controller.signal });
     } catch (e) {
       if (e && e.name === 'AbortError') throw new Error('O serviço demorou demais para responder. Tente novamente.');
       throw new Error('Não foi possível conectar ao ' + nome + '. Ele pode estar indisponível no momento ou sua conexão caiu.');
@@ -1484,7 +1495,7 @@
     const nome = 'serviço de chamados';
     const p = callService(ctx.chamadoAbrirEndpoint, {
       schema: ctx.schema, usuario: currentUser(), matricula: Number(d.matricula), tipo: d.tipo,
-      descricao: d.descricao.trim(), contato: d.contato.trim() || null, tokenOperador: operador && operador.token ? operador.token : undefined
+      descricao: d.descricao.trim(), contato: d.contato.trim() || null
     }, 45000, nome).then(res => readJson(res, nome)).then(j => {
       if (j.ok !== true || j.protocolo == null || j.protocolo === '') throw new Error(j.mensagem || 'O registro do chamado não foi confirmado pelo serviço. Tente novamente.');
       return j;
@@ -1690,7 +1701,7 @@
       const nome = 'serviço de chamados';
       try {
         const res = await callService(ctx.chamadoAtualizarEndpoint, {
-          schema: ctx.schema, usuario: currentUser(), tokenOperador: operador.token, protocolo: c.protocolo, status: novo, observacao: obs || null
+          schema: ctx.schema, usuario: currentUser(), protocolo: c.protocolo, status: novo, observacao: obs || null
         }, 45000, nome);
         const j = await readJson(res, nome);
         if (j.ok !== true) throw new Error(j.mensagem || 'A mudança de status não foi confirmada pelo serviço.');
@@ -1831,7 +1842,7 @@
   // ---- Autocompletar do campo de pergunta (combobox ARIA) ----
   // Fontes, nesta ordem: perguntas já feitas pelo usuário (localStorage), catálogo do config e modelos com entidades.
   const AC_MIN = 3, AC_MAX = 6, AC_DEBOUNCE = 150;
-  const ASKED_KEY = (ctx.storageKey || 'mgf-agente-iam') + ':perguntas:v1';
+  const ASKED_KEY = (ctx.storageKey || 'mgf-agente-iam') + escopoOperador + ':perguntas:v1';
   const ASKED_MAX = 100;
   const STOP = new Set(['a', 'o', 'e', 'as', 'de', 'da', 'do', 'das', 'dos', 'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'por', 'para', 'pra', 'com', 'que', 'qual', 'quais', 'me', 'se', 'ao']);
   const SRC_LABEL = { recente: 'Recente', catalogo: 'Sugestão', modelo: 'Modelo' };

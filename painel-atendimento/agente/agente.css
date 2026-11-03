@@ -400,6 +400,11 @@ textarea.field-input { height: auto; min-height: 96px; padding: 10px 12px; line-
 /* Cartão: acompanhamento */
 .ch-refresh { min-height: 32px; flex: none; }
 .ch-sec { display: grid; gap: 8px; min-width: 0; }
+.acesso-bloqueado { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg, #f3f3f3); }
+.acesso-bloqueado.hidden { display: none; }
+.acesso-caixa { max-width: 420px; padding: 24px; text-align: center; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+.acesso-caixa h1 { margin: 0 0 8px; font-size: 20px; color: var(--primary); }
+.acesso-caixa p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-soft); }
 .ch-status { border-top: 1px dashed var(--line); padding-top: 6px; }
 .ch-status summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--primary); }
 .ch-status-form { display: grid; gap: 8px; margin-top: 8px; }

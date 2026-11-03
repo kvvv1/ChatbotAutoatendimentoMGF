@@ -14,6 +14,8 @@ window.AGENTE_IAM_CONFIG = Object.freeze({
   chamadoAbrirEndpoint: 'https://n8n.webcidadao.com.br/webhook/mgf-chamado-abrir',
   chamadoConsultarEndpoint: 'https://n8n.webcidadao.com.br/webhook/mgf-chamado-consultar',
   chamadoAtualizarEndpoint: 'https://n8n.webcidadao.com.br/webhook/mgf-chamado-atualizar',
+  // Tela só abre com token assinado do sistema (?token=); os webhooks exigem o mesmo token
+  exigirLogin: true,
   rotaLimite: 15,
   // Opções do filtro "Tipo de serviço" no cartão de rota (vazio = todos os tipos)
   tiposServicoOs: ['Corte', 'Religação', 'Vazamento', 'Troca de hidrômetro', 'Revisão de leitura', 'Ligação nova', 'Falta d\'água', 'Desobstrução de esgoto'],

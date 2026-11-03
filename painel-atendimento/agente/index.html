@@ -74,6 +74,14 @@
   </div>
   <div class="toast" id="toast" role="status"></div>
 
+  <!-- Sem sessão assinada do sistema hospedeiro -->
+  <div class="acesso-bloqueado hidden" id="acesso-bloqueado" role="alertdialog" aria-modal="true" aria-labelledby="acesso-titulo" aria-describedby="acesso-texto">
+    <div class="acesso-caixa">
+      <h1 id="acesso-titulo">Acesso pelo sistema</h1>
+      <p id="acesso-texto">Sua sessão não foi identificada ou expirou. Abra o Agente MGF novamente pelo sistema de gestão.</p>
+    </div>
+  </div>
+
   <!-- Modal: enviar 2ª via por WhatsApp -->
   <div class="modal-backdrop hidden" id="wa-modal">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wa-title" aria-describedby="wa-desc">
