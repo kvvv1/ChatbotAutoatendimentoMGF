@@ -28,7 +28,8 @@
     chatTitle: $('chat-title'), systemName: $('system-name'), modeBadge: $('mode-badge'), brandTitle: $('brand-title'),
     menuBtn: $('menu-btn'), sidebarClose: $('sidebar-close'), backdrop: $('backdrop'), toast: $('toast'),
     waModal: $('wa-modal'), waForm: $('wa-form'), waPhone: $('wa-phone'), waError: $('wa-error'), waDesc: $('wa-desc'),
-    waResult: $('wa-result'), waSubmit: $('wa-submit'), waCancel: $('wa-cancel'), waClose: $('wa-close')
+    waResult: $('wa-result'), waSubmit: $('wa-submit'), waCancel: $('wa-cancel'), waClose: $('wa-close'),
+    acList: $('ac-list'), acStatus: $('ac-status')
   };
 
   // ---- Identidade estável do usuário ----
@@ -83,7 +84,15 @@
     calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
     barcode: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5v14M7 5v14M11 5v14M14 5v14M17 5v14M20 5v14"/></svg>',
     whatsapp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20l1.2-4.2A8.5 8.5 0 1 1 20 11.5z"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.6-2-1-1 1c-1-.4-2-1.4-2.4-2.4l1-1-1-2z"/></svg>',
-    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7L20 8.6M20 3v5.6h-5.6"/></svg>'
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7L20 8.6M20 3v5.6h-5.6"/></svg>',
+    route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/></svg>',
+    ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>',
+    track: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><path d="M6 8v8M11 6h9M11 12h9M11 18h9"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>',
+    map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>',
+    template: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><path d="m17 15 3 3-3 3"/></svg>'
   };
 
   // ---- Estado ----
@@ -253,7 +262,7 @@
 
     if (m.pdf) body.appendChild(renderPdfCard(m));
     if (m.biUrl) body.appendChild(renderBiCard(m));
-    if (m.acao && m.acao.tipo === 'segunda_via' && !m.error) body.appendChild(renderSegundaVia(m));
+    if (m.acao && !m.error) { const card = renderAcao(m); if (card) body.appendChild(card); }
 
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -378,37 +387,109 @@
     const c = active();
     el.chips.innerHTML = '';
     if (!c || !c.messages.length) return;
-    const lastUser = [...c.messages].reverse().find(m => m.role === 'user');
     const lastReply = [...c.messages].reverse().find(m => m.role === 'assistant');
-    const text = ' ' + (lastUser ? lastUser.text.toLowerCase() : '') + ' ';
-    let pool = [];
-    (ctx.domainKeywords || []).forEach(g => { if (g.palavrasChave.some(k => text.includes(k))) pool.push(...g.suggestions); });
-    pool = pool.concat(pick(ctx.followUpSuggestions || [], 3));
-    const seen = new Set(c.messages.filter(m => m.role === 'user').map(m => m.text.trim().toLowerCase()));
+    const seen = new Set(c.messages.filter(m => m.role === 'user').map(m => fold(m.text.trim())));
 
     // Sugestões personalizadas pelo servidor (histórico do usuário) vêm primeiro, em destaque
     const personal = [];
     ((lastReply && !lastReply.error && lastReply.sugestoes) || []).forEach(s => {
-      const k = s.trim().toLowerCase();
+      const k = fold(s.trim());
       if (k && !seen.has(k) && personal.length < 3) { seen.add(k); personal.push(s.trim()); }
     });
-    if (personal.length) {
-      const group = document.createElement('div');
-      group.className = 'chip-group';
-      group.setAttribute('role', 'group');
-      group.setAttribute('aria-labelledby', 'chips-personal-label');
-      group.innerHTML = '<span class="chips-label" id="chips-personal-label">' + ICON.sparkle + 'Sugestões para você</span>';
-      personal.forEach(s => group.appendChild(chip(s, 'chip chip-personal')));
-      el.chips.appendChild(group);
-    }
-    const contextual = [...new Set(pool)].filter(s => !seen.has(s.toLowerCase())).slice(0, personal.length ? 3 : 4);
-    if (personal.length && contextual.length) {
+    if (personal.length) el.chips.appendChild(chipGroup('chips-personal-label', ICON.sparkle + 'Sugestões para você', personal, 'chip chip-personal'));
+
+    // Próximos passos ligados ao assunto da última resposta (2 a 3, sem repetir o que já foi perguntado)
+    const next = nextSteps(c, seen);
+    if (personal.length && next.list.length) {
       const sep = document.createElement('span');
       sep.className = 'chips-sep';
       sep.setAttribute('aria-hidden', 'true');
       el.chips.appendChild(sep);
     }
-    contextual.forEach(s => el.chips.appendChild(chip(s, 'chip')));
+    if (next.byTopic) el.chips.appendChild(chipGroup('chips-next-label', ICON.arrow + 'Próximos passos', next.list, 'chip chip-next'));
+    else next.list.forEach(s => el.chips.appendChild(chip(s, 'chip')));
+  }
+  function chipGroup(id, label, items, cls) {
+    const group = document.createElement('div');
+    group.className = 'chip-group';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-labelledby', id);
+    group.innerHTML = '<span class="chips-label" id="' + id + '">' + label + '</span>';
+    items.forEach(s => group.appendChild(chip(s, cls)));
+    return group;
+  }
+
+  // Assunto da conversa: pontua cada assunto do config pela pergunta (3), resposta (1) e cartão (5).
+  function nextSteps(conv, seen) {
+    const lastUser = [...conv.messages].reverse().find(m => m.role === 'user');
+    const lastReply = [...conv.messages].reverse().find(m => m.role === 'assistant');
+    const q = ' ' + fold(lastUser ? lastUser.text : '') + ' ';
+    const replyOk = lastReply && !lastReply.error;
+    const r = replyOk ? ' ' + fold(htmlToPlain(lastReply.html || escapeHtml(lastReply.text || '')).slice(0, 3000)) + ' ' : '';
+    const acaoTipo = replyOk && lastReply.acao ? lastReply.acao.tipo : '';
+    const ent = conversationEntities(conv);
+    const ranked = (ctx.assuntos || []).map((a, i) => {
+      let score = 0;
+      (a.palavrasChave || []).forEach(k => { const f = fold(k); if (q.includes(f)) score += 3; else if (r.includes(f)) score += 1; });
+      if (acaoTipo && (a.acoes || []).includes(acaoTipo)) score += 5;
+      return { a, score, i };
+    }).filter(x => x.score > 0).sort((x, y) => y.score - x.score || x.i - y.i);
+
+    const out = [];
+    const used = new Set(seen);
+    const add = s => { const k = fold(s); if (!used.has(k) && out.length < 3) { used.add(k); out.push(s); } };
+    ranked.slice(0, 2).forEach(({ a }, idx) => {
+      (a.proximos || []).forEach(t => {
+        if (idx > 0 && out.length >= 2) return; // o 2º assunto só completa até 2 sugestões
+        const s = fillPlaceholders(t, ent);
+        if (s) add(s);
+      });
+    });
+    if (out.length >= 2) return { list: out, byTopic: true };
+    // Sem assunto reconhecido: comportamento anterior (sugestões gerais)
+    pick(ctx.followUpSuggestions || [], 4).forEach(add);
+    return { list: out, byTopic: false };
+  }
+  function fillPlaceholders(t, ent) {
+    let ok = true;
+    const s = t.replace(/\{(\w+)\}/g, (_, k) => { if (ent[k]) return ent[k]; ok = false; return ''; });
+    return ok ? s : '';
+  }
+  // Entidades citadas na conversa (a mais recente vence): matrícula, bairro, protocolo e ano.
+  function conversationEntities(conv) {
+    const ent = {};
+    const msgs = [...conv.messages].reverse().slice(0, 8);
+    for (const m of msgs) {
+      if (m.error) continue;
+      if (m.acao) {
+        if (!ent.matricula && m.acao.matricula) ent.matricula = String(m.acao.matricula);
+        if (!ent.protocolo && m.acao.protocolo) ent.protocolo = m.acao.protocolo;
+        if (!ent.bairro && m.acao.filtros && m.acao.filtros.bairro) ent.bairro = m.acao.filtros.bairro;
+      }
+      if (!ent.protocolo && m.chamado && m.chamado.protocolo) ent.protocolo = m.chamado.protocolo;
+      const text = m.role === 'user' ? m.text : htmlToPlain(m.html || escapeHtml(m.text || '')).slice(0, 3000);
+      const found = extractEntities(text, m.role !== 'user'); // bairro só do que o usuário escreveu (ou da tabela)
+      Object.keys(found).forEach(k => { if (!ent[k]) ent[k] = found[k]; });
+      if (!ent.bairro && m.role === 'assistant' && m.html) {
+        const b = firstColumnValue(m.html, 'bairro');
+        if (b) ent.bairro = b;
+      }
+    }
+    return ent;
+  }
+  // Primeira célula da coluna "Bairro" de uma tabela da resposta (ex.: dívida por bairro)
+  function firstColumnValue(html, header) {
+    const root = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstChild;
+    for (const t of root.querySelectorAll('table')) {
+      const ths = [...t.querySelectorAll('thead th, tr:first-child th')];
+      const idx = ths.findIndex(th => fold(th.textContent.trim()) === header);
+      if (idx < 0) continue;
+      const row = t.querySelector('tbody tr');
+      const cell = row && row.children[idx];
+      const v = cell && cell.textContent.trim();
+      if (v && v.length <= 40 && !/^\d+$/.test(v)) return v;
+    }
+    return '';
   }
   function chip(s, cls) {
     const b = document.createElement('button');
@@ -433,6 +514,8 @@
     let c = active();
     if (!c) c = newConversation();
     const mode = detectMode(text);
+    acClose();
+    rememberQuestion(text);
     c.messages.push({ id: uid(), role: 'user', text, time: Date.now() });
     if (c.messages.length === 1) c.title = text.length > 60 ? text.slice(0, 57) + '...' : text;
     c.updatedAt = Date.now();
@@ -570,15 +653,36 @@
       if (s.length) r.sugestoes = s;
     }
     const acao = resp.acao;
-    if (acao && typeof acao === 'object' && acao.tipo === 'segunda_via') {
-      const mat = Number(acao.matricula);
-      if (Number.isFinite(mat) && mat > 0) r.acao = { tipo: 'segunda_via', matricula: mat };
-    }
-    if (r.acao && !r.text && !html.trim()) r.text = 'Encontrei os boletos da matrícula ' + r.acao.matricula + '.';
+    const parsed = acao && typeof acao === 'object' ? parseAcao(acao) : null;
+    if (parsed) r.acao = parsed;
+    if (r.acao && !r.text && !html.trim()) r.text = ACAO_TEXTO_PADRAO[r.acao.tipo](r.acao);
     r.html = html.trim() ? sanitize(html) : markdownToHtml(r.text);
     if (!r.text && !html.trim() && !r.pdf && !r.biUrl) { r.error = true; r.text = 'O agente não retornou resposta. Reformule a pergunta.'; r.html = '<p>' + r.text + '</p>'; }
     return r;
   }
+
+  // Contrato das ações (guardadas na mensagem para recriar o cartão ao reabrir a conversa)
+  const posInt = v => { const n = Number(v); return Number.isFinite(n) && n > 0 && Math.floor(n) === n ? n : null; };
+  const cleanStr = (v, max) => (typeof v === 'string' || typeof v === 'number') ? String(v).trim().slice(0, max) : '';
+  function parseAcao(a) {
+    if (a.tipo === 'segunda_via') {
+      const mat = posInt(a.matricula);
+      return mat ? { tipo: 'segunda_via', matricula: mat } : null;
+    }
+    if (a.tipo === 'rota_os') {
+      const f = a.filtros && typeof a.filtros === 'object' ? a.filtros : {};
+      return { tipo: 'rota_os', filtros: { tipo: cleanStr(f.tipo, 60), bairro: cleanStr(f.bairro, 60) } };
+    }
+    if (a.tipo === 'chamado_abrir') return { tipo: 'chamado_abrir', matricula: posInt(a.matricula), tipoChamado: cleanStr(a.tipoChamado, 40) };
+    if (a.tipo === 'chamado_consultar') return { tipo: 'chamado_consultar', protocolo: cleanStr(a.protocolo, 40), matricula: posInt(a.matricula) };
+    return null;
+  }
+  const ACAO_TEXTO_PADRAO = {
+    segunda_via: a => 'Encontrei os boletos da matrícula ' + a.matricula + '.',
+    rota_os: () => 'Montei uma rota sugerida para a equipe de campo com as ordens de serviço pendentes.',
+    chamado_abrir: () => 'Preencha os dados abaixo para registrar o chamado.',
+    chamado_consultar: a => 'Este é o acompanhamento ' + (a.protocolo ? 'do chamado ' + a.protocolo : a.matricula ? 'dos chamados da matrícula ' + a.matricula : 'dos chamados') + '.'
+  };
 
   // ---- HTML/markdown ----
   function escapeHtml(s) {
@@ -659,7 +763,8 @@
 
   // ---- 2ª via de boletos ----
   // Chamada genérica aos webhooks auxiliares, com mensagens amigáveis para 404 / rede / tempo.
-  async function callService(url, body, timeoutMs) {
+  async function callService(url, body, timeoutMs, nome) {
+    nome = nome || 'serviço de 2ª via';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs || 45000);
     let res;
@@ -667,18 +772,18 @@
       res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
     } catch (e) {
       if (e && e.name === 'AbortError') throw new Error('O serviço demorou demais para responder. Tente novamente.');
-      throw new Error('Não foi possível conectar ao serviço de 2ª via. Ele pode estar indisponível no momento ou sua conexão caiu.');
+      throw new Error('Não foi possível conectar ao ' + nome + '. Ele pode estar indisponível no momento ou sua conexão caiu.');
     } finally {
       clearTimeout(timer);
     }
-    if (res.status === 404) throw new Error('O serviço de 2ª via ainda não está disponível. Tente novamente mais tarde.');
-    if (!res.ok) throw new Error(res.status >= 500 ? 'O serviço de 2ª via está indisponível no momento. Tente novamente em instantes.' : 'O serviço de 2ª via recusou a solicitação (erro ' + res.status + ').');
+    if (res.status === 404) throw new Error('O ' + nome + ' ainda não está disponível. Tente novamente mais tarde.');
+    if (!res.ok) throw new Error(res.status >= 500 ? 'O ' + nome + ' está indisponível no momento. Tente novamente em instantes.' : 'O ' + nome + ' recusou a solicitação (erro ' + res.status + ').');
     return res;
   }
-  async function readJson(res) {
+  async function readJson(res, nome) {
     const raw = (await res.text()).trim();
     if (!raw) return {};
-    try { return unwrap(JSON.parse(raw)); } catch (e) { throw new Error('O serviço de 2ª via devolveu uma resposta inválida.'); }
+    try { return unwrap(JSON.parse(raw)); } catch (e) { throw new Error('O ' + (typeof nome === 'string' ? nome : 'serviço de 2ª via') + ' devolveu uma resposta inválida.'); }
   }
 
   const svCache = new Map();   // msgId -> Promise<dados> (refeito ao reabrir a conversa)
@@ -872,6 +977,643 @@
     document.querySelectorAll('[data-busy-key]').forEach(b => { if (b.dataset.busyKey === key) paintButton(b, busy); });
   }
 
+  // ---- Cartões de campo e atendimento: rota de OS, abrir chamado e acompanhamento ----
+  // Mesmo modelo da 2ª via: a ação fica guardada na mensagem, os dados são buscados ao exibir
+  // (svCache por mensagem, refeito ao reabrir a conversa) e erros mostram "Tentar novamente".
+  function renderAcao(m) {
+    let card = null;
+    if (m.acao.tipo === 'segunda_via') card = renderSegundaVia(m);
+    else if (m.acao.tipo === 'rota_os') card = renderRotaOs(m);
+    else if (m.acao.tipo === 'chamado_abrir') card = renderChamadoAbrir(m);
+    else if (m.acao.tipo === 'chamado_consultar') card = renderChamadoConsultar(m);
+    if (card) card.dataset.cardMsg = m.id;
+    return card;
+  }
+  // Recria o cartão de uma mensagem que está na tela (ex.: quando um envio termina)
+  function rerenderCard(m) {
+    let novo = null;
+    document.querySelectorAll('[data-card-msg]').forEach(n => {
+      if (n.dataset.cardMsg !== m.id) return;
+      novo = renderAcao(m);
+      n.replaceWith(novo);
+    });
+    return novo;
+  }
+  function node(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function cardShell(icon, title, sub, aria) {
+    const card = node('section', 'sv-card');
+    card.setAttribute('aria-label', aria);
+    card.innerHTML = '<div class="sv-head"><div class="att-icon" aria-hidden="true">' + icon + '</div>' +
+      '<div class="sv-head-text"><strong></strong><span></span></div></div><div class="sv-body"></div>';
+    card.querySelector('.sv-head-text strong').textContent = title;
+    card.querySelector('.sv-head-text span').textContent = sub;
+    return { card, head: card.querySelector('.sv-head'), body: card.querySelector('.sv-body') };
+  }
+  function cardLoading(box, text) {
+    box.setAttribute('aria-busy', 'true');
+    box.innerHTML = '<div class="sv-state"><span class="btn-spin" aria-hidden="true"></span><span></span></div>';
+    box.querySelector('.sv-state span:last-child').textContent = text;
+  }
+  function cardError(box, err, fallback, onRetry) {
+    box.removeAttribute('aria-busy');
+    box.innerHTML = '<div class="sv-error" role="alert"><p></p><button type="button" class="btn-secondary">' + ICON.retry + 'Tentar novamente</button></div>';
+    box.querySelector('p').textContent = (err && err.message) || fallback;
+    box.querySelector('button').addEventListener('click', onRetry);
+  }
+  // Consulta com cache por chave; erro não fica em cache ("Tentar novamente" refaz a chamada)
+  function loadService(key, url, payload, nome, timeoutMs) {
+    if (!svCache.has(key)) {
+      const p = callService(url, payload, timeoutMs || 45000, nome)
+        .then(res => readJson(res, nome))
+        .then(j => {
+          if (j.ok === false) throw new Error(j.mensagem || j.message || 'O ' + nome + ' não conseguiu concluir a consulta.');
+          return j;
+        });
+      p.catch(() => svCache.delete(key));
+      svCache.set(key, p);
+    }
+    return svCache.get(key);
+  }
+  function addRow(dl, label, value) {
+    const r = node('div');
+    r.appendChild(node('dt', null, label));
+    r.appendChild(node('dd', null, value));
+    dl.appendChild(r);
+  }
+
+  const nf1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+  function fmtMin(min) {
+    const n = Math.max(0, Math.round(Number(min) || 0));
+    if (n < 60) return n + ' min';
+    return Math.floor(n / 60) + ' h' + (n % 60 ? ' ' + String(n % 60).padStart(2, '0') + ' min' : '');
+  }
+  // DD/MM/AAAA HH:MM (horário só quando vier); datas com fuso viram horário local
+  function fmtDateTime(v) {
+    const s = String(v == null ? '' : v).trim();
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+    if (!m) return s || '—';
+    if (m[4] && /(z|[+-]\d{2}:?\d{2})$/i.test(s)) {
+      const d = new Date(s);
+      if (!isNaN(d)) return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    return m[3] + '/' + m[2] + '/' + m[1] + (m[4] && !(m[4] === '00' && m[5] === '00') ? ' ' + m[4] + ':' + m[5] : '');
+  }
+  const fmtDia = v => (v ? fmtDate(v) || '—' : '—');
+
+  function prioridade(v) {
+    const f = fold(String(v || '')).trim();
+    if (!f) return null;
+    if (f.startsWith('alt')) return { rotulo: 'Alta', cls: 'sv-badge-late' };
+    if (f.startsWith('med')) return { rotulo: 'Média', cls: 'sv-badge-mid' };
+    if (f.startsWith('baix')) return { rotulo: 'Baixa', cls: 'sv-badge-open' };
+    return { rotulo: String(v), cls: 'sv-badge-open' };
+  }
+  // Situações das ordens de serviço e status de chamados (códigos do sistema -> texto)
+  const SITUACAO_OS = Object.assign({
+    P: 'Pendente', PENDENTE: 'Pendente', A: 'Aberta', ABERTA: 'Aberta', E: 'Executada', EXECUTADA: 'Executada',
+    B: 'Baixada', BAIXADA: 'Baixada', C: 'Cancelada', CANCELADA: 'Cancelada', N: 'Não executada', NAO_EXECUTADA: 'Não executada',
+    PROGRAMADA: 'Programada', AGENDADA: 'Agendada', EM_ANDAMENTO: 'Em andamento', EM_EXECUCAO: 'Em execução'
+  }, ctx.situacoesOs || {});
+  const STATUS_CHAMADO = {
+    ABERTO: 'Aberto', REGISTRADO: 'Registrado', RECEBIDO: 'Recebido', EM_ANALISE: 'Em análise', EM_ATENDIMENTO: 'Em atendimento',
+    EM_ANDAMENTO: 'Em andamento', ENCAMINHADO: 'Encaminhado', AGUARDANDO: 'Aguardando', AGUARDANDO_CLIENTE: 'Aguardando o cliente',
+    OS_GERADA: 'OS gerada', CONCLUIDO: 'Concluído', RESOLVIDO: 'Resolvido', FECHADO: 'Fechado', CANCELADO: 'Cancelado'
+  };
+  const tiposChamado = () => (ctx.tiposChamado && ctx.tiposChamado.length ? ctx.tiposChamado : [{ valor: 'outro', rotulo: 'Outro' }]);
+  const TIPO_CHAMADO = {};
+  tiposChamado().forEach(t => { TIPO_CHAMADO[fold(t.valor).toUpperCase().replace(/[\s-]+/g, '_')] = t.rotulo; });
+  function traduz(v, map) {
+    const raw = String(v == null ? '' : v).trim();
+    if (!raw) return '—';
+    const k = fold(raw).toUpperCase().replace(/[\s-]+/g, '_');
+    if (map[k]) return map[k];
+    const s = raw.replace(/_/g, ' ').toLowerCase();
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function statusClass(rotulo) {
+    const f = fold(rotulo);
+    if (/conclu|resolv|fechad|execut|baixad/.test(f) && !/nao exec/.test(f)) return 'sv-badge-done';
+    if (/cancel|nao exec/.test(f)) return 'sv-badge-muted';
+    if (/aguard|pendent/.test(f)) return 'sv-badge-mid';
+    return 'sv-badge-open';
+  }
+
+  // ---- Cartão: rota sugerida para a equipe ----
+  const rotaSub = f => (f.tipo || 'Todos os tipos') + ' · ' + (f.bairro ? 'Bairro ' + f.bairro : 'Todos os bairros');
+  function renderRotaOs(m) {
+    const f = m.acao.filtros || (m.acao.filtros = { tipo: '', bairro: '' });
+    const { card, head, body } = cardShell(ICON.route, 'Rota sugerida para a equipe', rotaSub(f), 'Rota sugerida para a equipe de campo');
+    const key = 'rota:' + m.id + ':' + (f.tipo || '') + '|' + (f.bairro || '');
+    const refresh = node('button', 'icon-btn sv-refresh');
+    refresh.type = 'button';
+    refresh.title = 'Recalcular';
+    refresh.setAttribute('aria-label', 'Recalcular rota');
+    refresh.innerHTML = ICON.refresh;
+    refresh.addEventListener('click', () => { svCache.delete(key); card.replaceWith(renderAcao(m)); });
+    head.appendChild(refresh);
+    body.appendChild(rotaFilters(m, f, card));
+    const out = node('div', 'rt-out');
+    body.appendChild(out);
+    const load = () => {
+      cardLoading(out, 'Calculando a melhor ordem de visita…');
+      loadService(key, ctx.rotaOsEndpoint, {
+        schema: ctx.schema, usuario: currentUser(), tipo: f.tipo || null, bairro: f.bairro || null, limite: ctx.rotaLimite || 15
+      }, 'serviço de rotas', 60000).then(normalizeRota).then(d => {
+        out.removeAttribute('aria-busy');
+        fillRota(out, d, f, card);
+      }, err => cardError(out, err, 'Não foi possível calcular a rota agora.', () => { svCache.delete(key); load(); }));
+    };
+    load();
+    return card;
+  }
+  function rotaFilters(m, f, card) {
+    const id = 'rt-' + m.id;
+    const form = node('form', 'rt-filters');
+    form.noValidate = true;
+    form.setAttribute('aria-label', 'Filtros da rota');
+    form.innerHTML =
+      '<div class="rt-field"><label class="field-label" for="' + id + '-tipo">Tipo de serviço</label><select class="field-input" id="' + id + '-tipo" name="tipo"></select></div>' +
+      '<div class="rt-field"><label class="field-label" for="' + id + '-bairro">Bairro</label><input class="field-input" id="' + id + '-bairro" name="bairro" type="text" maxlength="60" autocomplete="off" placeholder="Todos os bairros" list="' + id + '-bairros" /><datalist id="' + id + '-bairros"></datalist></div>' +
+      '<button type="submit" class="btn-secondary rt-apply">' + ICON.search + '<span>Aplicar filtros</span></button>';
+    const sel = form.elements.tipo;
+    const tipos = (ctx.tiposServicoOs || []).slice();
+    if (f.tipo && !tipos.some(t => fold(t) === fold(f.tipo))) tipos.unshift(f.tipo);
+    [['', 'Todos os tipos']].concat(tipos.map(t => [t, t])).forEach(([v, l]) => {
+      const o = node('option', null, l);
+      o.value = v;
+      if (fold(v) === fold(f.tipo || '')) o.selected = true;
+      sel.appendChild(o);
+    });
+    form.elements.bairro.value = f.bairro || '';
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      m.acao.filtros = { tipo: sel.value.trim(), bairro: form.elements.bairro.value.trim().slice(0, 60) };
+      persist(); // os filtros voltam ao reabrir a conversa
+      const novo = renderAcao(m);
+      card.replaceWith(novo);
+      novo.querySelector('.rt-apply').focus();
+    });
+    return form;
+  }
+  function normalizeRota(d) {
+    const paradas = (Array.isArray(d.paradas) ? d.paradas : []).map((p, i) => ({
+      ordem: Number(p.ordem) || i + 1,
+      osId: p.osId != null ? String(p.osId) : '',
+      matricula: p.matricula != null ? String(p.matricula) : '',
+      tipo: p.tipo ? String(p.tipo) : '',
+      endereco: fmtEndereco(p.endereco),
+      bairro: p.bairro ? String(p.bairro) : '',
+      diasPendente: p.diasPendente != null && p.diasPendente !== '' && isFinite(Number(p.diasPendente)) ? Number(p.diasPendente) : null,
+      prioridade: prioridade(p.prioridade)
+    })).sort((a, b) => a.ordem - b.ordem);
+    const sc = d.semCoordenada;
+    const semLista = Array.isArray(sc) ? sc.map(x => (x && typeof x === 'object')
+      ? [x.osId != null ? 'OS ' + x.osId : '', x.matricula != null ? 'Matrícula ' + x.matricula : '', fmtEndereco(x.endereco), x.bairro || ''].filter(Boolean).join(' · ')
+      : String(x)).filter(Boolean) : [];
+    let criterio = d.criterio ? String(d.criterio).trim() : '';
+    if (criterio && !/tr[aá]fego|tr[aâ]nsito/i.test(criterio)) criterio += ' A estimativa não considera o trânsito em tempo real.';
+    const num = v => (v != null && v !== '' && isFinite(Number(v)) ? Number(v) : null);
+    return {
+      paradas, semLista, semQtd: Array.isArray(sc) ? sc.length : Math.max(0, Number(sc) || 0),
+      distanciaKm: num(d.distanciaKm), tempo: num(d.tempoEstimadoMin), criterio,
+      linkMaps: typeof d.linkMaps === 'string' && /^https:\/\//i.test(d.linkMaps) ? d.linkMaps : '',
+      // o Google Maps aceita até 10 pontos por link: rotas maiores vêm em trechos
+      lotes: (Array.isArray(d.lotes) ? d.lotes : []).filter(l => l && typeof l.linkMaps === 'string' && /^https:\/\//i.test(l.linkMaps))
+        .map(l => ({ de: Number(l.de) || null, ate: Number(l.ate) || null, linkMaps: l.linkMaps }))
+    };
+  }
+  function fillRota(out, d, f, card) {
+    out.innerHTML = '';
+    const dl = card.querySelector('datalist');
+    if (dl) {
+      dl.innerHTML = '';
+      [...new Set(d.paradas.map(p => p.bairro).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')).forEach(b => {
+        const o = document.createElement('option'); o.value = b; dl.appendChild(o);
+      });
+    }
+    if (!d.paradas.length) {
+      out.appendChild(node('div', 'sv-state', 'Nenhuma ordem de serviço pendente com localização para esses filtros.'));
+      if (d.semQtd) out.appendChild(rotaSemCoord(d));
+      if (d.criterio) out.appendChild(rotaCriterio(d.criterio));
+      return;
+    }
+    const resumo = node('dl', 'rt-summary');
+    addRow(resumo, 'Paradas', String(d.paradas.length));
+    addRow(resumo, 'Distância', d.distanciaKm != null ? nf1.format(d.distanciaKm) + ' km' : '—');
+    addRow(resumo, 'Tempo estimado', d.tempo != null ? '≈ ' + fmtMin(d.tempo) : '—');
+    out.appendChild(resumo);
+
+    const ol = node('ol', 'rt-list');
+    ol.setAttribute('aria-label', 'Paradas na ordem sugerida');
+    d.paradas.forEach(p => {
+      const li = node('li', 'rt-stop');
+      li.innerHTML = '<span class="rt-num" aria-hidden="true"></span><div class="rt-info"><span class="sr-only"></span>' +
+        '<strong class="rt-addr"></strong><span class="rt-meta"></span><span class="sv-badges rt-badges"></span></div>';
+      li.querySelector('.rt-num').textContent = p.ordem;
+      li.querySelector('.sr-only').textContent = 'Parada ' + p.ordem + ': ';
+      li.querySelector('.rt-addr').textContent = (p.endereco || 'Endereço não informado') + (p.bairro ? ' — ' + p.bairro : '');
+      li.querySelector('.rt-meta').textContent = [p.osId ? 'OS ' + p.osId : '', p.matricula ? 'Matrícula ' + p.matricula : '', p.tipo].filter(Boolean).join(' · ');
+      const badges = li.querySelector('.rt-badges');
+      if (p.prioridade) badges.appendChild(node('span', 'sv-badge ' + p.prioridade.cls, 'Prioridade ' + p.prioridade.rotulo));
+      if (p.diasPendente != null) badges.appendChild(node('span', 'sv-badge sv-badge-muted', 'Pendente há ' + p.diasPendente + (p.diasPendente === 1 ? ' dia' : ' dias')));
+      ol.appendChild(li);
+    });
+    out.appendChild(ol);
+    if (d.semQtd) out.appendChild(rotaSemCoord(d));
+    if (d.criterio) out.appendChild(rotaCriterio(d.criterio));
+
+    const acts = node('div', 'rt-actions');
+    if (d.lotes.length > 1) {
+      d.lotes.forEach(l => {
+        const a = node('a', 'btn-primary');
+        const trecho = 'paradas ' + l.de + ' a ' + l.ate;
+        a.href = l.linkMaps; a.target = '_blank'; a.rel = 'noopener';
+        a.setAttribute('aria-label', 'Abrir no Google Maps as ' + trecho + ' (abre em nova aba)');
+        a.innerHTML = ICON.map + '<span></span>';
+        a.querySelector('span').textContent = 'Mapa: ' + trecho;
+        acts.appendChild(a);
+      });
+    } else if (d.linkMaps) {
+      const a = node('a', 'btn-primary');
+      a.href = d.linkMaps; a.target = '_blank'; a.rel = 'noopener';
+      a.setAttribute('aria-label', 'Abrir no Google Maps (abre em nova aba)');
+      a.innerHTML = ICON.map + '<span>Abrir no Google Maps</span>';
+      acts.appendChild(a);
+    }
+    acts.appendChild(svButton(ICON.copy, 'Copiar roteiro', '', null, 'Copiar roteiro da rota', () => copyText(rotaTexto(d, f))));
+    out.appendChild(acts);
+  }
+  function rotaSemCoord(d) {
+    const box = node('div', 'rt-warn');
+    box.innerHTML = ICON.warn + '<div><p></p></div>';
+    box.querySelector('p').textContent = d.semQtd === 1
+      ? '1 imóvel está sem coordenada e ficou fora da rota. Programe essa visita à parte.'
+      : d.semQtd + ' imóveis estão sem coordenada e ficaram fora da rota. Programe essas visitas à parte.';
+    if (d.semLista.length) {
+      const det = node('details');
+      det.appendChild(node('summary', null, 'Ver imóveis sem coordenada'));
+      const ul = node('ul');
+      d.semLista.forEach(t => ul.appendChild(node('li', null, t)));
+      det.appendChild(ul);
+      box.lastChild.appendChild(det);
+    }
+    return box;
+  }
+  function rotaCriterio(t) {
+    const box = node('div', 'sv-tip rt-crit');
+    box.innerHTML = ICON.info + '<p><strong>Critério: </strong><span></span></p>';
+    box.querySelector('span').textContent = t;
+    return box;
+  }
+  function rotaTexto(d, f) {
+    const L = ['Rota sugerida para a equipe — ' + (ctx.entidade || ctx.sistemaNome || '') + ' — ' + new Date().toLocaleDateString('pt-BR'), 'Filtros: ' + rotaSub(f)];
+    L.push(d.paradas.length + ' paradas' + (d.distanciaKm != null ? ' · ' + nf1.format(d.distanciaKm) + ' km' : '') + (d.tempo != null ? ' · ≈ ' + fmtMin(d.tempo) : ''), '');
+    d.paradas.forEach(p => L.push(p.ordem + '. ' + (p.endereco || 'Endereço não informado') + (p.bairro ? ' — ' + p.bairro : '') + ' | ' +
+      [p.osId ? 'OS ' + p.osId : '', p.matricula ? 'Mat. ' + p.matricula : '', p.tipo, p.prioridade ? 'Prioridade ' + p.prioridade.rotulo : '',
+        p.diasPendente != null ? 'pendente há ' + p.diasPendente + (p.diasPendente === 1 ? ' dia' : ' dias') : ''].filter(Boolean).join(' · ')));
+    if (d.semQtd) { L.push('', 'Sem coordenada (fora da rota): ' + d.semQtd); d.semLista.forEach(t => L.push('- ' + t)); }
+    if (d.criterio) L.push('', 'Critério: ' + d.criterio);
+    if (d.lotes.length > 1) { L.push(''); d.lotes.forEach(l => L.push('Mapa (paradas ' + l.de + ' a ' + l.ate + '): ' + l.linkMaps)); }
+    else if (d.linkMaps) L.push('', 'Mapa: ' + d.linkMaps);
+    return L.join('\n');
+  }
+
+  // ---- Cartão-formulário: abrir chamado ----
+  const chamadoDrafts = new Map(); // msgId -> rascunho (sobrevive às re-renderizações da conversa)
+  const chamadoEnvios = new Map(); // msgId -> Promise do registro em andamento
+  const saaeNome = () => ctx.entidade || 'SAAE';
+  const rotuloTipo = v => (tiposChamado().find(t => t.valor === v) || { rotulo: traduz(v, TIPO_CHAMADO) }).rotulo;
+  function tipoChamadoValor(v) {
+    const f = fold(String(v || '')).replace(/[^a-z0-9]+/g, '');
+    if (!f) return '';
+    const t = tiposChamado().find(x => {
+      const a = fold(x.valor).replace(/[^a-z0-9]+/g, ''), b = fold(x.rotulo).replace(/[^a-z0-9]+/g, '');
+      return a === f || b === f || b.startsWith(f) || f.startsWith(a);
+    });
+    return t ? t.valor : 'outro';
+  }
+  function renderChamadoAbrir(m) {
+    const { card, body } = cardShell(ICON.ticket, 'Abrir chamado', 'Registro para o atendimento do ' + saaeNome(), 'Abrir chamado para o atendimento do SAAE');
+    if (m.chamado) { fillChamadoResultado(body, m.chamado); return card; }
+    let d = chamadoDrafts.get(m.id);
+    if (!d) {
+      d = { matricula: m.acao.matricula ? String(m.acao.matricula) : '', tipo: tipoChamadoValor(m.acao.tipoChamado), descricao: '', contato: '', etapa: 'form', erro: '' };
+      chamadoDrafts.set(m.id, d);
+    }
+    if (chamadoEnvios.has(m.id) || d.etapa === 'confirm') fillChamadoConfirm(body, m, d, card);
+    else fillChamadoForm(body, m, d, card);
+    return card;
+  }
+  function chField(id, name, label, control, help) {
+    return '<div class="ch-field"><label class="field-label" for="' + id + '">' + label + '</label>' + control + (help || '') +
+      '<p class="field-error" id="' + id + '-err" role="alert" data-err="' + name + '"></p></div>';
+  }
+  function fillChamadoForm(body, m, d, card) {
+    const id = 'ch-' + m.id;
+    body.innerHTML = '';
+    const note = node('div', 'sv-tip ch-note');
+    note.innerHTML = ICON.info + '<p></p>';
+    note.querySelector('p').textContent = 'O chamado é registrado para o atendimento do ' + saaeNome() + ', que dá andamento à solicitação. O protocolo gerado permite acompanhar o chamado depois.';
+    body.appendChild(note);
+    const form = node('form', 'ch-form');
+    form.noValidate = true;
+    form.setAttribute('aria-label', 'Dados do chamado');
+    form.innerHTML =
+      chField(id + '-mat', 'matricula', 'Matrícula do imóvel',
+        '<input class="field-input" id="' + id + '-mat" name="matricula" type="text" inputmode="numeric" maxlength="10" autocomplete="off" aria-required="true" aria-invalid="false" aria-describedby="' + id + '-mat-err" />') +
+      chField(id + '-tipo', 'tipo', 'Tipo do chamado',
+        '<select class="field-input" id="' + id + '-tipo" name="tipo" aria-required="true" aria-invalid="false" aria-describedby="' + id + '-tipo-err"><option value="">Selecione…</option></select>') +
+      chField(id + '-desc', 'descricao', 'Descrição',
+        '<textarea class="field-input ch-desc" id="' + id + '-desc" name="descricao" rows="4" maxlength="500" aria-required="true" aria-invalid="false" aria-describedby="' + id + '-desc-count ' + id + '-desc-err" placeholder="Descreva o problema: local exato, desde quando, pontos de referência…"></textarea>',
+        '<p class="field-help ch-count" id="' + id + '-desc-count"></p>') +
+      chField(id + '-cont', 'contato', 'Contato <span class="ch-opt">(opcional)</span>',
+        '<input class="field-input" id="' + id + '-cont" name="contato" type="text" maxlength="80" autocomplete="off" placeholder="Telefone com DDD ou e-mail" aria-invalid="false" aria-describedby="' + id + '-cont-err" />') +
+      '<div class="ch-actions"><button type="submit" class="btn-primary">' + ICON.arrow + '<span>Revisar e registrar</span></button></div>';
+    const els = form.elements;
+    tiposChamado().forEach(t => { const o = node('option', null, t.rotulo); o.value = t.valor; els.tipo.appendChild(o); });
+    els.matricula.value = d.matricula;
+    els.tipo.value = d.tipo;
+    els.descricao.value = d.descricao;
+    els.contato.value = d.contato;
+    const count = form.querySelector('.ch-count');
+    const updCount = () => { count.textContent = els.descricao.value.length + ' de 500 caracteres'; };
+    updCount();
+    const showErrors = (errs, only) => {
+      ['matricula', 'tipo', 'descricao', 'contato'].forEach(k => {
+        if (only && only !== k) return;
+        form.querySelector('[data-err="' + k + '"]').textContent = errs[k] || '';
+        els[k].setAttribute('aria-invalid', errs[k] ? 'true' : 'false');
+      });
+    };
+    const sync = () => {
+      d.matricula = els.matricula.value; d.tipo = els.tipo.value; d.descricao = els.descricao.value; d.contato = els.contato.value;
+    };
+    form.addEventListener('input', e => {
+      if (e.target === els.matricula) els.matricula.value = els.matricula.value.replace(/\D/g, '').slice(0, 10);
+      if (e.target === els.descricao) updCount();
+      sync();
+      // erro já exibido some assim que o campo fica válido
+      const k = e.target.name;
+      if (k && e.target.getAttribute('aria-invalid') === 'true') showErrors(validateChamado(d), k);
+    });
+    form.addEventListener('change', sync);
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      sync();
+      const errs = validateChamado(d);
+      showErrors(errs);
+      const first = ['matricula', 'tipo', 'descricao', 'contato'].find(k => errs[k]);
+      if (first) { els[first].focus(); return; }
+      d.etapa = 'confirm';
+      d.erro = '';
+      fillChamadoConfirm(body, m, d, card);
+      const t = body.querySelector('.ch-confirm-title');
+      if (t) t.focus();
+    });
+    body.appendChild(form);
+  }
+  function validateChamado(d) {
+    const e = {};
+    const mat = String(d.matricula || '').trim();
+    if (!mat) e.matricula = 'Informe a matrícula do imóvel.';
+    else if (!/^\d{1,10}$/.test(mat) || Number(mat) <= 0) e.matricula = 'A matrícula deve ter apenas números.';
+    if (!d.tipo) e.tipo = 'Selecione o tipo do chamado.';
+    const desc = String(d.descricao || '').trim();
+    if (!desc) e.descricao = 'Descreva o problema.';
+    else if (desc.length < 10) e.descricao = 'Descreva com um pouco mais de detalhe (mínimo de 10 caracteres).';
+    else if (desc.length > 500) e.descricao = 'A descrição pode ter no máximo 500 caracteres.';
+    const c = String(d.contato || '').trim();
+    if (c) {
+      if (c.includes('@')) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c)) e.contato = 'E-mail inválido.';
+      } else {
+        let dig = c.replace(/\D/g, '');
+        if (/^55\d{10,11}$/.test(dig)) dig = dig.slice(2);
+        if (/[^\d\s()+.-]/.test(c) || dig.length < 10 || dig.length > 11) e.contato = 'Informe um telefone com DDD (10 ou 11 dígitos) ou um e-mail.';
+      }
+    }
+    return e;
+  }
+  function fillChamadoConfirm(body, m, d, card) {
+    const busy = chamadoEnvios.has(m.id);
+    body.innerHTML = '';
+    const box = node('div', 'ch-confirm');
+    const title = node('p', 'ch-confirm-title', 'Confirme os dados do chamado');
+    title.tabIndex = -1;
+    box.appendChild(title);
+    const dl = node('dl', 'ch-review');
+    addRow(dl, 'Matrícula', d.matricula.trim());
+    addRow(dl, 'Tipo', rotuloTipo(d.tipo));
+    addRow(dl, 'Descrição', d.descricao.trim());
+    addRow(dl, 'Contato', d.contato.trim() || 'Não informado');
+    box.appendChild(dl);
+    const warn = node('div', 'modal-warn');
+    warn.innerHTML = ICON.warn + '<span></span>';
+    warn.querySelector('span').textContent = 'O chamado será registrado para o atendimento do ' + saaeNome() + '. Confira os dados com o solicitante antes de confirmar.';
+    box.appendChild(warn);
+    const result = node('p', 'modal-result err');
+    result.setAttribute('role', 'alert');
+    result.textContent = busy ? '' : d.erro || '';
+    box.appendChild(result);
+    const acts = node('div', 'ch-actions');
+    const back = node('button', 'btn-secondary', 'Voltar e editar');
+    back.type = 'button';
+    back.disabled = busy;
+    back.addEventListener('click', () => {
+      d.etapa = 'form'; d.erro = '';
+      fillChamadoForm(body, m, d, card);
+      const f = body.querySelector('textarea');
+      if (f) f.focus();
+    });
+    const ok = node('button', 'btn-primary ch-confirm-btn');
+    ok.type = 'button';
+    ok.disabled = busy;
+    ok.setAttribute('aria-busy', busy ? 'true' : 'false');
+    ok.innerHTML = busy ? '<span class="btn-spin" aria-hidden="true"></span><span>Registrando…</span>'
+      : ICON.check + '<span>' + (d.erro ? 'Tentar novamente' : 'Confirmar e registrar') + '</span>';
+    ok.addEventListener('click', () => enviarChamado(m, d));
+    acts.appendChild(back);
+    acts.appendChild(ok);
+    box.appendChild(acts);
+    body.appendChild(box);
+  }
+  function enviarChamado(m, d) {
+    if (chamadoEnvios.has(m.id) || m.chamado) return;
+    const nome = 'serviço de chamados';
+    const p = callService(ctx.chamadoAbrirEndpoint, {
+      schema: ctx.schema, usuario: currentUser(), matricula: Number(d.matricula), tipo: d.tipo,
+      descricao: d.descricao.trim(), contato: d.contato.trim() || null
+    }, 45000, nome).then(res => readJson(res, nome)).then(j => {
+      if (j.ok !== true || j.protocolo == null || j.protocolo === '') throw new Error(j.mensagem || 'O registro do chamado não foi confirmado pelo serviço. Tente novamente.');
+      return j;
+    });
+    chamadoEnvios.set(m.id, p);
+    rerenderCard(m);
+    p.then(j => {
+      m.chamado = {
+        protocolo: String(j.protocolo), status: j.status ? String(j.status) : '', prioridade: j.prioridade ? String(j.prioridade) : '',
+        prazoEstimado: j.prazoEstimado ? String(j.prazoEstimado) : '', mensagem: j.mensagem ? String(j.mensagem) : '',
+        matricula: Number(d.matricula), tipo: d.tipo, registradoEm: Date.now()
+      };
+      chamadoDrafts.delete(m.id);
+      persist(); // o protocolo fica salvo: ao reabrir a conversa o cartão mostra o resultado, não o formulário
+      toast('Chamado registrado · protocolo ' + m.chamado.protocolo, 3500);
+    }, err => {
+      d.erro = (err && err.message) || 'Não foi possível registrar o chamado agora.';
+    }).then(() => {
+      chamadoEnvios.delete(m.id);
+      const novo = rerenderCard(m);
+      if (novo) {
+        const alvo = novo.querySelector(m.chamado ? '.ch-proto' : '.ch-confirm-btn');
+        if (alvo) alvo.focus();
+      }
+      if (m.chamado) renderChips();
+    });
+  }
+  function fillChamadoResultado(body, r) {
+    body.innerHTML = '';
+    const proto = node('div', 'ch-proto');
+    proto.tabIndex = -1;
+    proto.innerHTML = '<div class="ch-proto-text"><span class="ch-proto-label">Protocolo</span><strong class="ch-proto-value"></strong></div>';
+    proto.querySelector('.ch-proto-value').textContent = r.protocolo;
+    proto.setAttribute('aria-label', 'Chamado registrado. Protocolo ' + r.protocolo);
+    proto.appendChild(svButton(ICON.copy, 'Copiar protocolo', '', null, 'Copiar protocolo ' + r.protocolo, () => copyText(r.protocolo)));
+    body.appendChild(proto);
+    const dl = node('dl', 'ch-review ch-review-grid');
+    addRow(dl, 'Status', traduz(r.status || 'aberto', STATUS_CHAMADO));
+    if (r.prioridade) addRow(dl, 'Prioridade', (prioridade(r.prioridade) || {}).rotulo || r.prioridade);
+    if (r.prazoEstimado) addRow(dl, 'Prazo estimado', /^\d{4}-\d{2}-\d{2}/.test(r.prazoEstimado) ? fmtDateTime(r.prazoEstimado) : r.prazoEstimado);
+    addRow(dl, 'Matrícula', String(r.matricula));
+    addRow(dl, 'Tipo', rotuloTipo(r.tipo));
+    body.appendChild(dl);
+    if (r.mensagem) body.appendChild(node('p', 'ch-msg', r.mensagem));
+    const note = node('div', 'sv-tip');
+    note.innerHTML = ICON.info + '<p></p>';
+    note.querySelector('p').textContent = 'Chamado registrado para o atendimento do ' + saaeNome() + ' em ' + new Date(r.registradoEm || Date.now()).toLocaleDateString('pt-BR') + ' às ' + fmtTime(r.registradoEm || Date.now()) + '. Informe o protocolo ao solicitante.';
+    body.appendChild(note);
+    const acts = node('div', 'ch-actions');
+    const follow = node('button', 'btn-secondary');
+    follow.type = 'button';
+    follow.innerHTML = ICON.track + '<span>Acompanhar este chamado</span>';
+    follow.addEventListener('click', () => sendMessage('acompanhar o chamado protocolo ' + r.protocolo));
+    acts.appendChild(follow);
+    body.appendChild(acts);
+  }
+
+  // ---- Cartão: acompanhamento de chamados e ordens de serviço ----
+  function renderChamadoConsultar(m) {
+    const a = m.acao;
+    const sub = a.protocolo ? 'Protocolo ' + a.protocolo : a.matricula ? 'Matrícula ' + a.matricula : 'Chamados recentes';
+    const { card, head, body } = cardShell(ICON.track, 'Acompanhamento', sub, 'Acompanhamento de chamados: ' + sub);
+    const key = 'consulta:' + m.id;
+    const btn = node('button', 'btn-secondary ch-refresh');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Atualizar acompanhamento');
+    btn.innerHTML = ICON.refresh + '<span>Atualizar</span>';
+    btn.addEventListener('click', () => {
+      svCache.delete(key);
+      const novo = renderAcao(m);
+      card.replaceWith(novo);
+      novo.querySelector('.ch-refresh').focus();
+    });
+    head.appendChild(btn);
+    const load = () => {
+      cardLoading(body, 'Consultando chamados e ordens de serviço…');
+      loadService(key, ctx.chamadoConsultarEndpoint, {
+        schema: ctx.schema, usuario: currentUser(), protocolo: a.protocolo || null, matricula: a.matricula || null
+      }, 'serviço de chamados', 45000).then(normalizeConsulta).then(d => {
+        body.removeAttribute('aria-busy');
+        fillConsulta(body, d);
+      }, err => cardError(body, err, 'Não foi possível consultar os chamados agora.', () => { svCache.delete(key); load(); }));
+    };
+    load();
+    return card;
+  }
+  function normalizeConsulta(d) {
+    const iso = v => /^\d{4}-\d{2}-\d{2}/.test(String(v || ''));
+    const chamados = (Array.isArray(d.chamados) ? d.chamados : []).map(c => {
+      let hist = (Array.isArray(c.historico) ? c.historico : []).map(h => ({
+        status: traduz(h && h.status, STATUS_CHAMADO), em: (h && h.em) || '', observacao: h && h.observacao ? String(h.observacao) : ''
+      }));
+      if (hist.every(h => iso(h.em))) hist = hist.sort((x, y) => String(x.em).localeCompare(String(y.em))); // ordem cronológica
+      return {
+        protocolo: c.protocolo != null ? String(c.protocolo) : '', matricula: c.matricula != null ? String(c.matricula) : '',
+        tipo: c.tipo ? traduz(c.tipo, TIPO_CHAMADO) : '', status: traduz(c.status, STATUS_CHAMADO), prioridade: prioridade(c.prioridade),
+        abertoEm: c.abertoEm || '', atualizadoEm: c.atualizadoEm || '', historico: hist
+      };
+    });
+    const ordens = (Array.isArray(d.ordensServico) ? d.ordensServico : []).map(o => ({
+      osId: o.osId != null ? String(o.osId) : '—', tipo: o.tipo ? String(o.tipo) : '—', situacao: traduz(o.situacao, SITUACAO_OS),
+      emissao: fmtDia(o.emissao), execucao: fmtDia(o.execucao), baixa: fmtDia(o.baixa)
+    }));
+    return { chamados, ordens };
+  }
+  function fillConsulta(body, d) {
+    body.innerHTML = '';
+    const secCh = node('section', 'ch-sec');
+    secCh.appendChild(node('h3', 'ch-sec-title', 'Chamados' + (d.chamados.length ? ' (' + d.chamados.length + ')' : '')));
+    if (!d.chamados.length) secCh.appendChild(node('div', 'sv-state', 'Nenhum chamado encontrado.'));
+    d.chamados.forEach(c => secCh.appendChild(renderChamadoItem(c)));
+    body.appendChild(secCh);
+
+    const secOs = node('section', 'ch-sec');
+    secOs.appendChild(node('h3', 'ch-sec-title', 'Ordens de serviço no sistema' + (d.ordens.length ? ' (' + d.ordens.length + ')' : '')));
+    if (!d.ordens.length) secOs.appendChild(node('div', 'sv-state', 'Nenhuma ordem de serviço encontrada.'));
+    else {
+      const wrap = node('div', 'table-wrap');
+      wrap.tabIndex = 0;
+      wrap.setAttribute('role', 'region');
+      wrap.setAttribute('aria-label', 'Ordens de serviço (role para o lado para ver todas as colunas)');
+      const table = node('table', 'ch-table');
+      table.innerHTML = '<thead><tr><th scope="col">OS</th><th scope="col">Tipo</th><th scope="col">Situação</th><th scope="col">Emissão</th><th scope="col">Execução</th><th scope="col">Baixa</th></tr></thead><tbody></tbody>';
+      const tb = table.querySelector('tbody');
+      d.ordens.forEach(o => {
+        const tr = node('tr');
+        tr.appendChild(node('td', 'num', o.osId));
+        tr.appendChild(node('td', null, o.tipo));
+        const td = node('td');
+        td.appendChild(node('span', 'sv-badge ' + statusClass(o.situacao), o.situacao));
+        tr.appendChild(td);
+        [o.emissao, o.execucao, o.baixa].forEach(v => tr.appendChild(node('td', 'num', v)));
+        tb.appendChild(tr);
+      });
+      wrap.appendChild(table);
+      secOs.appendChild(wrap);
+    }
+    body.appendChild(secOs);
+    body.appendChild(node('p', 'ch-updated', 'Consultado às ' + fmtTime(Date.now())));
+  }
+  function renderChamadoItem(c) {
+    const art = node('article', 'ch-item');
+    art.setAttribute('aria-label', 'Chamado ' + (c.protocolo || ''));
+    art.innerHTML = '<div class="ch-item-head"><div class="ch-item-id"><strong></strong><span></span></div><span class="sv-badges"></span></div><p class="ch-dates"></p>';
+    art.querySelector('.ch-item-id strong').textContent = c.protocolo ? 'Protocolo ' + c.protocolo : 'Chamado';
+    art.querySelector('.ch-item-id span').textContent = [c.tipo, c.matricula ? 'Matrícula ' + c.matricula : ''].filter(Boolean).join(' · ');
+    const badges = art.querySelector('.sv-badges');
+    badges.appendChild(node('span', 'sv-badge ' + statusClass(c.status), c.status));
+    if (c.prioridade) badges.appendChild(node('span', 'sv-badge ' + c.prioridade.cls, 'Prioridade ' + c.prioridade.rotulo));
+    art.querySelector('.ch-dates').textContent = [c.abertoEm ? 'Aberto em ' + fmtDateTime(c.abertoEm) : '', c.atualizadoEm ? 'Atualizado em ' + fmtDateTime(c.atualizadoEm) : ''].filter(Boolean).join(' · ');
+    if (c.historico.length) {
+      const ol = node('ol', 'ch-timeline');
+      ol.setAttribute('aria-label', 'Histórico do chamado');
+      c.historico.forEach((h, i) => {
+        const li = node('li', 'ch-tl' + (i === c.historico.length - 1 ? ' current' : ''));
+        li.innerHTML = '<span class="ch-tl-dot" aria-hidden="true"></span><div class="ch-tl-body"><div class="ch-tl-head"><strong></strong><span></span></div></div>';
+        li.querySelector('strong').textContent = h.status;
+        li.querySelector('.ch-tl-head span').textContent = h.em ? fmtDateTime(h.em) : '';
+        if (h.observacao) li.querySelector('.ch-tl-body').appendChild(node('p', null, h.observacao));
+        ol.appendChild(li);
+      });
+      art.appendChild(ol);
+    } else art.appendChild(node('p', 'ch-dates', 'Sem movimentações registradas.'));
+    return art;
+  }
+
   // ---- Modal do WhatsApp ----
   let wa = null; // { key, mat, boletoId, resumo, opener, sending }
   const phoneDigits = v => String(v || '').replace(/\D/g, '').slice(0, 11);
@@ -993,6 +1735,265 @@
     el.chips.querySelectorAll('.chip').forEach(b => { b.disabled = busy; });
   }
 
+  // ---- Autocompletar do campo de pergunta (combobox ARIA) ----
+  // Fontes, nesta ordem: perguntas já feitas pelo usuário (localStorage), catálogo do config e modelos com entidades.
+  const AC_MIN = 3, AC_MAX = 6, AC_DEBOUNCE = 150;
+  const ASKED_KEY = (ctx.storageKey || 'mgf-agente-iam') + ':perguntas:v1';
+  const ASKED_MAX = 100;
+  const STOP = new Set(['a', 'o', 'e', 'as', 'de', 'da', 'do', 'das', 'dos', 'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'por', 'para', 'pra', 'com', 'que', 'qual', 'quais', 'me', 'se', 'ao']);
+  const SRC_LABEL = { recente: 'Recente', catalogo: 'Sugestão', modelo: 'Modelo' };
+  const ac = { open: false, items: [], index: -1, timer: null, dismissed: null, announced: '' };
+
+  // Minúsculas e sem acento, preservando o tamanho do texto (o índice serve para pôr o trecho em negrito)
+  function fold(s) {
+    const str = String(s == null ? '' : s);
+    let out = '';
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (ch === 'ª') { out += 'a'; continue; }
+      if (ch === 'º' || ch === '°') { out += 'o'; continue; }
+      const f = ch.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      out += f.length === 1 ? f : (f.charAt(0) || ' ');
+    }
+    return out;
+  }
+  const CATALOGO = [...new Set([].concat(
+    ...Object.values(ctx.catalogoPerguntas || {}),
+    (ctx.welcomeSuggestions || []).map(s => s.texto),
+    ctx.followUpSuggestions || []
+  ).filter(x => typeof x === 'string' && x.trim()))];
+
+  // Entidades digitadas ou citadas: matrícula, protocolo, bairro e ano
+  const ENTIDADES = {
+    matricula: /\bmatr[ií]cula\s*(?:n[º°o.]*\s*)?(\d{1,10})/i,
+    protocolo: /\bprotocolo\s*(?:n[º°o.]*\s*)?([a-z0-9][\w./-]{2,30})/i,
+    bairro: /\bbairro\s+([a-zà-ú0-9][a-zà-ú0-9' ]{0,40})/i,
+    ano: /\b(20\d{2})\b/
+  };
+  const BAIRRO_CORTE = /\s+(?:com|e|em|por|para|que|nos|no|na|nas|desde|ultimos|últimos|neste|nesse|este|esse|ate|até)\b.*$/i;
+  function extractEntities(text, semBairro) {
+    const out = {};
+    Object.keys(ENTIDADES).forEach(k => {
+      if (k === 'bairro' && semBairro) return;
+      const m = String(text || '').match(ENTIDADES[k]);
+      if (!m) return;
+      let v = m[1].trim();
+      if (k === 'bairro') {
+        if (/^(?:com|e|em|por|para|que|nos|no|na|nas|desde|ultimos|últimos)\b/i.test(v) || /^\d+$/.test(v)) return;
+        v = v.replace(BAIRRO_CORTE, '').replace(/[\s']+$/, '').trim();
+        if (!v) return;
+      }
+      if (k === 'protocolo' && !/\d/.test(v)) return; // "protocolo do chamado" não é um número de protocolo
+      out[k] = v;
+    });
+    return out;
+  }
+
+  function loadAsked() {
+    try {
+      const a = JSON.parse(localStorage.getItem(ASKED_KEY) || 'null');
+      if (Array.isArray(a)) return a.filter(x => x && typeof x.t === 'string' && x.t.trim()).slice(0, ASKED_MAX);
+    } catch (e) { /* armazenamento indisponível */ }
+    // Primeira vez: começa com as perguntas das conversas já salvas
+    const map = new Map();
+    state.conversations.forEach(c => c.messages.forEach(m => {
+      if (m.role !== 'user' || !m.text) return;
+      const t = m.text.trim();
+      const k = fold(t);
+      const ts = m.time || c.updatedAt || 0;
+      const cur = map.get(k);
+      if (cur) { cur.n++; cur.ts = Math.max(cur.ts, ts); } else map.set(k, { t, n: 1, ts });
+    }));
+    return [...map.values()].sort((a, b) => b.ts - a.ts).slice(0, ASKED_MAX);
+  }
+  let asked = loadAsked();
+  function rememberQuestion(raw) {
+    const t = String(raw || '').trim();
+    if (!t || t.length > 300) return;
+    const k = fold(t);
+    const prev = asked.find(x => fold(x.t) === k);
+    asked = [{ t, n: prev ? prev.n + 1 : 1, ts: Date.now() }].concat(asked.filter(x => x !== prev)).slice(0, ASKED_MAX);
+    try { localStorage.setItem(ASKED_KEY, JSON.stringify(asked)); } catch (e) { /* armazenamento indisponível */ }
+  }
+
+  const tokensOf = fq => fq.split(/[^a-z0-9]+/).filter(t => t && (t.length >= 2 || /\d/.test(t)) && !STOP.has(t));
+  // Pontuação: começa com o texto > contém o texto (início de palavra) > contém > contém todas as palavras
+  function matchScore(ft, fq, toks, numeroExato) {
+    if (ft.startsWith(fq)) return 100;
+    const i = ft.indexOf(fq);
+    if (i >= 0 && !(numeroExato && /\d$/.test(fq) && /\d/.test(ft[i + fq.length] || ''))) return /[a-z0-9]/.test(ft[i - 1] || ' ') ? 60 : 80;
+    if (!toks.length) return 0;
+    for (const t of toks) {
+      if (/^\d+$/.test(t) && numeroExato) { if (!new RegExp('(^|\\D)' + t + '(\\D|$)').test(ft)) return 0; }
+      else if (!ft.includes(t)) return 0;
+    }
+    return 40 + toks.length;
+  }
+  function templateSuggestions(text, fq) {
+    const ent = extractEntities(text);
+    const out = [];
+    Object.keys(ent).forEach(k => {
+      const list = (ctx.modelosAutocompletar || []).filter(t => t.entidade === k).map((t, i) => ({
+        text: t.modelo.replace('{valor}', ent[k]), i,
+        hits: (t.chaves || []).filter(c => fq.includes(fold(c))).length
+      }));
+      const comChave = list.filter(x => x.hits > 0);
+      // ano sozinho não define o assunto: só entra quando alguma palavra-chave combina
+      (comChave.length || k === 'ano' ? comChave : list).forEach(x => out.push(x));
+    });
+    return out.sort((a, b) => b.hits - a.hits || a.i - b.i);
+  }
+  function buildSuggestions(text) {
+    const q = String(text || '').trim();
+    const fq = fold(q).replace(/\s+/g, ' ');
+    if (fq.length < AC_MIN || q.includes('\n')) return [];
+    const toks = tokensOf(fq);
+    const out = [];
+    const seen = new Set([fq]);
+    const push = (t, src) => {
+      const k = fold(t).trim();
+      if (seen.has(k) || out.length >= AC_MAX) return;
+      seen.add(k);
+      out.push({ text: t, src });
+    };
+    asked.map((x, i) => ({ t: x.t, s: matchScore(fold(x.t), fq, toks, false), i }))
+      .filter(o => o.s > 0).sort((a, b) => b.s - a.s || a.i - b.i).slice(0, 3)
+      .forEach(o => push(o.t, 'recente'));
+    // No catálogo a matrícula 1234 é só um exemplo: troca pela matrícula digitada
+    const mat = (q.match(ENTIDADES.matricula) || [])[1];
+    CATALOGO.map((t, i) => {
+      const txt = mat ? t.replace(/\b1234\b/g, mat) : t;
+      return { t: txt, s: matchScore(fold(txt), fq, toks, true), i };
+    }).filter(o => o.s > 0).sort((a, b) => b.s - a.s || a.i - b.i)
+      .forEach(o => push(o.t, 'catalogo'));
+    templateSuggestions(q, fq).forEach(o => push(o.text, 'modelo'));
+    return out;
+  }
+  function highlight(text, q) {
+    const t = String(text).normalize('NFC');
+    const ft = fold(t);
+    const fq = fold(String(q).normalize('NFC')).replace(/\s+/g, ' ').trim();
+    const ranges = [];
+    const i = fq ? ft.indexOf(fq) : -1;
+    if (i >= 0) ranges.push([i, i + fq.length]);
+    else tokensOf(fq).forEach(tk => {
+      const m = new RegExp('(^|[^a-z0-9])' + tk).exec(ft);
+      const s = m ? m.index + m[1].length : ft.indexOf(tk);
+      if (s >= 0) ranges.push([s, s + tk.length]);
+    });
+    ranges.sort((a, b) => a[0] - b[0]);
+    let html = '', pos = 0;
+    ranges.forEach(([s, e]) => {
+      s = Math.max(s, pos);
+      if (e <= s) return;
+      html += escapeHtml(t.slice(pos, s)) + '<strong>' + escapeHtml(t.slice(s, e)) + '</strong>';
+      pos = e;
+    });
+    return html + escapeHtml(t.slice(pos));
+  }
+
+  function acAnnounce(msg) {
+    if (ac.announced === msg) return;
+    ac.announced = msg;
+    el.acStatus.textContent = msg;
+  }
+  function acOpen(items, q) {
+    if (!items.length) { acClose(); return; }
+    ac.items = items;
+    el.acList.innerHTML = '';
+    items.forEach((it, i) => {
+      const li = document.createElement('li');
+      li.id = 'ac-opt-' + i;
+      li.className = 'ac-item';
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', 'false');
+      li.innerHTML = '<span class="ac-ico" aria-hidden="true">' + (it.src === 'recente' ? ICON.history : it.src === 'modelo' ? ICON.template : ICON.search) + '</span>' +
+        '<span class="ac-text">' + highlight(it.text, q) + '</span><span class="ac-src">' + SRC_LABEL[it.src] + '</span>';
+      // mousedown sem foco: o campo continua focado (o teclado do celular não fecha)
+      li.addEventListener('mousedown', e => e.preventDefault());
+      li.addEventListener('click', () => acAccept(i));
+      li.addEventListener('mousemove', () => { if (ac.index !== i) acSetIndex(i, false); });
+      el.acList.appendChild(li);
+    });
+    ac.open = true;
+    ac.index = -1;
+    el.acList.classList.remove('hidden');
+    el.input.setAttribute('aria-expanded', 'true');
+    el.input.removeAttribute('aria-activedescendant');
+    acAnnounce(items.length + (items.length === 1 ? ' sugestão disponível' : ' sugestões disponíveis') + '. Use as setas para navegar.');
+  }
+  function acClose() {
+    clearTimeout(ac.timer);
+    if (!ac.open) return;
+    ac.open = false;
+    ac.items = [];
+    ac.index = -1;
+    el.acList.classList.add('hidden');
+    el.acList.innerHTML = '';
+    el.input.setAttribute('aria-expanded', 'false');
+    el.input.removeAttribute('aria-activedescendant');
+    ac.announced = '';
+  }
+  function acSetIndex(i, scroll) {
+    ac.index = i;
+    [...el.acList.children].forEach((li, j) => {
+      li.classList.toggle('active', j === i);
+      li.setAttribute('aria-selected', j === i ? 'true' : 'false');
+    });
+    if (i >= 0) {
+      el.input.setAttribute('aria-activedescendant', 'ac-opt-' + i);
+      if (scroll) el.acList.children[i].scrollIntoView({ block: 'nearest' });
+    } else el.input.removeAttribute('aria-activedescendant');
+  }
+  // As setas passam pelos itens e voltam ao texto digitado (índice -1)
+  function acMove(delta) {
+    const n = ac.items.length;
+    if (!n) return;
+    let i = ac.index + delta;
+    if (i >= n) i = -1;
+    else if (i < -1) i = n - 1;
+    acSetIndex(i, true);
+  }
+  function acAccept(i) {
+    const it = ac.items[i];
+    if (!it) return;
+    el.input.value = it.text;
+    ac.dismissed = it.text; // não reabre a lista para o texto que acabou de ser aceito
+    acClose();
+    autoresize();
+    updateComposer();
+    el.input.focus();
+    const n = el.input.value.length;
+    el.input.setSelectionRange(n, n);
+    acAnnounce('Sugestão aplicada. Pressione Enter para enviar.');
+  }
+  function acSchedule() {
+    clearTimeout(ac.timer);
+    const v = el.input.value;
+    if (ac.dismissed !== null && v === ac.dismissed) return;
+    ac.dismissed = null;
+    if (fold(v.trim()).length < AC_MIN || v.includes('\n')) { acClose(); return; }
+    ac.timer = setTimeout(() => {
+      if (document.activeElement !== el.input) return;
+      acOpen(buildSuggestions(el.input.value), el.input.value.trim());
+    }, AC_DEBOUNCE);
+  }
+  function acKeydown(e) {
+    if (e.isComposing) return false;
+    if (ac.open) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); acMove(e.key === 'ArrowDown' ? 1 : -1); return true; }
+      if (e.key === 'Escape') { e.preventDefault(); ac.dismissed = el.input.value; acClose(); return true; }
+      if ((e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey && ac.index >= 0) { e.preventDefault(); acAccept(ac.index); return true; }
+      if (e.key === 'Tab') acClose();
+      return false;
+    }
+    if (e.key === 'ArrowDown' && !el.input.value.includes('\n') && fold(el.input.value.trim()).length >= AC_MIN) {
+      const items = buildSuggestions(el.input.value);
+      if (items.length) { e.preventDefault(); acOpen(items, el.input.value.trim()); acSetIndex(0, true); return true; }
+    }
+    return false;
+  }
+
   // ---- Ações de conversa ----
   function selectConversation(id) {
     svCache.clear(); // ao (re)abrir uma conversa, os boletos dos cartões de 2ª via são buscados de novo
@@ -1028,9 +2029,11 @@
     sendMessage(el.input.value);
   });
   el.input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!sending) sendMessage(el.input.value); }
+    if (acKeydown(e)) return; // setas, Esc e Enter/Tab sobre uma sugestão selecionada
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); acClose(); if (!sending) sendMessage(el.input.value); }
   });
-  el.input.addEventListener('input', () => { autoresize(); updateComposer(); });
+  el.input.addEventListener('input', () => { autoresize(); updateComposer(); acSchedule(); });
+  el.input.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== el.input) acClose(); }, 120));
   el.newChat.addEventListener('click', startNewChat);
   el.search.addEventListener('input', () => { state.search = el.search.value; renderHistory(); });
   el.sessionId.addEventListener('click', () => { const c = active(); if (c) copyText(c.sessionId); });

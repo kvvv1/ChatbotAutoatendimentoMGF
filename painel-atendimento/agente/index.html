@@ -54,7 +54,13 @@
       <section class="composer-wrap">
         <div class="chips" id="chips"></div>
         <form class="composer" id="composer">
-          <textarea id="input" rows="1" maxlength="1500" placeholder="Pergunte algo ao agente..." aria-label="Mensagem"></textarea>
+          <!-- Autocompletar: lista aberta acima do campo (combobox ARIA) -->
+          <ul class="ac-list hidden" id="ac-list" role="listbox" aria-label="Sugestões de perguntas"></ul>
+          <textarea id="input" rows="1" maxlength="1500" placeholder="Pergunte algo ao agente..." aria-label="Mensagem"
+                    role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="ac-list"
+                    aria-describedby="ac-hint" autocomplete="off"></textarea>
+          <span class="sr-only" id="ac-hint">Digite ao menos 3 letras para ver sugestões. Use as setas para escolher e Enter ou Tab para aceitar.</span>
+          <span class="sr-only" id="ac-status" role="status" aria-live="polite"></span>
           <button type="submit" class="send" id="send" aria-label="Enviar" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
           </button>
