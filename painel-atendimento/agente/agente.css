@@ -400,6 +400,9 @@ textarea.field-input { height: auto; min-height: 96px; padding: 10px 12px; line-
 /* Cartão: acompanhamento */
 .ch-refresh { min-height: 32px; flex: none; }
 .ch-sec { display: grid; gap: 8px; min-width: 0; }
+.ch-status { border-top: 1px dashed var(--line); padding-top: 6px; }
+.ch-status summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--primary); }
+.ch-status-form { display: grid; gap: 8px; margin-top: 8px; }
 .ch-sec-title { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: .04em; }
 .ch-item { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
 .ch-item-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px 10px; flex-wrap: wrap; }

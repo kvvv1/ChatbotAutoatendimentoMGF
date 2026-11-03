@@ -32,8 +32,37 @@
     acList: $('ac-list'), acStatus: $('ac-status')
   };
 
+  // ---- Operador do iframe: ?token=<base64 de {"nome","email","id"}>, como no painel de atendimento ----
+  const OPERADOR_KEY = 'mgf-agente-operador';
+  function lerTokenOperador(rawToken) {
+    if (!rawToken) return null;
+    try {
+      const b64 = rawToken.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4;
+      const bin = atob(pad ? b64 + '='.repeat(4 - pad) : b64);
+      const json = new TextDecoder().decode(Uint8Array.from(bin, ch => ch.charCodeAt(0))); // nomes com acento
+      return limparOperador(JSON.parse(json));
+    } catch (e) { return null; }
+  }
+  function limparOperador(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const nome = typeof raw.nome === 'string' ? raw.nome.trim().slice(0, 120) : '';
+    const email = typeof raw.email === 'string' ? raw.email.trim().slice(0, 120) : '';
+    const id = raw.id != null ? String(raw.id).trim().slice(0, 60) : '';
+    return nome || email || id ? { nome, email, id } : null;
+  }
+  function carregarOperador() {
+    const doToken = lerTokenOperador(params.get('token'));
+    try {
+      if (doToken) { localStorage.setItem(OPERADOR_KEY, JSON.stringify(doToken)); return doToken; }
+      return limparOperador(JSON.parse(localStorage.getItem(OPERADOR_KEY) || 'null'));
+    } catch (e) { return doToken; }
+  }
+  const operador = carregarOperador();
+  if (operador) ctx.usuario = operador.email || operador.id || operador.nome;
+
   // ---- Identidade estável do usuário ----
-  // ctx.usuario vem do iframe (?usuario=) ou do postMessage; sem ele, usa um id anônimo persistente.
+  // ctx.usuario vem do token do iframe, de ?usuario= ou do postMessage; sem ele, usa um id anônimo persistente.
   const USER_KEY = ctx.usuarioStorageKey || 'mgf-agente-usuario';
   let anonUser = null;
   function uuid4() {
@@ -1611,7 +1640,63 @@
       });
       art.appendChild(ol);
     } else art.appendChild(node('p', 'ch-dates', 'Sem movimentações registradas.'));
+    const form = renderMudarStatus(c);
+    if (form) art.appendChild(form);
     return art;
+  }
+
+  // ---- Atendente muda o status do chamado (só com operador identificado pelo token do iframe) ----
+  // Mesmas transições do webhook mgf-chamado-atualizar, que continua sendo quem decide.
+  const TRANSICOES = {
+    'Aberto': ['Em análise', 'Encaminhado ao setor', 'Cancelado'],
+    'Em análise': ['Encaminhado ao setor', 'Concluído', 'Cancelado'],
+    'Encaminhado ao setor': ['Em análise', 'Concluído', 'Cancelado']
+  };
+  function renderMudarStatus(c) {
+    const destinos = TRANSICOES[c.status];
+    if (!operador || !ctx.chamadoAtualizarEndpoint || !c.protocolo || !destinos) return null;
+    const det = node('details', 'ch-status');
+    det.appendChild(node('summary', null, 'Mudar status'));
+    const id = 'st-' + c.protocolo;
+    const form = node('form', 'ch-status-form');
+    form.noValidate = true;
+    form.innerHTML =
+      '<div class="ch-field"><label class="field-label" for="' + id + '-novo">Novo status</label><select class="field-input" id="' + id + '-novo" name="novo"></select></div>' +
+      '<div class="ch-field"><label class="field-label" for="' + id + '-obs">Observação</label><textarea class="field-input" id="' + id + '-obs" name="obs" rows="2" maxlength="500" aria-describedby="' + id + '-err"></textarea></div>' +
+      '<p class="field-error" id="' + id + '-err" role="alert"></p>' +
+      '<div class="ch-actions"><button type="submit" class="btn-primary"><span>Salvar status</span></button></div>';
+    destinos.forEach(s => { const o = node('option', null, s); o.value = s; form.elements.novo.appendChild(o); });
+    const erro = form.querySelector('.field-error');
+    const btn = form.querySelector('button');
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const novo = form.elements.novo.value;
+      const obs = form.elements.obs.value.trim();
+      if ((novo === 'Concluído' || novo === 'Cancelado') && !obs) {
+        erro.textContent = 'Informe a observação para ' + (novo === 'Concluído' ? 'concluir' : 'cancelar') + ' o chamado.';
+        form.elements.obs.focus();
+        return;
+      }
+      erro.textContent = '';
+      btn.disabled = true;
+      const nome = 'serviço de chamados';
+      try {
+        const res = await callService(ctx.chamadoAtualizarEndpoint, {
+          schema: ctx.schema, usuario: operador.nome || currentUser(), protocolo: c.protocolo, status: novo, observacao: obs || null
+        }, 45000, nome);
+        const j = await readJson(res, nome);
+        if (j.ok !== true) throw new Error(j.mensagem || 'A mudança de status não foi confirmada pelo serviço.');
+        toast('Chamado ' + c.protocolo + ': ' + novo, 2600);
+        const card = form.closest('.sv-card');
+        const atualizar = card && card.querySelector('.ch-refresh');
+        if (atualizar) atualizar.click();
+      } catch (err) {
+        erro.textContent = err.message || 'Não foi possível mudar o status. Tente novamente.';
+        btn.disabled = false;
+      }
+    });
+    det.appendChild(form);
+    return det;
   }
 
   // ---- Modal do WhatsApp ----
