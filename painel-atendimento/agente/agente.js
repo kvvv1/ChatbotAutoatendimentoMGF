@@ -32,24 +32,32 @@
     acList: $('ac-list'), acStatus: $('ac-status')
   };
 
-  // ---- Operador do iframe: ?token=<base64 de {"nome","email","id"}>, como no painel de atendimento ----
+  // ---- Operador do iframe: ?token=<payload base64url>.<assinatura>, como o login do painel (src/human/auth.ts) ----
+  // A tela só lê o payload para identificar; quem confere a assinatura é o webhook. Base64 sem assinatura só identifica.
   const OPERADOR_KEY = 'mgf-agente-operador';
   function lerTokenOperador(rawToken) {
     if (!rawToken) return null;
     try {
-      const b64 = rawToken.replace(/-/g, '+').replace(/_/g, '/');
+      const partes = rawToken.split('.');
+      const b64 = partes[0].replace(/-/g, '+').replace(/_/g, '/');
       const pad = b64.length % 4;
       const bin = atob(pad ? b64 + '='.repeat(4 - pad) : b64);
       const json = new TextDecoder().decode(Uint8Array.from(bin, ch => ch.charCodeAt(0))); // nomes com acento
-      return limparOperador(JSON.parse(json));
+      const op = limparOperador(JSON.parse(json));
+      if (op && partes.length === 2 && partes[1]) op.token = rawToken;
+      return op;
     } catch (e) { return null; }
   }
   function limparOperador(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const nome = typeof raw.nome === 'string' ? raw.nome.trim().slice(0, 120) : '';
     const email = typeof raw.email === 'string' ? raw.email.trim().slice(0, 120) : '';
-    const id = raw.id != null ? String(raw.id).trim().slice(0, 60) : '';
-    return nome || email || id ? { nome, email, id } : null;
+    const bruto = raw.id != null ? raw.id : raw.sub;
+    const id = bruto != null ? String(bruto).trim().slice(0, 60) : '';
+    if (!nome && !email && !id) return null;
+    const exp = Number(raw.exp) || 0;
+    if (exp && exp * 1000 < Date.now()) return null; // sessão vencida não identifica mais
+    return { nome, email, id, exp, token: typeof raw.token === 'string' ? raw.token : '' };
   }
   function carregarOperador() {
     const doToken = lerTokenOperador(params.get('token'));
@@ -1476,7 +1484,7 @@
     const nome = 'serviço de chamados';
     const p = callService(ctx.chamadoAbrirEndpoint, {
       schema: ctx.schema, usuario: currentUser(), matricula: Number(d.matricula), tipo: d.tipo,
-      descricao: d.descricao.trim(), contato: d.contato.trim() || null
+      descricao: d.descricao.trim(), contato: d.contato.trim() || null, tokenOperador: operador && operador.token ? operador.token : undefined
     }, 45000, nome).then(res => readJson(res, nome)).then(j => {
       if (j.ok !== true || j.protocolo == null || j.protocolo === '') throw new Error(j.mensagem || 'O registro do chamado não foi confirmado pelo serviço. Tente novamente.');
       return j;
@@ -1645,7 +1653,7 @@
     return art;
   }
 
-  // ---- Atendente muda o status do chamado (só com operador identificado pelo token do iframe) ----
+  // ---- Atendente muda o status do chamado (só com token assinado; o webhook confere a assinatura) ----
   // Mesmas transições do webhook mgf-chamado-atualizar, que continua sendo quem decide.
   const TRANSICOES = {
     'Aberto': ['Em análise', 'Encaminhado ao setor', 'Cancelado'],
@@ -1654,7 +1662,7 @@
   };
   function renderMudarStatus(c) {
     const destinos = TRANSICOES[c.status];
-    if (!operador || !ctx.chamadoAtualizarEndpoint || !c.protocolo || !destinos) return null;
+    if (!operador || !operador.token || !ctx.chamadoAtualizarEndpoint || !c.protocolo || !destinos) return null;
     const det = node('details', 'ch-status');
     det.appendChild(node('summary', null, 'Mudar status'));
     const id = 'st-' + c.protocolo;
@@ -1682,7 +1690,7 @@
       const nome = 'serviço de chamados';
       try {
         const res = await callService(ctx.chamadoAtualizarEndpoint, {
-          schema: ctx.schema, usuario: operador.nome || currentUser(), protocolo: c.protocolo, status: novo, observacao: obs || null
+          schema: ctx.schema, usuario: currentUser(), tokenOperador: operador.token, protocolo: c.protocolo, status: novo, observacao: obs || null
         }, 45000, nome);
         const j = await readJson(res, nome);
         if (j.ok !== true) throw new Error(j.mensagem || 'A mudança de status não foi confirmada pelo serviço.');
