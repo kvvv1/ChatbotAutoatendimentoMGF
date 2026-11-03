@@ -482,10 +482,11 @@ textarea.field-input { height: auto; min-height: 96px; padding: 10px 12px; line-
 /* Composer */
 .composer-wrap { padding: 8px 20px 14px; }
 .composer-wrap > * { max-width: var(--content); margin-left: auto; margin-right: auto; }
-.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, .3) transparent; }
 /* indica que há mais sugestões rolando para o lado */
 .chips:has(.chip-group) { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-right: 24px; }
-.chips::-webkit-scrollbar { display: none; }
+.chips::-webkit-scrollbar { height: 8px; }
+.chips::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .3); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
 .chip {
   flex: none; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line);
   background: var(--surface); color: var(--text-soft); font-size: 12.5px; transition: all .15s;

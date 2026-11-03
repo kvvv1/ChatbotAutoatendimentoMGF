@@ -429,6 +429,12 @@
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
     return a.slice(0, n);
   }
+  // Roda do mouse sobre as sugestões rola para o lado
+  el.chips.addEventListener('wheel', e => {
+    if (el.chips.scrollWidth <= el.chips.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    el.chips.scrollLeft += e.deltaY;
+  }, { passive: false });
   function renderChips() {
     const c = active();
     el.chips.innerHTML = '';
