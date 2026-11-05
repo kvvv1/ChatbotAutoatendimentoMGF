@@ -62,13 +62,26 @@ test('7lagoas habilita finalizar sessão e a orientação LGPD/SAC 115', async (
 });
 
 test('outras cidades mantêm o menu e a opção 6 não encerra sessão', async () => {
-  for (const municipio of ['formiga', 'oliveira', undefined]) {
+  for (const municipio of ['oliveira', undefined]) {
     const store = await storeWith(authenticated);
     const replies = await processMessage({ ...config, municipio }, phone, '6', store);
     assert.equal((await store.getByPhone(phone))?.state.name, 'main_menu');
     const list = replies.find(reply => typeof reply !== 'string' && reply.type === 'list') as any;
-    assert.ok(list.sections.every((section: any) => section.rows.every((row: any) => row.id !== '6')));
+    assert.ok(list.sections.every((section: any) => section.rows.every((row: any) => row.id !== '6' && row.id !== '7')));
   }
+});
+
+test('formiga exibe opções 6 e 7 de requerimentos sem encerrar sessão', async () => {
+  const store = await storeWith(authenticated);
+  const formiga = { ...config, municipio: 'formiga' };
+  const six = await processMessage(formiga, phone, '6', store);
+  assert.equal((await store.getByPhone(phone))?.state.name, 'main_menu');
+  assert.ok(six.some(reply => typeof reply === 'string' && reply.includes('Sem requerimentos disponíveis para solicitar')));
+  const list = six.find(reply => typeof reply !== 'string' && reply.type === 'list') as any;
+  const ids = list.sections.flatMap((section: any) => section.rows.map((row: any) => row.id));
+  assert.ok(ids.includes('6') && ids.includes('7'));
+  const seven = await processMessage(formiga, phone, '7', store);
+  assert.ok(seven.some(reply => typeof reply === 'string' && reply.includes('Nenhum requerimento foi solicitado')));
 });
 
 function verification(challenge: IdentityChallengeState, attemptsLeft = 3): ConversationState {

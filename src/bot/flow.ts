@@ -297,12 +297,23 @@ const MENU_ITEMS: { id: string; title: string; description?: string }[] = [
   { id: '0', title: '0️⃣ Falar com atendente' }
 ];
 
+// Opções de requerimento — habilitadas somente para Formiga
+function requerimentosEnabled(config: Pick<AppConfig, 'municipio'>): boolean {
+  return (config.municipio || '').trim().toLowerCase() === 'formiga';
+}
+const REQUERIMENTO_ITEMS = [
+  { id: '6', title: '6️⃣ Solicitar requerimento' },
+  { id: '7', title: '7️⃣ Verificar situação dos requerimentos' }
+];
+
 function menuSections(config: AppConfig): { title: string; rows: { id: string; title: string; description?: string }[] }[] {
   const otherItems = isSeteLagoas(config)
     ? [{ id: '6', title: '6️⃣ Finalizar sessão' }, ...MENU_ITEMS.slice(5)]
     : MENU_ITEMS.slice(5);
+  const autoatendimento = MENU_ITEMS.slice(0, 5);
+  if (requerimentosEnabled(config)) autoatendimento.push(...REQUERIMENTO_ITEMS);
   return [
-    { title: 'Autoatendimento', rows: MENU_ITEMS.slice(0, 5) },
+    { title: 'Autoatendimento', rows: autoatendimento },
     { title: 'Outros serviços', rows: otherItems }
   ];
 }
@@ -1123,6 +1134,26 @@ export async function processMessage(
                 showMenuAfter = true;
               }
               break;
+            case '6': {
+              // 6️⃣ Solicitar requerimento (somente Formiga; em Sete Lagoas o 6 é tratado antes como "Finalizar sessão")
+              if (!requerimentosEnabled(config)) {
+                replies.push(menuInteractive(config));
+                break;
+              }
+              replies.push('📄 *Requerimentos disponíveis para solicitar:*\n\nSem requerimentos disponíveis para solicitar, ir a local de atendimento físico.');
+              showMenuAfter = true;
+              break;
+            }
+            case '7': {
+              // 7️⃣ Verificar situação dos requerimentos (somente Formiga)
+              if (!requerimentosEnabled(config)) {
+                replies.push(menuInteractive(config));
+                break;
+              }
+              replies.push('📋 *Situação dos requerimentos*\n\nNenhum requerimento foi solicitado por você via chatbot.');
+              showMenuAfter = true;
+              break;
+            }
             case '0': {
               // 0️⃣ Falar com atendente — só disponível via menu (usuário já autenticado neste estado)
               if (!isWithinBusinessHours(config)) {
