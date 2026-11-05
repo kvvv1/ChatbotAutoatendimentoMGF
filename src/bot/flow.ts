@@ -283,9 +283,17 @@ const MENU_ITEMS: { id: string; title: string; description?: string }[] = [
   { id: '0', title: '0️⃣ Falar com atendente' }
 ];
 
+// Opção "Solicitar requerimento" — habilitada somente para Formiga
+function requerimentosEnabled(): boolean {
+  return (process.env.MUNICIPIO || '').trim().toLowerCase() === 'formiga';
+}
+const REQUERIMENTO_ITEM = { id: '6', title: '6️⃣ Solicitar requerimento' };
+
 function menuSections(): { title: string; rows: { id: string; title: string; description?: string }[] }[] {
+  const autoatendimento = MENU_ITEMS.slice(0, 5);
+  if (requerimentosEnabled()) autoatendimento.push(REQUERIMENTO_ITEM);
   return [
-    { title: 'Autoatendimento', rows: MENU_ITEMS.slice(0, 5) },
+    { title: 'Autoatendimento', rows: autoatendimento },
     { title: 'Outros serviços', rows: MENU_ITEMS.slice(5) }
   ];
 }
@@ -1051,6 +1059,35 @@ export async function processMessage(
                 replies.push('Não foi possível carregar a localização de atendimento presencial no momento.');
                 showMenuAfter = true;
               }
+              break;
+            case '6':
+            case 'req_solicitar': {
+              // 6️⃣ Solicitar requerimento (somente Formiga)
+              if (!requerimentosEnabled()) {
+                replies.push(menuInteractive());
+                break;
+              }
+              replies.push({
+                type: 'buttons',
+                text: '📄 *Requerimentos disponíveis para solicitar:*\n\nSem requerimentos disponíveis para solicitar, ir a local de atendimento físico.',
+                buttons: [
+                  { id: 'req_situacao', text: 'Verificar situação' },
+                  { id: 'req_voltar', text: 'Voltar ao menu' }
+                ]
+              });
+              break;
+            }
+            case 'req_situacao': {
+              if (!requerimentosEnabled()) {
+                replies.push(menuInteractive());
+                break;
+              }
+              replies.push('📋 *Situação dos requerimentos*\n\nNenhum requerimento foi solicitado por você via chatbot.');
+              showMenuAfter = true;
+              break;
+            }
+            case 'req_voltar':
+              showMenuAfter = true;
               break;
             case '0': {
               // 0️⃣ Falar com atendente — só disponível via menu (usuário já autenticado neste estado)
