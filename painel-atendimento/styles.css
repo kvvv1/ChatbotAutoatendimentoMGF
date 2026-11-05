@@ -60,6 +60,42 @@ body {
   padding: 18px;
   background: var(--header);
   border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-header .sidebar-tabs {
+  flex: 1;
+  min-width: 0;
+}
+
+.notifications-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--accent-dark);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.notifications-toggle:hover {
+  background: rgba(17, 27, 33, 0.08);
+}
+
+.notifications-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.notifications-toggle.is-off {
+  color: var(--text-soft);
 }
 
 .sidebar-header h1 {

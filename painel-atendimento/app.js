@@ -760,6 +760,11 @@ async function loadTickets(options = {}) {
 
       ticketsCache = Array.isArray(json.data) ? json.data : [];
       consecutiveLoadErrors = 0;
+      try {
+        window.PanelNotifications?.onTickets(ticketsCache, qs, (id) => selectTicket(id));
+      } catch (err) {
+        console.error(err);
+      }
 
       if (!ticketsCache.length && !enhancedConversationSearch) {
         ticketsListEl.innerHTML = '<div class="chat-empty">Nenhuma conversa encontrada para este filtro.</div>';
