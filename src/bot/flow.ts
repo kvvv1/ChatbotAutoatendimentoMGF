@@ -287,11 +287,14 @@ const MENU_ITEMS: { id: string; title: string; description?: string }[] = [
 function requerimentosEnabled(): boolean {
   return (process.env.MUNICIPIO || '').trim().toLowerCase() === 'formiga';
 }
-const REQUERIMENTO_ITEM = { id: '6', title: '6️⃣ Solicitar requerimento' };
+const REQUERIMENTO_ITEMS = [
+  { id: '6', title: '6️⃣ Solicitar requerimento' },
+  { id: '7', title: '7️⃣ Verificar situação dos requerimentos' }
+];
 
 function menuSections(): { title: string; rows: { id: string; title: string; description?: string }[] }[] {
   const autoatendimento = MENU_ITEMS.slice(0, 5);
-  if (requerimentosEnabled()) autoatendimento.push(REQUERIMENTO_ITEM);
+  if (requerimentosEnabled()) autoatendimento.push(...REQUERIMENTO_ITEMS);
   return [
     { title: 'Autoatendimento', rows: autoatendimento },
     { title: 'Outros serviços', rows: MENU_ITEMS.slice(5) }
@@ -1067,17 +1070,13 @@ export async function processMessage(
                 replies.push(menuInteractive());
                 break;
               }
-              replies.push({
-                type: 'buttons',
-                text: '📄 *Requerimentos disponíveis para solicitar:*\n\nSem requerimentos disponíveis para solicitar, ir a local de atendimento físico.',
-                buttons: [
-                  { id: 'req_situacao', text: 'Verificar situação' },
-                  { id: 'req_voltar', text: 'Voltar ao menu' }
-                ]
-              });
+              replies.push('📄 *Requerimentos disponíveis para solicitar:*\n\nSem requerimentos disponíveis para solicitar, ir a local de atendimento físico.');
+              showMenuAfter = true;
               break;
             }
+            case '7':
             case 'req_situacao': {
+              // 7️⃣ Verificar situação dos requerimentos (somente Formiga)
               if (!requerimentosEnabled()) {
                 replies.push(menuInteractive());
                 break;
